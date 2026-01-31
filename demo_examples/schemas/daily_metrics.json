@@ -1,0 +1,65 @@
+{
+  "name": "daily_metrics",
+  "description": "Daily health and wellness tracking",
+  "columns": [
+    {
+      "name": "date",
+      "type": "date",
+      "required": true,
+      "format": "YYYY-MM-DD"
+    },
+    {
+      "name": "sleep_hours",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "sleep_quality",
+      "type": "integer",
+      "required": false,
+      "min": 1,
+      "max": 10,
+      "description": "Sleep quality rating 1-10"
+    },
+    {
+      "name": "energy",
+      "type": "integer",
+      "required": false,
+      "min": 1,
+      "max": 10,
+      "description": "Energy level rating 1-10"
+    },
+    {
+      "name": "mood",
+      "type": "integer",
+      "required": false,
+      "min": 1,
+      "max": 10,
+      "description": "Mood rating 1-10"
+    },
+    {
+      "name": "stress",
+      "type": "integer",
+      "required": false,
+      "min": 1,
+      "max": 10,
+      "description": "Stress level rating 1-10"
+    },
+    {
+      "name": "weight_kg",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "notes",
+      "type": "string",
+      "required": false
+    },
+    {
+      "name": "source_file",
+      "type": "string",
+      "required": false,
+      "description": "Path to the markdown file this was extracted from"
+    }
+  ]
+}

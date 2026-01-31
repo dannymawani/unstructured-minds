@@ -132,7 +132,28 @@ git checkout -b um/feature/phase0-init
 
 ---
 
-### Step 0.2: Backend Project Structure
+### Step 0.2: Schema Validation
+
+| Task | Test | Acceptance Criteria |
+|------|------|---------------------|
+| Compare schemas with obsidian reference repo | `test_schema_alignment.py` | No conflicts |
+| Update demo_examples schemas to match decisions | N/A | Schemas use descriptive names |
+| Create activities.json schema | N/A | Activities table defined |
+| Validate ID generation patterns | N/A | Composite key format documented |
+
+**Branch:** `um/feature/phase0-schema-validation`
+
+**Reference repo:** `/Users/dmh/Code/obsedian`
+
+**Key validations:**
+- Column names use descriptive format (`set_number`, `duration_minutes`)
+- `activities` table exists separately from `exercise_log`
+- Flat CSV storage (single file per type, not date-partitioned)
+- Composite ID format: `{activity_id}_{exercise}_{set_number}`
+
+---
+
+### Step 0.3: Backend Project Structure
 
 | Task | Test | Acceptance Criteria |
 |------|------|---------------------|
@@ -157,59 +178,7 @@ def test_required_modules_exist():
 
 ---
 
-### Step 0.3: Docker Compose Setup
-
-| Task | Test | Acceptance Criteria |
-|------|------|---------------------|
-| Create Dockerfile | `docker build .` succeeds | Image builds |
-| Create docker-compose.yml | `docker-compose config` valid | Config validates |
-| Test volume mounts | Write test file | File accessible on host |
-| Add .env.example | N/A | All vars documented |
-
-**Branch:** `um/feature/phase0-docker`
-
-**Tests:**
-```bash
-# Manual test script: scripts/test_docker.sh
-docker-compose up -d
-curl http://localhost:8000/health
-docker-compose down
-```
-
----
-
-### Step 0.4: FastAPI Backend
-
-| Task | Test | Acceptance Criteria |
-|------|------|---------------------|
-| Create FastAPI app | `test_health_endpoint` | GET /health returns 200 |
-| Add CORS middleware | N/A | Frontend can connect |
-| Create config module | `test_config_loads` | Config from env vars |
-| Add logging | N/A | Structured logs output |
-
-**Branch:** `um/feature/phase0-fastapi`
-
-**Tests:**
-```python
-# backend/tests/test_api.py
-from fastapi.testclient import TestClient
-from src.main import app
-
-client = TestClient(app)
-
-def test_health_endpoint():
-    response = client.get("/health")
-    assert response.status_code == 200
-    assert response.json()["status"] == "ok"
-
-def test_config_loads():
-    from src.config import settings
-    assert settings.vault_path is not None
-```
-
----
-
-### Step 0.5: Storage Abstraction Layer
+### Step 0.4: Storage Abstraction Layer
 
 | Task | Test | Acceptance Criteria |
 |------|------|---------------------|
@@ -248,7 +217,60 @@ async def test_delete(storage):
 
 ---
 
-### Step 0.6: DuckDB Setup
+### Step 0.5: Docker Compose Setup
+
+| Task | Test | Acceptance Criteria |
+|------|------|---------------------|
+| Create Dockerfile | `docker build .` succeeds | Image builds |
+| Create docker-compose.yml | `docker-compose config` valid | Config validates |
+| Test volume mounts | Write test file | File accessible on host |
+| Add .env.example | N/A | All vars documented |
+
+**Branch:** `um/feature/phase0-docker`
+
+**Tests:**
+```bash
+# Manual test script: scripts/test_docker.sh
+docker-compose up -d
+curl http://localhost:8000/health
+docker-compose down
+```
+
+---
+
+### Step 0.6: FastAPI Backend
+
+| Task | Test | Acceptance Criteria |
+|------|------|---------------------|
+| Create FastAPI app | `test_health_endpoint` | GET /health returns 200 |
+| Add CORS middleware | N/A | Frontend can connect |
+| Create config module | `test_config_loads` | Config from env vars |
+| Add logging | N/A | Structured logs output |
+| Integrate StorageBackend | `test_storage_injection` | API uses storage layer |
+
+**Branch:** `um/feature/phase0-fastapi`
+
+**Tests:**
+```python
+# backend/tests/test_api.py
+from fastapi.testclient import TestClient
+from src.main import app
+
+client = TestClient(app)
+
+def test_health_endpoint():
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+
+def test_config_loads():
+    from src.config import settings
+    assert settings.vault_path is not None
+```
+
+---
+
+### Step 0.7: DuckDB Setup
 
 | Task | Test | Acceptance Criteria |
 |------|------|---------------------|
@@ -318,7 +340,7 @@ def mock_anthropic():
 
 def test_client_init(mock_anthropic):
     client = ClaudeClient()
-    assert client.model == "claude-sonnet-4-20250514"
+    assert client.model_fast == "claude-3-5-haiku-20241022"
 
 async def test_extraction_returns_json(mock_anthropic):
     mock_response = AsyncMock()
@@ -336,15 +358,17 @@ async def test_extraction_returns_json(mock_anthropic):
 ### Phase 0 Completion Checklist
 
 - [ ] `um/feature/phase0-init` merged
+- [ ] `um/feature/phase0-schema-validation` merged
 - [ ] `um/feature/phase0-backend-structure` merged
+- [ ] `um/feature/phase0-storage` merged
 - [ ] `um/feature/phase0-docker` merged
 - [ ] `um/feature/phase0-fastapi` merged
-- [ ] `um/feature/phase0-storage` merged
 - [ ] `um/feature/phase0-duckdb` merged
 - [ ] `um/feature/phase0-claude` merged
 - [ ] All tests passing
 - [ ] Docker Compose runs successfully
 - [ ] API accessible at localhost:8000
+- [ ] Schemas validated against obsidian reference
 
 **Release:** Tag `v0.1.0-alpha` on `um/main`
 
@@ -379,11 +403,11 @@ test('shadcn button renders', () => {
 
 ---
 
-### Step 1.2: TipTap Editor
+### Step 1.2: Milkdown Editor
 
 | Task | Test | Acceptance Criteria |
 |------|------|---------------------|
-| Install TipTap packages | N/A | Packages installed |
+| Install Milkdown packages | N/A | Packages installed |
 | Create MarkdownEditor component | `test_editor_renders` | Editor displays |
 | Add markdown export | `test_markdown_export` | Returns valid MD |
 | Add auto-save | `test_auto_save` | Debounced save works |
@@ -393,14 +417,14 @@ test('shadcn button renders', () => {
 **Tests:**
 ```typescript
 // frontend/src/components/Editor/__tests__/MarkdownEditor.test.tsx
-import { render, fireEvent, waitFor } from '@testing-library/react';
+import { render, waitFor } from '@testing-library/react';
 import { MarkdownEditor } from '../MarkdownEditor';
 
 test('editor renders with initial content', () => {
   const { container } = render(
     <MarkdownEditor content="# Hello" onChange={() => {}} />
   );
-  expect(container.querySelector('.ProseMirror')).toBeInTheDocument();
+  expect(container.querySelector('.milkdown')).toBeInTheDocument();
 });
 
 test('editor exports markdown', async () => {
@@ -600,56 +624,101 @@ async def test_daily_skill_creates_note(client, mock_claude):
 
 ---
 
-## Phase 3: Distribution
+## Phase 3: Deployment (Docker)
 
-**Goal:** Packaged Electron app ready for use
+**Goal:** Containerized web app ready for deployment
 
-### Step 3.1: Electron Integration
+### Step 3.1: Docker Configuration
 
 | Task | Test | Acceptance Criteria |
 |------|------|---------------------|
-| Add Electron to project | `npm run electron:dev` | App opens |
-| Main process setup | N/A | Window creates |
-| Preload scripts | N/A | IPC works |
-| Python sidecar start | `test_sidecar_starts` | Backend runs |
+| Create backend Dockerfile | `docker build backend/` | Image builds |
+| Create frontend Dockerfile | `docker build frontend/` | Image builds |
+| Create docker-compose.yml | `docker-compose up` | Services start |
+| Configure volume mounts | Test file persistence | Data persists |
 
-**Branch:** `um/feature/phase3-electron`
+**Branch:** `um/feature/phase3-docker`
+
+**Dockerfiles:**
+```dockerfile
+# backend/Dockerfile
+FROM python:3.12-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# frontend/Dockerfile
+FROM node:22-alpine AS build
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+FROM nginx:alpine
+COPY --from=build /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+```
 
 ---
 
-### Step 3.2: Build & Package
+### Step 3.2: Docker Compose Setup
 
 | Task | Test | Acceptance Criteria |
 |------|------|---------------------|
-| electron-builder config | N/A | Config valid |
-| macOS .dmg build | Manual test | DMG installs |
-| Windows installer | Manual test | Installer works |
-| Linux AppImage | Manual test | AppImage runs |
+| Define services | `docker-compose config` | Valid config |
+| Configure networking | Frontend reaches backend | API calls work |
+| Set up health checks | Services report healthy | Health OK |
+| Add .env.example | N/A | All vars documented |
 
-**Branch:** `um/feature/phase3-packaging`
+**Branch:** `um/feature/phase3-compose`
+
+**docker-compose.yml:**
+```yaml
+services:
+  frontend:
+    build: ./frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ${VAULT_PATH:-./vault}:/app/vault
+      - ${DATA_PATH:-./data}:/app/data
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+```
 
 ---
 
-### Step 3.3: Python Bundling
+### Step 3.3: Production Readiness
 
 | Task | Test | Acceptance Criteria |
 |------|------|---------------------|
-| PyInstaller config | Build succeeds | Binary created |
-| Include dependencies | App runs | No missing modules |
-| Cross-platform builds | Test on each OS | All work |
+| Add nginx config | Static files served | Frontend loads |
+| Configure CORS | Cross-origin works | No CORS errors |
+| Add rate limiting | N/A | API protected |
+| Create .dockerignore | Build clean | No junk in image |
 
-**Branch:** `um/feature/phase3-python-bundle`
+**Branch:** `um/feature/phase3-production`
 
 ---
 
 ### Phase 3 Completion Checklist
 
-- [ ] Electron app runs in dev
-- [ ] macOS DMG builds and installs
-- [ ] Windows installer works
-- [ ] Linux AppImage runs
-- [ ] Python backend bundled
-- [ ] All features work in packaged app
+- [ ] `docker-compose up` starts all services
+- [ ] Frontend accessible at http://localhost
+- [ ] Backend API at http://localhost:8000
+- [ ] Data persists across restarts
+- [ ] All features work in containers
+- [ ] README documents deployment steps
 
 **Release:** Tag `v1.0.0` on `um/main`
 
@@ -676,7 +745,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.14'
+          python-version: '3.12'
       - run: |
           cd backend
           pip install -e ".[dev]"
