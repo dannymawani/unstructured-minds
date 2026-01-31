@@ -55,16 +55,15 @@ unstructured-minds/
 │   ├── Dockerfile             # Production image
 │   ├── pyproject.toml
 │   └── README.md
-├── frontend/                   # React/Vite/Electron
+├── frontend/                   # React/Vite (Docker)
 │   ├── src/
 │   │   ├── components/
 │   │   ├── hooks/
 │   │   ├── stores/
 │   │   └── App.tsx
-│   ├── electron/              # Electron main process
-│   │   ├── main.js
-│   │   └── preload.js
+│   ├── Dockerfile             # Production image (nginx)
 │   ├── Dockerfile.dev         # Dev container
+│   ├── nginx.conf             # nginx config for SPA
 │   ├── package.json
 │   └── vite.config.ts
 ├── skills/                     # Skill definitions
@@ -492,80 +491,85 @@ interface Settings {
 
 ---
 
-## Phase 3: Distribution (Week 6+)
+## Phase 3: Production Deployment (Week 6+)
 
-**Goal:** Packaged app ready for use
+**Goal:** Containerized web app ready for deployment
 
-### 3.1 Tauri Integration
+### 3.1 Production Docker Configuration
 
-```bash
-# Add Tauri to existing frontend
-cd frontend
-npm install @tauri-apps/cli @tauri-apps/api
-npx tauri init
+```dockerfile
+# frontend/Dockerfile
+FROM node:22-alpine AS build
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+FROM nginx:alpine
+COPY --from=build /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
 ```
 
-```toml
-# src-tauri/tauri.conf.json
-{
-  "productName": "Unstructured Minds",
-  "version": "0.1.0",
-  "identifier": "com.unstructuredminds.app",
-  "build": {
-    "beforeBuildCommand": "npm run build",
-    "beforeDevCommand": "npm run dev",
-    "devPath": "http://localhost:5173",
-    "distDir": "../dist"
-  },
-  "bundle": {
-    "active": true,
-    "icon": ["icons/icon.icns"],
-    "targets": ["dmg", "app"]
-  }
+```nginx
+# frontend/nginx.conf
+server {
+    listen 80;
+    server_name localhost;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /api {
+        proxy_pass http://backend:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
 }
 ```
 
-### 3.2 Python Sidecar
+### 3.2 Production Docker Compose
 
-```rust
-// src-tauri/src/main.rs
+```yaml
+# docker-compose.prod.yml
+services:
+  frontend:
+    build: ./frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
 
-use tauri::Manager;
-use std::process::{Command, Child};
-
-struct PythonServer(Child);
-
-fn main() {
-    tauri::Builder::default()
-        .setup(|app| {
-            // Start Python server as sidecar
-            let python_server = Command::new("python")
-                .args(["-m", "uvicorn", "src.main:app", "--port", "8765"])
-                .current_dir(app.path_resolver().resource_dir().unwrap().join("backend"))
-                .spawn()
-                .expect("Failed to start Python server");
-
-            app.manage(PythonServer(python_server));
-            Ok(())
-        })
-        .on_window_event(|event| {
-            if let tauri::WindowEvent::CloseRequested { .. } = event.event() {
-                // Cleanup Python server
-            }
-        })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
-}
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ${VAULT_PATH:-./vault}:/app/vault
+      - ${DATA_PATH:-./data}:/app/data
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 ```
 
 ### Deliverables - Phase 3
 
-- [ ] Tauri app building successfully
-- [ ] Python bundled with app
-- [ ] macOS .dmg installer
-- [ ] Auto-update mechanism
+- [ ] Production Docker images building
+- [ ] docker-compose.prod.yml working
+- [ ] Health checks configured
+- [ ] Data persists across restarts
 - [ ] User documentation
-- [ ] Installation guide
+- [ ] Deployment guide
 
 ---
 
@@ -703,9 +707,8 @@ docker-compose build --no-cache
 # Stop and remove containers
 docker-compose down
 
-# Build Electron app (native, not containerized)
-cd frontend
-npm run electron:build
+# Build production images
+docker-compose -f docker-compose.prod.yml build
 ```
 
 ---
@@ -745,11 +748,11 @@ K8s manifests will be added to `k8s/` directory when approaching production.
 
 | Risk | Mitigation |
 |------|------------|
-| Claude API costs | Caching, batching, model selection |
+| Claude API costs | Caching, batching, model selection (Haiku for extraction) |
 | Editor complexity | Start with Milkdown defaults, customize later |
 | DuckDB size | Periodic cleanup, archiving old data |
-| Tauri issues | Can fall back to Electron |
-| Python packaging | PyInstaller or embedded Python |
+| Docker complexity | Use docker-compose for simplicity |
+| Volume permissions | Document user mapping, provide helper scripts |
 
 ---
 

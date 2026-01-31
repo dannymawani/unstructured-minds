@@ -125,8 +125,8 @@ def sample_note_content():
 
 async def test_extract_exercises(sample_note_content):
     result = await extract_exercises(sample_note_content, date(2026, 1, 15))
-    assert len(result) == 1
-    assert result[0].exercise_name == "Squat"
+    assert len(result) >= 1
+    assert result[0].exercise_name == "squat"
     assert result[0].weight_kg == 100
 ```
 
@@ -147,11 +147,11 @@ def get_db_connection(path: str):
 def insert_exercises(conn: duckdb.DuckDBPyConnection, exercises: list[dict]):
     conn.executemany(
         """
-        INSERT INTO exercise_log (activity_id, date, activity_type, exercise_name, sets, reps, weight_kg)
+        INSERT INTO exercise_log (id, activity_id, date, exercise_name, weight_kg, reps, set_number)
         VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
-        [(e["activity_id"], e["date"], e["activity_type"],
-          e["exercise_name"], e["sets"], e["reps"], e["weight_kg"])
+        [(e["id"], e["activity_id"], e["date"],
+          e["exercise_name"], e["weight_kg"], e["reps"], e["set_number"])
          for e in exercises]
     )
 ```

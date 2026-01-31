@@ -7,7 +7,7 @@
 │                      Docker Compose                              │
 ├─────────────────────────────────┬───────────────────────────────┤
 │         Frontend Container      │      Backend Container        │
-│         (nginx:alpine)          │      (python:3.12-slim)       │
+│         (nginx:alpine)          │      (python:3.14-slim)       │
 │  ┌───────────────────────────┐  │  ┌─────────────────────────┐  │
 │  │    React SPA (Milkdown)   │  │  │   FastAPI Application   │  │
 │  │  ┌───────┐ ┌───────────┐  │  │  │  ┌──────┐ ┌──────────┐ │  │

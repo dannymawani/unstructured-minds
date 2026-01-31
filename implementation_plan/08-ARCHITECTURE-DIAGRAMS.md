@@ -11,7 +11,7 @@
 | | Tailwind CSS | 4.x | Styling |
 | | Zustand | 5.x | State management |
 | | Recharts | 2.x | Charts/dashboards |
-| **Deployment** | Docker | - | nginx:alpine + python:3.12-slim |
+| **Deployment** | Docker | - | nginx:alpine + python:3.14-slim |
 | **Backend** | Python | 3.12 | |
 | | FastAPI | 0.115.x | |
 | | DuckDB | 1.4 | Embedded analytics |
@@ -30,7 +30,7 @@
 ┃                                                                               ┃
 ┃ ┌───────────────────────────────────┐  ┌───────────────────────────────────┐ ┃
 ┃ │      FRONTEND CONTAINER           │  │      BACKEND CONTAINER            │ ┃
-┃ │      (nginx:alpine)               │  │      (python:3.12-slim)           │ ┃
+┃ │      (nginx:alpine)               │  │      (python:3.14-slim)           │ ┃
 ┃ │                                   │  │                                   │ ┃
 ┃ │  ┌─────────────────────────────┐  │  │  ┌─────────────────────────────┐  │ ┃
 ┃ │  │    REACT SPA (Milkdown)     │  │  │  │   FastAPI Application      │  │ ┃
@@ -252,7 +252,7 @@ This flowchart shows what happens when a user creates a daily note and logs acti
 │   Claude returns structured JSON:                                            │
 │   {                                                                          │
 │     "exercise_log": [                                                        │
-│       {"exercise": "squat", "weight_kg": 100, "reps": 5, "set_number": 1}   │
+│       {"exercise_name": "squat", "weight_kg": 100, "reps": 5, "set_number": 1}│
 │     ],                                                                       │
 │     "food_log": [                                                            │
 │       {"meal_type": "breakfast", "description": "oatmeal with blueberries"} │
@@ -331,8 +331,8 @@ This flowchart shows what happens when a user creates a daily note and logs acti
 │                           CLAUDE TEXT-TO-SQL                                 │
 │                                                                              │
 │   System: "You are a SQL assistant for DuckDB. Tables available:            │
-│   - exercise_log (date, exercise, weight_kg, reps, set_number...)          │
-│   - activities (date, type, duration_minutes...)                            │
+│   - exercise_log (date, exercise_name, weight_kg, reps, set_number...)     │
+│   - activities (date, activity_type, duration_minutes...)                   │
 │   Generate ONLY the SQL query."                                             │
 │                                                                              │
 │   User: "How many times did I squat over 100kg this month?"                 │
@@ -342,7 +342,7 @@ This flowchart shows what happens when a user creates a daily note and logs acti
 │   Response:                                                                  │
 │   SELECT COUNT(DISTINCT date) as days                                       │
 │   FROM exercise_log                                                         │
-│   WHERE exercise ILIKE '%squat%'                                            │
+│   WHERE exercise_name ILIKE '%squat%'                                            │
 │     AND weight_kg > 100                                                     │
 │     AND date >= DATE_TRUNC('month', CURRENT_DATE)                          │
 │                                                                              │
@@ -484,7 +484,7 @@ This flowchart shows what happens when a user creates a daily note and logs acti
 ## Requirements.txt (Backend)
 
 ```
-# Python 3.12
+# Python 3.14
 fastapi>=0.115.0
 uvicorn[standard]>=0.30.0
 anthropic>=0.40.0
