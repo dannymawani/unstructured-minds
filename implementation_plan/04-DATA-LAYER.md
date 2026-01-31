@@ -243,9 +243,9 @@ Extract any workout/exercise information:
 {
   "exercise_log": [
     {
-      "activity_id": "YYYYMMDD_type_index",
+      "activity_id": "YYYYMMDD_activity_type_index",
       "date": "YYYY-MM-DD",
-      "exercise": "exercise name",
+      "exercise_name": "exercise name",
       "weight_kg": number or null,
       "reps": number or null,
       "set_number": number,
@@ -316,13 +316,13 @@ Extract task items:
 
 ```sql
 SELECT
-    type,
+    activity_type,
     COUNT(*) as sessions,
     SUM(duration_minutes) as total_minutes,
     ROUND(AVG(duration_minutes), 0) as avg_duration
 FROM activities
 WHERE date >= CURRENT_DATE - INTERVAL '7 days'
-GROUP BY type
+GROUP BY activity_type
 ORDER BY sessions DESC;
 ```
 
@@ -330,13 +330,13 @@ ORDER BY sessions DESC;
 
 ```sql
 SELECT
-    exercise,
+    exercise_name,
     date,
     weight_kg,
     reps,
     ROUND(weight_kg * (1 + reps / 30.0), 1) as estimated_1rm
 FROM exercise_log
-WHERE exercise = 'squat'
+WHERE exercise_name = 'squat'
   AND date >= CURRENT_DATE - INTERVAL '90 days'
 ORDER BY date;
 ```
@@ -439,7 +439,7 @@ SELECT * FROM read_csv_auto('data/exercise_log/*.csv');
 
 ### ID Generation
 **Decision:** Composite key pattern for exercise_log IDs.
-- Format: `{activity_id}_{exercise}_{set_number}`
+- Format: `{activity_id}_{exercise_name}_{set_number}`
 - Example: `20260131_str_1_squat_1`
 - Deterministic: same content always produces same IDs
 - Enables idempotent extraction (re-extracting replaces same rows)

@@ -101,7 +101,7 @@ Total: 42 | Passed: 40 | Failed: 2 | Skipped: 0
 FAILURES
 --------
 1. test_extract_exercises (tests/test_extraction.py:25)
-   Expected: [{"exercise": "Squat", ...}]
+   Expected: [{"exercise_name": "Squat", ...}]
    Actual: []
    Cause: Regex pattern doesn't match "squats" (plural)
 

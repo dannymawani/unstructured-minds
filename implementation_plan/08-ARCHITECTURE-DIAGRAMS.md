@@ -58,8 +58,8 @@
 ┌─────────────────┐         ┌─────────────────┐         ┌─────────────────┐
 │  ./vault/       │         │  ./data/        │         │  ./config/      │
 │  ├── Daily-Notes│         │  ├── app.duckdb │         │  └── settings   │
-│  │   └── *.md   │         │  ├── exercise.csv│        │                 │
-│  ├── Training/  │         │  ├── food.csv   │         │                 │
+│  │   └── *.md   │         │  ├── exercise_log│        │                 │
+│  ├── Training/  │         │  ├── food_log   │         │                 │
 │  └── Work/      │         │  └── metrics.csv│         │                 │
 └─────────────────┘         └─────────────────┘         └─────────────────┘
                                       │

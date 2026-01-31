@@ -749,13 +749,13 @@ Should the chat interface maintain conversation history?
 How to generate unique IDs for exercise_log records.
 
 ### Options Considered
-1. **Composite key** - `{activity_id}_{exercise}_{set_number}`
+1. **Composite key** - `{activity_id}_{exercise_name}_{set_number}`
 2. **UUID** - Random unique identifier
 3. **Auto-increment** - Database handles it
 4. **Natural key** - No ID column
 
 ### Decision
-**Composite key pattern**: `{activity_id}_{exercise}_{set_number}`
+**Composite key pattern**: `{activity_id}_{exercise_name}_{set_number}`
 Example: `20260131_str_1_squat_1`
 
 ### Consequences

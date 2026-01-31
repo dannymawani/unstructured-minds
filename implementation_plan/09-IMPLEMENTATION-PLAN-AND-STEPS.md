@@ -7,7 +7,7 @@
 | Branch | Purpose |
 |--------|---------|
 | `um/main` | Main development branch (protected) |
-| `um/um/feature/<name>` | Feature development |
+| `um/feature/<name>` | Feature development |
 | `um/bugfix/<name>` | Bug fixes |
 | `um/hotfix/<name>` | Critical production fixes |
 | `um/release/<version>` | Release preparation |
@@ -149,7 +149,7 @@ git checkout -b um/feature/phase0-init
 - Column names use descriptive format (`set_number`, `duration_minutes`)
 - `activities` table exists separately from `exercise_log`
 - Flat CSV storage (single file per type, not date-partitioned)
-- Composite ID format: `{activity_id}_{exercise}_{set_number}`
+- Composite ID format: `{activity_id}_{exercise_name}_{set_number}`
 
 ---
 
@@ -305,11 +305,11 @@ def test_insert_and_query(tmp_path):
     conn = init_database(db_path)
 
     conn.execute("""
-        INSERT INTO exercise_log (id, activity_id, date, exercise)
+        INSERT INTO exercise_log (id, activity_id, date, exercise_name)
         VALUES ('test1', 'act1', '2026-01-31', 'squat')
     """)
 
-    result = conn.execute("SELECT exercise FROM exercise_log").fetchone()
+    result = conn.execute("SELECT exercise_name FROM exercise_log").fetchone()
     assert result[0] == "squat"
 ```
 
@@ -745,7 +745,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: '3.14'
       - run: |
           cd backend
           pip install -e ".[dev]"
