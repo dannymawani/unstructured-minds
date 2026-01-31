@@ -1,6 +1,8 @@
 # 02 - System Architecture
 
-## High-Level Architecture
+## Selected Architecture: Docker Web App
+
+Based on DECISION-015, we chose a containerized web application over desktop wrappers (Electron/Tauri).
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -34,208 +36,24 @@
 └─────────────────┘  └─────────────────┘  └─────────────────┘
 ```
 
-### Deployment Size Comparison
+### Why Docker Web App?
 
-| Approach | Size | Startup |
-|----------|------|---------|
-| **Web App (Docker)** | ~50MB images | <5s |
-| Electron | ~200MB | 3-5s |
-| Tauri | ~30MB | <2s |
-
----
-
-## Architecture Options
-
-### Option A: Tauri + React
-
-**Stack:**
-- Frontend: React + TypeScript
-- Backend: Rust (Tauri)
-- Database: DuckDB (Rust bindings)
-- Editor: Milkdown
-
-```
-┌─────────────────────────────────────┐
-│           Tauri Window              │
-│  ┌───────────────────────────────┐ │
-│  │      React Application        │ │
-│  │  (TypeScript, Milkdown)       │ │
-│  └───────────────────────────────┘ │
-│                 │ IPC              │
-│  ┌───────────────────────────────┐ │
-│  │        Rust Backend           │ │
-│  │  ┌─────────┐ ┌─────────────┐ │ │
-│  │  │ DuckDB  │ │ File System │ │ │
-│  │  └─────────┘ └─────────────┘ │ │
-│  │  ┌─────────────────────────┐ │ │
-│  │  │   Claude API Client     │ │ │
-│  │  └─────────────────────────┘ │ │
-│  └───────────────────────────────┘ │
-└─────────────────────────────────────┘
-        Bundle size: ~15-30 MB
-```
-
-**Pros:**
-- Small bundle size (no Chromium bundled, uses native webview)
-- Rust backend is fast and memory-efficient
-- Good DuckDB support in Rust
-- Strong security model
-- Cross-platform (macOS, Windows, Linux)
-
-**Cons:**
-- Rust learning curve if not familiar
-- Smaller ecosystem than Electron
-- Some webview inconsistencies across platforms
-
-**Best for:** Production-quality app with performance focus
-
----
-
-### Option B: Electron + React + Python
-
-**Stack:**
-- Frontend: React + TypeScript
-- Backend: Python (FastAPI as sidecar)
-- Database: DuckDB (Python bindings)
-- Editor: Milkdown
-
-```
-┌─────────────────────────────────────┐
-│         Electron Window             │
-│  ┌───────────────────────────────┐ │
-│  │      React Application        │ │
-│  │  (TypeScript, Milkdown)       │ │
-│  └───────────────────────────────┘ │
-│                 │ HTTP             │
-│  ┌───────────────────────────────┐ │
-│  │    Python Sidecar (FastAPI)   │ │
-│  │  ┌─────────┐ ┌─────────────┐ │ │
-│  │  │ DuckDB  │ │   Scripts   │ │ │
-│  │  └─────────┘ └─────────────┘ │ │
-│  │  ┌─────────────────────────┐ │ │
-│  │  │   Claude API Client     │ │ │
-│  │  └─────────────────────────┘ │ │
-│  └───────────────────────────────┘ │
-└─────────────────────────────────────┘
-        Bundle size: ~150-200 MB
-```
-
-**Pros:**
-- Reuse existing Python scripts directly
-- Mature ecosystem
-- Easy to prototype
-- Consistent rendering (bundled Chromium)
-- Huge community and resources
-
-**Cons:**
-- Large bundle size
-- Higher memory usage
-- Need to manage Python sidecar process
-- Security model less strict than Tauri
-
-**Best for:** Fast development, reusing existing Python code
-
----
-
-### Option C: Tauri + React + Python Sidecar
-
-**Stack:**
-- Frontend: React + TypeScript
-- Backend: Rust (Tauri) for core, Python for AI/skills
-- Database: DuckDB (accessible from both)
-- Editor: Milkdown
-
-```
-┌─────────────────────────────────────┐
-│           Tauri Window              │
-│  ┌───────────────────────────────┐ │
-│  │      React Application        │ │
-│  └───────────────────────────────┘ │
-│         │ IPC           │ HTTP     │
-│  ┌──────┴──────┐ ┌──────┴───────┐ │
-│  │    Rust     │ │    Python    │ │
-│  │   (files,   │ │   (Claude,   │ │
-│  │   DuckDB)   │ │   skills)    │ │
-│  └─────────────┘ └──────────────┘ │
-└─────────────────────────────────────┘
-        Bundle size: ~50-80 MB
-```
-
-**Pros:**
-- Best of both: Rust performance + Python flexibility
-- Reuse existing Python scripts
-- Smaller than pure Electron
-- Can migrate Python to Rust over time
-
-**Cons:**
-- Two backend languages to maintain
-- More complex build/packaging
-- Need to manage Python process
-
-**Best for:** Pragmatic balance - ship fast, optimize later
-
----
-
-### Option D: Web App (Next.js) + Local Server
-
-**Stack:**
-- Frontend: Next.js (static export)
-- Backend: Python (FastAPI)
-- Database: DuckDB
-- Runs in browser, connects to local server
-
-```
-┌─────────────────────────────────────┐
-│         Any Browser                 │
-│  ┌───────────────────────────────┐ │
-│  │    Next.js Static App         │ │
-│  │    (served from localhost)    │ │
-│  └───────────────────────────────┘ │
-└─────────────────────────────────────┘
-                 │ HTTP
-┌─────────────────────────────────────┐
-│    Python Server (FastAPI)          │
-│  ┌─────────┐ ┌─────────────────┐   │
-│  │ DuckDB  │ │   File System   │   │
-│  └─────────┘ └─────────────────┘   │
-└─────────────────────────────────────┘
-```
-
-**Pros:**
-- Fastest to develop
-- Easy to iterate on UI
-- No app packaging needed
-- Can later wrap with Tauri/Electron
-
-**Cons:**
-- Not a "real" app (runs in browser)
-- User must start server manually (or use launcher)
-- Less polished experience
-- File system access via API only
-
-**Best for:** Rapid prototyping, validating UI/UX
-
----
-
-## Recommendation
-
-### ✅ Selected: Option D (Web App + Docker)
-
-**Why:**
-1. **Simplest architecture** - No Electron/Tauri complexity
-2. **Easy deployment** - Docker Compose, runs anywhere
-3. **Lighter footprint** - ~5MB frontend vs ~200MB Electron
-4. **Containerized** - Reproducible, cloud-ready
-5. **Milkdown works perfectly** - No desktop wrapper needed
-6. **Focus on features** - Not app packaging
+| Benefit | Description |
+|---------|-------------|
+| **Simple** | No Electron/Tauri complexity, IPC, or desktop packaging |
+| **Portable** | Docker Compose runs anywhere - local, cloud, CI |
+| **Light** | ~50MB images vs ~200MB Electron |
+| **Containerized** | Reproducible builds, easy deployment |
+| **Focus** | Build features, not app packaging |
 
 ### Rejected Alternatives
 
 | Option | Why Rejected |
 |--------|--------------|
-| Electron | Overkill for web app, 150-200MB bundle, complex |
-| Tauri | Adds complexity without benefit for web deployment |
-| Desktop-first | User wants Docker/containerized deployment |
+| Electron | 150-200MB bundle, overkill for web app, complex packaging |
+| Tauri | Adds complexity without benefit for Docker deployment |
+| Tauri + Python sidecar | Two backend languages, complex build process |
+| Desktop-first | User wants containerized deployment, not installers |
 
 ---
 
@@ -249,17 +67,17 @@
 | File Browser | Navigate vault | Custom tree component |
 | Chat Interface | Natural language input | Custom |
 | Command Palette | Quick actions, /skills | Custom (like VS Code) |
-| Dashboard Panels | Visualize data | Recharts or Observable Plot |
+| Dashboard Panels | Visualize data | Recharts |
 | Settings Panel | Configuration | Custom |
 
 ### Backend Services
 
 | Service | Purpose | Notes |
 |---------|---------|-------|
-| File Watcher | Detect changes | watchdog (Python) or notify (Rust) |
+| File Watcher | Detect changes | watchdog (Python) |
 | Data Extractor | Parse notes → structured | Claude API + custom parsers |
 | Skill Engine | Execute /commands | Port from current .claude/skills/ |
-| DuckDB Manager | Query structured data | duckdb Python/Rust bindings |
+| DuckDB Manager | Query structured data | duckdb Python bindings |
 | Claude Client | API communication | anthropic SDK |
 
 ---
