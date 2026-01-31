@@ -4,54 +4,43 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Unstructured Minds App                        │
-│                                                                  │
-│  ┌────────────────────────────────────────────────────────────┐ │
-│  │                    Frontend (UI Layer)                      │ │
-│  │  ┌──────────────┐ ┌──────────────┐ ┌──────────────────┐   │ │
-│  │  │   Markdown   │ │    Chat      │ │    Dashboard     │   │ │
-│  │  │   Editor     │ │   Interface  │ │    Views         │   │ │
-│  │  └──────────────┘ └──────────────┘ └──────────────────┘   │ │
-│  │  ┌──────────────┐ ┌──────────────┐                        │ │
-│  │  │    File      │ │   Command    │                        │ │
-│  │  │   Browser    │ │   Palette    │                        │ │
-│  │  └──────────────┘ └──────────────┘                        │ │
-│  └────────────────────────────────────────────────────────────┘ │
-│                              │                                   │
-│                              ▼                                   │
-│  ┌────────────────────────────────────────────────────────────┐ │
-│  │                   Backend (Core Logic)                      │ │
-│  │  ┌──────────────┐ ┌──────────────┐ ┌──────────────────┐   │ │
-│  │  │   Claude     │ │   Skill      │ │    Data          │   │ │
-│  │  │   Client     │ │   Engine     │ │    Extractor     │   │ │
-│  │  └──────────────┘ └──────────────┘ └──────────────────┘   │ │
-│  │  ┌──────────────┐ ┌──────────────┐                        │ │
-│  │  │   File       │ │   DuckDB     │                        │ │
-│  │  │   Watcher    │ │   Manager    │                        │ │
-│  │  └──────────────┘ └──────────────┘                        │ │
-│  │  ┌──────────────────────────────────────────────────────┐ │ │
-│  │  │          Storage Abstraction Layer                   │ │ │
-│  │  │  read() | write() | delete() | list() | exists()    │ │ │
-│  │  └──────────────────────────────────────────────────────┘ │ │
-│  └────────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────┘
+│                      Docker Compose                              │
+├─────────────────────────────────┬───────────────────────────────┤
+│         Frontend Container      │      Backend Container        │
+│         (nginx:alpine)          │      (python:3.12-slim)       │
+│  ┌───────────────────────────┐  │  ┌─────────────────────────┐  │
+│  │    React SPA (Milkdown)   │  │  │   FastAPI Application   │  │
+│  │  ┌───────┐ ┌───────────┐  │  │  │  ┌──────┐ ┌──────────┐ │  │
+│  │  │Editor │ │ Dashboard │  │  │  │  │Claude│ │ DuckDB   │ │  │
+│  │  └───────┘ └───────────┘  │  │  │  │Client│ │ Manager  │ │  │
+│  │  ┌───────┐ ┌───────────┐  │  │  │  └──────┘ └──────────┘ │  │
+│  │  │ Chat  │ │File Tree  │  │  │  │  ┌──────────────────┐  │  │
+│  │  └───────┘ └───────────┘  │  │  │  │ Data Extractor   │  │  │
+│  └───────────────────────────┘  │  │  └──────────────────┘  │  │
+│         Port 80                 │  │  └─────────────────────────┘│
+│              │                  │          Port 8000             │
+└──────────────┼──────────────────┴───────────────┬───────────────┘
+               │         HTTP/REST                │
+               └──────────────────────────────────┘
+                              │
+                       Volume Mounts
                               │
          ┌────────────────────┼────────────────────┐
          ▼                    ▼                    ▼
 ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
-│  Local FS ✅    │  │  Azure Blob 🔜  │  │  S3 / GCP 🔜   │
-│  (v1.0)         │  │  (Future)       │  │  (Future)       │
+│   ./vault/      │  │   ./data/       │  │   ./config/     │
+│   *.md files    │  │   *.csv         │  │   settings      │
+│                 │  │   *.duckdb      │  │                 │
 └─────────────────┘  └─────────────────┘  └─────────────────┘
-         │
-         ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                      Local File System                           │
-│  ┌──────────────┐ ┌──────────────┐ ┌──────────────────────┐    │
-│  │   vault/     │ │   data/      │ │   .unstructured/     │    │
-│  │   *.md files │ │   *.duckdb   │ │   config, cache      │    │
-│  └──────────────┘ └──────────────┘ └──────────────────────┘    │
-└─────────────────────────────────────────────────────────────────┘
 ```
+
+### Deployment Size Comparison
+
+| Approach | Size | Startup |
+|----------|------|---------|
+| **Web App (Docker)** | ~50MB images | <5s |
+| Electron | ~200MB | 3-5s |
+| Tauri | ~30MB | <2s |
 
 ---
 
@@ -63,14 +52,14 @@
 - Frontend: React + TypeScript
 - Backend: Rust (Tauri)
 - Database: DuckDB (Rust bindings)
-- Editor: TipTap or Milkdown
+- Editor: Milkdown
 
 ```
 ┌─────────────────────────────────────┐
 │           Tauri Window              │
 │  ┌───────────────────────────────┐ │
 │  │      React Application        │ │
-│  │  (TypeScript, TipTap, etc.)   │ │
+│  │  (TypeScript, Milkdown)       │ │
 │  └───────────────────────────────┘ │
 │                 │ IPC              │
 │  ┌───────────────────────────────┐ │
@@ -108,14 +97,14 @@
 - Frontend: React + TypeScript
 - Backend: Python (FastAPI as sidecar)
 - Database: DuckDB (Python bindings)
-- Editor: TipTap or Monaco
+- Editor: Milkdown
 
 ```
 ┌─────────────────────────────────────┐
 │         Electron Window             │
 │  ┌───────────────────────────────┐ │
 │  │      React Application        │ │
-│  │  (TypeScript, TipTap, etc.)   │ │
+│  │  (TypeScript, Milkdown)       │ │
 │  └───────────────────────────────┘ │
 │                 │ HTTP             │
 │  ┌───────────────────────────────┐ │
@@ -154,7 +143,7 @@
 - Frontend: React + TypeScript
 - Backend: Rust (Tauri) for core, Python for AI/skills
 - Database: DuckDB (accessible from both)
-- Editor: TipTap
+- Editor: Milkdown
 
 ```
 ┌─────────────────────────────────────┐
@@ -230,21 +219,23 @@
 
 ## Recommendation
 
-### For POC: Option D (Web App + Local Server)
+### ✅ Selected: Option D (Web App + Docker)
 
 **Why:**
-1. Fastest path to something working
-2. Reuse all existing Python scripts
-3. Focus on features, not packaging
-4. Can wrap with Tauri later for "real" app
+1. **Simplest architecture** - No Electron/Tauri complexity
+2. **Easy deployment** - Docker Compose, runs anywhere
+3. **Lighter footprint** - ~5MB frontend vs ~200MB Electron
+4. **Containerized** - Reproducible, cloud-ready
+5. **Milkdown works perfectly** - No desktop wrapper needed
+6. **Focus on features** - Not app packaging
 
-### For Production: Option C (Tauri + Python Sidecar)
+### Rejected Alternatives
 
-**Why:**
-1. Small bundle, native feel
-2. Keep Python for Claude/skills (familiar, existing code)
-3. Rust handles file system, DuckDB for performance
-4. Can gradually port Python to Rust if needed
+| Option | Why Rejected |
+|--------|--------------|
+| Electron | Overkill for web app, 150-200MB bundle, complex |
+| Tauri | Adds complexity without benefit for web deployment |
+| Desktop-first | User wants Docker/containerized deployment |
 
 ---
 
@@ -254,7 +245,7 @@
 
 | Component | Purpose | Library |
 |-----------|---------|---------|
-| Markdown Editor | Write/edit notes | TipTap + markdown extension |
+| Markdown Editor | Write/edit notes | Milkdown |
 | File Browser | Navigate vault | Custom tree component |
 | Chat Interface | Natural language input | Custom |
 | Command Palette | Quick actions, /skills | Custom (like VS Code) |

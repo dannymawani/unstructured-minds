@@ -7,20 +7,21 @@ See the [main README](../README.md) for project overview.
 ## Core Principles (Non-Negotiable)
 
 1. **Markdown files as source of truth** - Human-readable, portable, version-controllable
-2. **Claude as the intelligence layer** - Natural language processing, skill execution
+2. **Claude is optional** - Core app works without it, Claude adds enhanced features
 3. **Local-first with pluggable storage** - Local filesystem first, optional cloud backends (Azure Blob, S3, GCP)
 4. **DuckDB as query engine** - Fast analytics over structured data
-5. **No Obsidian dependency** - Standalone Electron application
+5. **No Obsidian dependency** - Standalone web application (Docker)
+6. **Single workspace** - No vault concept, one workspace per installation
 
 ## Chosen Stack (January 2026)
 
 | Layer | Technology | Version |
 |-------|------------|---------|
-| Desktop | Electron | 40.0.0 |
-| Frontend | React + TipTap | 19.2.4 / 3.15.3 |
-| Backend | Python + FastAPI | 3.14.2 / 0.115.x |
-| Database | DuckDB | 1.4.4 LTS |
-| AI | Claude API | Sonnet 4 / Opus 4 |
+| Deployment | Docker Compose | - |
+| Frontend | React + Milkdown | 19 / 7.x |
+| Backend | Python + FastAPI | 3.12 / 0.115.x |
+| Database | DuckDB | 1.4 |
+| AI | Claude API (optional) | Haiku / Sonnet |
 
 ## Planning Documents
 

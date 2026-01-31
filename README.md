@@ -29,7 +29,7 @@ A standalone desktop application that transforms natural language notes into str
 
 | Feature | Description |
 |---------|-------------|
-| **Markdown Editor** | TipTap-powered WYSIWYG editing |
+| **Markdown Editor** | Milkdown-powered WYSIWYG editing |
 | **Natural Language Logging** | Write freely, data gets extracted |
 | **AI-Powered Queries** | Ask questions, get SQL-backed answers |
 | **Daily Note Workflow** | One-click daily notes with task rollover |
@@ -41,8 +41,8 @@ A standalone desktop application that transforms natural language notes into str
 
 | Layer | Technology |
 |-------|------------|
-| Desktop | Electron 40.0.0 |
-| Frontend | React 19.2.4 + TipTap 3.15.3 |
+| Deployment | Docker Compose |
+| Frontend | React 19 + Milkdown |
 | Backend | Python 3.14 + FastAPI |
 | Database | DuckDB 1.4.4 |
 | AI | Claude API (Sonnet 4 / Opus 4) |
@@ -101,7 +101,7 @@ docker-compose up
 - [ ] **Phase 1:** Foundation (Backend, Docker, APIs)
 - [ ] **Phase 2:** Core MVP (Editor, Chat, Extraction)
 - [ ] **Phase 3:** Polish (Dashboards, Settings)
-- [ ] **Phase 4:** Distribution (Electron packaging)
+- [ ] **Phase 4:** Production (Cloud deployment)
 
 ## License
 

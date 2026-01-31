@@ -53,7 +53,7 @@ src/
 - You likely know React already
 - Huge ecosystem of components
 - Great TypeScript support
-- TipTap (best markdown editor) is React-native
+- Milkdown (MIT-licensed markdown editor) is React-compatible
 
 **Cons:**
 - Need to choose state management
@@ -147,67 +147,64 @@ src/
 ## Recommendation: React + TypeScript
 
 **Why React:**
-1. Best markdown editor (TipTap) is React-first
+1. Milkdown markdown editor works great with React
 2. Largest ecosystem for components we need
 3. Likely already familiar
-4. Great Electron integration (consistent Chromium rendering)
+4. Great browser support
 5. Easy to find help/examples
 
 ---
 
 ## Markdown Editor Comparison
 
-### TipTap (Recommended)
+### Milkdown (Selected)
 
-**Type:** ProseMirror-based WYSIWYG
-**Stars:** 28k+
-**License:** MIT
+**Type:** Plugin-based markdown editor built on ProseMirror
+**Stars:** 9k+
+**License:** MIT (fully open source, no paid tiers)
 
 ```typescript
-import { useEditor, EditorContent } from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
-import Markdown from 'tiptap-markdown';
+import { Editor, rootCtx } from '@milkdown/core';
+import { commonmark } from '@milkdown/preset-commonmark';
+import { nord } from '@milkdown/theme-nord';
+import { ReactEditor, useEditor } from '@milkdown/react';
 
-const Editor = () => {
-  const editor = useEditor({
-    extensions: [
-      StarterKit,
-      Markdown,
-    ],
-    content: '# Hello World',
-  });
+const MilkdownEditor = () => {
+  const { editor } = useEditor((root) =>
+    Editor.make()
+      .config((ctx) => {
+        ctx.set(rootCtx, root);
+      })
+      .use(nord)
+      .use(commonmark)
+  );
 
-  return <EditorContent editor={editor} />;
+  return <ReactEditor editor={editor} />;
 };
 ```
 
 **Pros:**
-- Excellent markdown support
-- Highly extensible
-- Active development
-- Great React integration
-- Can switch between WYSIWYG and raw
-
-**Cons:**
-- Learning curve for customization
-- ProseMirror concepts to understand
-
----
-
-### Milkdown
-
-**Type:** Plugin-based markdown editor
-**Stars:** 9k+
-**License:** MIT
-
-**Pros:**
-- Clean architecture
+- 100% MIT licensed - no paid features
+- Clean plugin architecture
 - Good markdown support
-- Collaborative editing support
+- Built on ProseMirror (solid foundation)
+- React integration available
 
 **Cons:**
 - Smaller community than TipTap
-- Less documentation
+- May need more custom work for advanced features
+
+---
+
+### TipTap (Rejected)
+
+**Type:** ProseMirror-based WYSIWYG
+**Stars:** 28k+
+**License:** MIT core, but Pro features are paid
+
+**Why rejected:**
+- Pro extensions require paid license
+- Want fully open source stack with no licensing concerns
 
 ---
 
@@ -248,10 +245,10 @@ const Editor = () => {
 
 ---
 
-## Editor Recommendation: TipTap + Monaco Toggle
+## Editor Recommendation: Milkdown
 
-**Primary:** TipTap for WYSIWYG markdown editing
-**Secondary:** Monaco for raw markdown mode (optional toggle)
+**Primary:** Milkdown for WYSIWYG markdown editing
+**Secondary:** Monaco for raw markdown mode (optional toggle, if needed)
 
 ---
 
@@ -354,18 +351,20 @@ Plot.plot({
 
 ```
 Frontend Stack:
-├── Framework:      React 19.2.4 + TypeScript 5.9.3
-├── Desktop:        Electron 40.0.0
+├── Framework:      React 19 + TypeScript 5.x
+├── Deployment:     Docker (nginx:alpine) - NO Electron
 ├── Build:          Vite 6.x
 ├── Styling:        Tailwind CSS 4.x
 ├── Components:     shadcn/ui (Radix primitives)
 ├── State:          Zustand 5.x
 ├── Data Fetching:  TanStack React Query 5.x
-├── Editor:         TipTap 3.15.3 (with markdown extension)
+├── Editor:         Milkdown (MIT, plugin-based)
 ├── Charts:         Recharts 2.x
 ├── Icons:          Lucide React
 └── File Tree:      react-arborist or custom
 ```
+
+> **Note:** Pure web app served via nginx. No Electron wrapper needed - simpler, lighter, and containerized.
 
 ---
 

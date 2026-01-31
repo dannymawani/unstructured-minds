@@ -256,7 +256,7 @@ def init_database(db_path: Path) -> duckdb.DuckDBPyConnection:
 ```bash
 cd frontend
 npm create vite@latest . -- --template react-ts
-npm install @tiptap/react @tiptap/starter-kit tiptap-markdown
+npm install @milkdown/core @milkdown/react @milkdown/preset-commonmark @milkdown/theme-nord
 npm install zustand @tanstack/react-query
 npm install tailwindcss postcss autoprefixer
 npm install lucide-react recharts
@@ -268,10 +268,12 @@ npx shadcn-ui@latest init
 ```tsx
 // frontend/src/components/Editor/MarkdownEditor.tsx
 
-import { useEditor, EditorContent } from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
-import Markdown from 'tiptap-markdown';
-import { useCallback, useEffect } from 'react';
+import { Editor, rootCtx, defaultValueCtx } from '@milkdown/core';
+import { commonmark } from '@milkdown/preset-commonmark';
+import { nord } from '@milkdown/theme-nord';
+import { ReactEditor, useEditor } from '@milkdown/react';
+import { listener, listenerCtx } from '@milkdown/plugin-listener';
+import { useEffect } from 'react';
 import { useVaultStore } from '@/stores/vault';
 import { useMutation } from '@tanstack/react-query';
 import { saveFile } from '@/api/vault';
@@ -286,16 +288,19 @@ export function MarkdownEditor() {
     }
   });
 
-  const editor = useEditor({
-    extensions: [
-      StarterKit,
-      Markdown,
-    ],
-    content: content,
-    onUpdate: ({ editor }) => {
-      setContent(editor.storage.markdown.getMarkdown());
-    },
-  });
+  const { editor } = useEditor((root) =>
+    Editor.make()
+      .config((ctx) => {
+        ctx.set(rootCtx, root);
+        ctx.set(defaultValueCtx, content);
+        ctx.get(listenerCtx).markdownUpdated((_, markdown) => {
+          setContent(markdown);
+        });
+      })
+      .use(nord)
+      .use(commonmark)
+      .use(listener)
+  );
 
   // Debounced auto-save
   useEffect(() => {
@@ -309,7 +314,7 @@ export function MarkdownEditor() {
 
   return (
     <div className="editor-container">
-      <EditorContent editor={editor} />
+      <ReactEditor editor={editor} />
     </div>
   );
 }
@@ -405,7 +410,7 @@ export function DailyNoteButton() {
 
 ### Deliverables - Phase 1
 
-- [ ] React app with TipTap editor
+- [ ] React app with Milkdown editor
 - [ ] File browser sidebar
 - [ ] Chat interface for queries
 - [ ] Command palette (Cmd+K)
@@ -741,7 +746,7 @@ K8s manifests will be added to `k8s/` directory when approaching production.
 | Risk | Mitigation |
 |------|------------|
 | Claude API costs | Caching, batching, model selection |
-| Editor complexity | Start with TipTap defaults, customize later |
+| Editor complexity | Start with Milkdown defaults, customize later |
 | DuckDB size | Periodic cleanup, archiving old data |
 | Tauri issues | Can fall back to Electron |
 | Python packaging | PyInstaller or embedded Python |
