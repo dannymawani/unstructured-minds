@@ -1,98 +1,67 @@
 # 08 - Architecture Diagrams
 
-## Technology Stack (Latest Versions - January 2026)
+## Technology Stack (January 2026)
 
 | Layer | Technology | Version | Notes |
 |-------|------------|---------|-------|
-| **Frontend** | React | 19.2.4 | Released Jan 26, 2026 |
-| | TypeScript | 5.9.3 | (6.0 bridge coming, 7.0 in Go) |
-| | TipTap | 3.15.3 | Markdown WYSIWYG editor |
+| **Frontend** | React | 19 | Pure web app (no Electron) |
+| | TypeScript | 5.x | |
+| | Milkdown | - | Markdown WYSIWYG editor (MIT) |
 | | Vite | 6.x | Build tool |
 | | Tailwind CSS | 4.x | Styling |
 | | Zustand | 5.x | State management |
 | | Recharts | 2.x | Charts/dashboards |
-| **Desktop** | Electron | 40.0.0 | Released Jan 13, 2026 (Chromium 144, Node 24) |
-| **Backend** | Python | 3.14.2 | Released Dec 5, 2025 |
-| | FastAPI | 0.115.x | Latest with Python 3.14 support |
-| | DuckDB | 1.4.4 | Released Jan 26, 2026 (LTS) |
+| **Deployment** | Docker | - | nginx:alpine + python:3.12-slim |
+| **Backend** | Python | 3.12 | |
+| | FastAPI | 0.115.x | |
+| | DuckDB | 1.4 | Embedded analytics |
 | | Anthropic SDK | 0.45.x | Claude API client |
 | | Watchdog | 6.x | File system monitoring |
+| **AI** | Claude Haiku | claude-3-5-haiku | Extraction (fast, cheap) |
+| | Claude Sonnet | claude-sonnet-4 | Complex queries |
 
 ---
 
-## System Architecture
+## System Architecture (Docker Compose)
 
 ```
 ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃                           ELECTRON SHELL (v40.0.0)                            ┃
-┃                         Chromium 144 + Node.js 24                             ┃
-┃ ┌───────────────────────────────────────────────────────────────────────────┐ ┃
-┃ │                         REACT FRONTEND (v19.2.4)                          │ ┃
-┃ │                                                                           │ ┃
-┃ │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────────┐  │ ┃
-┃ │  │   SIDEBAR   │  │   EDITOR    │  │    CHAT     │  │   DASHBOARD     │  │ ┃
-┃ │  │             │  │             │  │             │  │                 │  │ ┃
-┃ │  │ • File Tree │  │  TipTap     │  │ • NL Input  │  │ • Weekly View   │  │ ┃
-┃ │  │ • Search    │  │  v3.15.3    │  │ • /skills   │  │ • Metrics       │  │ ┃
-┃ │  │ • Quick     │  │             │  │ • History   │  │ • Trends        │  │ ┃
-┃ │  │   Actions   │  │  Markdown   │  │             │  │                 │  │ ┃
-┃ │  │             │  │  WYSIWYG    │  │             │  │  Recharts       │  │ ┃
-┃ │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────────┘  │ ┃
-┃ │                                                                           │ ┃
-┃ │  ┌─────────────────────────────────────────────────────────────────────┐  │ ┃
-┃ │  │                    COMMAND PALETTE (⌘K)                             │  │ ┃
-┃ │  │    /daily  /wod  /foodlog  /query  Settings  Open File  ...        │  │ ┃
-┃ │  └─────────────────────────────────────────────────────────────────────┘  │ ┃
-┃ │                                                                           │ ┃
-┃ │  ┌─────────────────────────┐    ┌─────────────────────────────────────┐  │ ┃
-┃ │  │      Zustand Store      │    │         React Query Cache          │  │ ┃
-┃ │  │  • Current file         │    │  • API responses                   │  │ ┃
-┃ │  │  • Editor state         │    │  • Dashboard data                  │  │ ┃
-┃ │  │  • UI preferences       │    │  • File contents                   │  │ ┃
-┃ │  └─────────────────────────┘    └─────────────────────────────────────┘  │ ┃
-┃ └───────────────────────────────────────────────────────────────────────────┘ ┃
-┃                                      │                                        ┃
-┃                                      │ IPC / HTTP (localhost:8765)            ┃
-┃                                      ▼                                        ┃
-┃ ┌───────────────────────────────────────────────────────────────────────────┐ ┃
-┃ │                      PYTHON BACKEND (FastAPI)                             │ ┃
-┃ │                         Python 3.14.2                                     │ ┃
-┃ │                                                                           │ ┃
-┃ │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │ ┃
-┃ │  │   CLAUDE     │  │    SKILL     │  │     DATA     │  │    FILE      │  │ ┃
-┃ │  │   SERVICE    │  │    ENGINE    │  │   EXTRACTOR  │  │   WATCHER    │  │ ┃
-┃ │  │              │  │              │  │              │  │              │  │ ┃
-┃ │  │ • Extraction │  │ • /daily     │  │ • Parse MD   │  │ • watchdog   │  │ ┃
-┃ │  │ • Text2SQL   │  │ • /wod       │  │ • Validate   │  │ • Debounce   │  │ ┃
-┃ │  │ • Chat       │  │ • /foodlog   │  │ • Transform  │  │ • Events     │  │ ┃
-┃ │  │              │  │ • Custom     │  │              │  │              │  │ ┃
-┃ │  │ Anthropic    │  │              │  │              │  │              │  │ ┃
-┃ │  │ SDK v0.45    │  │              │  │              │  │              │  │ ┃
-┃ │  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘  │ ┃
-┃ │                           │                                               │ ┃
-┃ │                           ▼                                               │ ┃
-┃ │  ┌─────────────────────────────────────────────────────────────────────┐  │ ┃
-┃ │  │                       DuckDB v1.4.4 (LTS)                           │  │ ┃
-┃ │  │                                                                     │  │ ┃
-┃ │  │   exercise_log │ daily_metrics │ food_log │ tasks │ activities    │  │ ┃
-┃ │  │                                                                     │  │ ┃
-┃ │  └─────────────────────────────────────────────────────────────────────┘  │ ┃
-┃ └───────────────────────────────────────────────────────────────────────────┘ ┃
+┃                           DOCKER COMPOSE                                      ┃
+┃                                                                               ┃
+┃ ┌───────────────────────────────────┐  ┌───────────────────────────────────┐ ┃
+┃ │      FRONTEND CONTAINER           │  │      BACKEND CONTAINER            │ ┃
+┃ │      (nginx:alpine)               │  │      (python:3.12-slim)           │ ┃
+┃ │                                   │  │                                   │ ┃
+┃ │  ┌─────────────────────────────┐  │  │  ┌─────────────────────────────┐  │ ┃
+┃ │  │    REACT SPA (Milkdown)     │  │  │  │   FastAPI Application      │  │ ┃
+┃ │  │                             │  │  │  │                             │  │ ┃
+┃ │  │  ┌─────────┐ ┌───────────┐  │  │  │  │  ┌────────┐ ┌───────────┐  │  │ ┃
+┃ │  │  │ Editor  │ │ Dashboard │  │  │  │  │  │ Claude │ │  DuckDB   │  │  │ ┃
+┃ │  │  │Milkdown │ │ Recharts  │  │  │  │  │  │ Client │ │  Manager  │  │  │ ┃
+┃ │  │  └─────────┘ └───────────┘  │  │  │  │  │ Haiku  │ └───────────┘  │  │ ┃
+┃ │  │  ┌─────────┐ ┌───────────┐  │  │  │  │  └────────┘                │  │ ┃
+┃ │  │  │  Chat   │ │ File Tree │  │  │  │  │  ┌────────────────────┐   │  │ ┃
+┃ │  │  └─────────┘ └───────────┘  │  │  │  │  │  Data Extractor    │   │  │ ┃
+┃ │  └─────────────────────────────┘  │  │  │  └────────────────────┘   │  │ ┃
+┃ │                                   │  │  └─────────────────────────────┘  │ ┃
+┃ │        Port 80 (nginx)            │  │        Port 8000 (uvicorn)        │ ┃
+┃ └───────────────────────────────────┘  └───────────────────────────────────┘ ┃
+┃                    │                              │                          ┃
+┃                    └──────────── HTTP ───────────┘                          ┃
+┃                                                                               ┃
 ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
                                       │
-                                      │ File System
-                                      ▼
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃                              LOCAL FILE SYSTEM                                ┃
-┃                                                                               ┃
-┃   vault/                    .unstructured/           data/                   ┃
-┃   ├── Daily-Notes/          ├── config.json          └── exports/            ┃
-┃   │   └── 2026-01/          ├── cache/                   ├── exercise.csv   ┃
-┃   │       └── *.md          └── app.duckdb               └── metrics.csv    ┃
-┃   ├── Training/                                                              ┃
-┃   └── Work/                                                                  ┃
-┃                                                                               ┃
-┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+                               Volume Mounts
+                                      │
+         ┌────────────────────────────┼────────────────────────────┐
+         ▼                            ▼                            ▼
+┌─────────────────┐         ┌─────────────────┐         ┌─────────────────┐
+│  ./vault/       │         │  ./data/        │         │  ./config/      │
+│  ├── Daily-Notes│         │  ├── app.duckdb │         │  └── settings   │
+│  │   └── *.md   │         │  ├── exercise.csv│        │                 │
+│  ├── Training/  │         │  ├── food.csv   │         │                 │
+│  └── Work/      │         │  └── metrics.csv│         │                 │
+└─────────────────┘         └─────────────────┘         └─────────────────┘
                                       │
                                       │ HTTPS
                                       ▼
@@ -102,8 +71,8 @@
 ┃   ┌─────────────────────────────────────────────────────────────────────┐    ┃
 ┃   │                     Claude API (Anthropic)                          │    ┃
 ┃   │                                                                     │    ┃
-┃   │   claude-sonnet-4  ──────  Fast extraction, queries                │    ┃
-┃   │   claude-opus-4    ──────  Complex skills, reasoning               │    ┃
+┃   │   claude-3-5-haiku ──────  Extraction, SQL (fast & cheap)          │    ┃
+┃   │   claude-sonnet-4  ──────  Complex skills, reasoning               │    ┃
 ┃   │                                                                     │    ┃
 ┃   └─────────────────────────────────────────────────────────────────────┘    ┃
 ┃                                                                               ┃
@@ -240,7 +209,7 @@ This flowchart shows what happens when a user creates a daily note and logs acti
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                           OPEN IN EDITOR                                     │
 │                                                                              │
-│   TipTap editor loads the new note                                          │
+│   Milkdown editor loads the new note                                        │
 │   User sees formatted markdown                                              │
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -423,56 +392,50 @@ This flowchart shows what happens when a user creates a daily note and logs acti
 
 ---
 
-## Component Communication
+## Component Communication (Docker)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                           ELECTRON MAIN PROCESS                              │
+│                           docker-compose up                                  │
 │                                                                              │
 │   ┌───────────────┐         ┌───────────────┐         ┌───────────────┐    │
-│   │  App Startup  │────────▶│ Start Python  │────────▶│  Open Window  │    │
-│   │               │         │ FastAPI       │         │               │    │
+│   │  Start nginx  │         │ Start uvicorn │         │  Mount        │    │
+│   │  (frontend)   │         │ (backend)     │         │  Volumes      │    │
 │   └───────────────┘         └───────────────┘         └───────────────┘    │
-│                                    │                                        │
-│                                    │ spawn child process                    │
-│                                    ▼                                        │
-│                           ┌───────────────┐                                 │
-│                           │ Python Server │                                 │
-│                           │ localhost:8765│                                 │
-│                           └───────────────┘                                 │
-│                                    │                                        │
-└────────────────────────────────────│────────────────────────────────────────┘
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
                                      │
-                          ┌──────────┴──────────┐
-                          │                     │
-                          ▼                     ▼
-            ┌──────────────────────┐  ┌──────────────────────┐
-            │  RENDERER PROCESS    │  │  RENDERER PROCESS    │
-            │  (Main Window)       │  │  (Settings Window)   │
-            │                      │  │                      │
-            │  React App           │  │  React App           │
-            │  ├── Editor          │  │  └── Settings        │
-            │  ├── Sidebar         │  │                      │
-            │  ├── Chat            │  │                      │
-            │  └── Dashboard       │  │                      │
-            └──────────────────────┘  └──────────────────────┘
-                          │
-                          │ HTTP requests
-                          ▼
-            ┌──────────────────────────────────────────────┐
-            │              FastAPI Server                   │
-            │                                               │
-            │  GET  /vault/files      → List files         │
-            │  GET  /vault/file       → Read file          │
-            │  POST /vault/file       → Write file         │
-            │  POST /extract          → Extract data       │
-            │  POST /query            → NL query           │
-            │  POST /query/sql        → Direct SQL         │
-            │  GET  /skills           → List skills        │
-            │  POST /skills/{name}    → Execute skill      │
-            │  GET  /dashboard/*      → Dashboard data     │
-            │                                               │
-            └──────────────────────────────────────────────┘
+                        ┌────────────┴────────────┐
+                        ▼                         ▼
+          ┌──────────────────────┐    ┌──────────────────────┐
+          │  BROWSER (any)       │    │  BACKEND CONTAINER    │
+          │                      │    │                       │
+          │  React SPA           │───▶│  FastAPI Server       │
+          │  ├── Editor          │    │  localhost:8000       │
+          │  ├── Sidebar         │    │                       │
+          │  ├── Chat            │    │                       │
+          │  └── Dashboard       │    │                       │
+          │                      │    │                       │
+          │  localhost:80        │    │                       │
+          └──────────────────────┘    └──────────────────────┘
+                        │
+                        │ HTTP requests (fetch/axios)
+                        ▼
+          ┌──────────────────────────────────────────────┐
+          │              FastAPI Server                   │
+          │                                               │
+          │  GET  /vault/files      → List files         │
+          │  GET  /vault/file       → Read file          │
+          │  POST /vault/file       → Write file         │
+          │  POST /extract          → Extract data       │
+          │  POST /query            → NL query           │
+          │  POST /query/sql        → Direct SQL         │
+          │  GET  /skills           → List skills        │
+          │  POST /skills/{name}    → Execute skill      │
+          │  GET  /dashboard/*      → Dashboard data     │
+          │  GET  /health           → Health check       │
+          │                                               │
+          └──────────────────────────────────────────────┘
 ```
 
 ---
@@ -481,65 +444,86 @@ This flowchart shows what happens when a user creates a daily note and logs acti
 
 ```json
 {
-  "name": "unstructured-minds",
+  "name": "unstructured-minds-frontend",
   "version": "0.1.0",
-  "main": "electron/main.js",
+  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "electron:dev": "concurrently \"vite\" \"electron .\"",
-    "electron:build": "vite build && electron-builder"
+    "preview": "vite preview",
+    "lint": "eslint . --ext ts,tsx",
+    "test": "vitest"
   },
   "dependencies": {
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4",
-    "@tiptap/react": "^3.15.3",
-    "@tiptap/starter-kit": "^3.15.3",
-    "@tiptap/extension-markdown": "^3.15.3",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "@milkdown/core": "^7.0.0",
+    "@milkdown/react": "^7.0.0",
+    "@milkdown/preset-commonmark": "^7.0.0",
+    "@milkdown/theme-nord": "^7.0.0",
     "zustand": "^5.0.0",
-    "@tanstack/react-query": "^5.60.0",
+    "@tanstack/react-query": "^5.0.0",
     "recharts": "^2.15.0",
     "lucide-react": "^0.470.0",
-    "tailwindcss": "^4.0.0",
     "clsx": "^2.1.0"
   },
   "devDependencies": {
-    "typescript": "^5.9.3",
+    "typescript": "^5.0.0",
     "vite": "^6.0.0",
-    "electron": "^40.0.0",
-    "electron-builder": "^25.0.0",
     "@types/react": "^19.0.0",
-    "concurrently": "^9.0.0"
+    "tailwindcss": "^4.0.0",
+    "vitest": "^2.0.0"
   }
 }
 ```
+
+> **Note:** No Electron dependencies. This is a standard Vite + React web app.
 
 ---
 
 ## Requirements.txt (Backend)
 
 ```
-# Python 3.14.2
-fastapi==0.115.6
-uvicorn[standard]==0.34.0
-anthropic==0.45.0
-duckdb==1.4.4
-watchdog==6.0.0
-pydantic==2.12.0
-python-dotenv==1.0.1
-httpx==0.28.0
+# Python 3.12
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+anthropic>=0.40.0
+duckdb>=1.0.0
+watchdog>=4.0.0
+pydantic>=2.0.0
+python-dotenv>=1.0.0
+httpx>=0.27.0
+```
+
+---
+
+## docker-compose.yml
+
+```yaml
+services:
+  frontend:
+    build: ./frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ${VAULT_PATH:-./vault}:/app/vault
+      - ${DATA_PATH:-./data}:/app/data
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 ```
 
 ---
 
 *Back to: [README.md](./README.md)*
-
-## Sources
-
-- [React Versions](https://react.dev/versions) - React 19.2.4
-- [Electron Releases](https://www.electronjs.org/docs/latest/tutorial/electron-timelines) - Electron 40.0.0
-- [TipTap GitHub](https://github.com/ueberdosis/tiptap) - TipTap 3.15.3
-- [DuckDB Release Calendar](https://duckdb.org/release_calendar) - DuckDB 1.4.4
-- [FastAPI PyPI](https://pypi.org/project/fastapi/) - FastAPI 0.115.x
-- [Python Downloads](https://www.python.org/downloads/) - Python 3.14.2
-- [TypeScript Releases](https://github.com/microsoft/typescript/releases) - TypeScript 5.9.3
