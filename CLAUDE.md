@@ -40,7 +40,7 @@ Markdown Note → Claude Extraction → CSV/DuckDB → Natural Language Query
 | Component | Technology |
 |-----------|------------|
 | Frontend | React 19 + Milkdown (pure web app) |
-| Backend | Python 3.12 + FastAPI |
+| Backend | Python 3.14 + FastAPI |
 | Database | DuckDB 1.4 |
 | AI | Claude API (Haiku for extraction, Sonnet for queries) |
 | Deployment | Docker Compose |

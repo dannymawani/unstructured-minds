@@ -16,13 +16,24 @@ The database is at `.unstructured/unstructured.duckdb` (relative to vault root).
 
 Based on the project's data extraction patterns:
 
-### Exercise Log
-- `activity_id` (VARCHAR): Format `{YYYYMMDD}_{type}_{index}`
-- `date` (DATE): Exercise date
+### Activities
+- `id` (VARCHAR): Format `{YYYYMMDD}_{type}_{index}` (e.g., `20260131_str_1`)
+- `date` (DATE): Activity date
 - `activity_type` (VARCHAR): str, bjj, run, rec
-- `exercise_name` (VARCHAR)
-- `sets`, `reps`, `weight_kg` (NUMERIC)
-- `duration_min` (INTEGER)
+- `duration_minutes` (INTEGER)
+- `notes` (VARCHAR)
+- `source_file` (VARCHAR)
+
+### Exercise Log
+- `id` (VARCHAR): Format `{activity_id}_{exercise_name}_{set_number}` (e.g., `20260131_str_1_squat_1`)
+- `activity_id` (VARCHAR): Foreign key to activities
+- `date` (DATE): Exercise date
+- `exercise_name` (VARCHAR): Exercise name (snake_case)
+- `weight_kg` (DECIMAL)
+- `reps` (INTEGER)
+- `set_number` (INTEGER)
+- `duration_minutes` (INTEGER): For timed exercises
+- `distance_km` (DECIMAL): For cardio
 - `notes` (VARCHAR)
 
 ### Food Log
@@ -32,25 +43,35 @@ Based on the project's data extraction patterns:
 - `calories`, `protein_g`, `carbs_g`, `fat_g` (NUMERIC)
 
 ### Daily Metrics
-- `date` (DATE)
-- `weight_kg`, `sleep_hours`, `energy_level`, `mood_score` (NUMERIC)
+- `date` (DATE): Primary key
+- `sleep_hours` (DECIMAL)
+- `sleep_quality` (INTEGER): 1-5 scale
+- `energy` (INTEGER): 1-5 scale
+- `mood` (INTEGER): 1-5 scale
+- `stress` (INTEGER): 1-5 scale
+- `notes` (VARCHAR)
+- `source_file` (VARCHAR)
 
-### Daily Tasks
+### Tasks
+- `id` (VARCHAR): Primary key
 - `date` (DATE)
-- `task` (VARCHAR)
-- `status` (VARCHAR): done, pending, moved
-- `priority` (VARCHAR): high, medium, low
+- `description` (VARCHAR): Task description
+- `status` (VARCHAR): pending, completed, cancelled
+- `completed_at` (TIMESTAMP)
+- `category` (VARCHAR)
+- `priority` (INTEGER): 1-3
+- `source_file` (VARCHAR)
 
 ## Query Examples
 
 ```sql
--- Weekly exercise summary
+-- Weekly activity summary
 SELECT
   DATE_TRUNC('week', date) as week,
   activity_type,
   COUNT(*) as sessions,
-  SUM(duration_min) as total_minutes
-FROM exercise_log
+  SUM(duration_minutes) as total_minutes
+FROM activities
 GROUP BY 1, 2
 ORDER BY 1 DESC;
 

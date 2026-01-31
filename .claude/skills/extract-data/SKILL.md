@@ -41,13 +41,24 @@ Then bench press 3x8 at 70kg. Finished with some lat pulldowns and face pulls.
 
 ## Expected Extraction
 
+### Activities
+```json
+[
+  {"id": "20260115_str_1", "date": "2026-01-15", "activity_type": "str", "duration_minutes": 60}
+]
+```
+
 ### Exercise Log
 ```json
 [
-  {"activity_id": "20260115_str_1", "date": "2026-01-15", "activity_type": "str",
-   "exercise_name": "Squat", "sets": 3, "reps": 5, "weight_kg": 100},
-  {"activity_id": "20260115_str_2", "date": "2026-01-15", "activity_type": "str",
-   "exercise_name": "Bench Press", "sets": 3, "reps": 8, "weight_kg": 70}
+  {"id": "20260115_str_1_squat_1", "activity_id": "20260115_str_1", "date": "2026-01-15",
+   "exercise_name": "squat", "set_number": 1, "reps": 5, "weight_kg": 100},
+  {"id": "20260115_str_1_squat_2", "activity_id": "20260115_str_1", "date": "2026-01-15",
+   "exercise_name": "squat", "set_number": 2, "reps": 5, "weight_kg": 100},
+  {"id": "20260115_str_1_squat_3", "activity_id": "20260115_str_1", "date": "2026-01-15",
+   "exercise_name": "squat", "set_number": 3, "reps": 5, "weight_kg": 100},
+  {"id": "20260115_str_1_bench_press_1", "activity_id": "20260115_str_1", "date": "2026-01-15",
+   "exercise_name": "bench_press", "set_number": 1, "reps": 8, "weight_kg": 70}
 ]
 ```
 
@@ -63,10 +74,10 @@ Then bench press 3x8 at 70kg. Finished with some lat pulldowns and face pulls.
 ### Tasks
 ```json
 [
-  {"date": "2026-01-15", "task": "Review PR for auth module", "status": "done"},
-  {"date": "2026-01-15", "task": "Fix the login bug", "status": "done"},
-  {"date": "2026-01-15", "task": "Write tests for extraction", "status": "moved"},
-  {"date": "2026-01-15", "task": "Call dentist", "status": "pending"}
+  {"id": "20260115_task_1", "date": "2026-01-15", "description": "Review PR for auth module", "status": "completed"},
+  {"id": "20260115_task_2", "date": "2026-01-15", "description": "Fix the login bug", "status": "completed"},
+  {"id": "20260115_task_3", "date": "2026-01-15", "description": "Write tests for extraction", "status": "cancelled"},
+  {"id": "20260115_task_4", "date": "2026-01-15", "description": "Call dentist", "status": "pending"}
 ]
 ```
 
@@ -92,7 +103,9 @@ Only extract data that is explicitly mentioned.
 ## Validation Rules
 
 1. Dates must be valid and match the note's date
-2. Activity IDs follow format: `{YYYYMMDD}_{type}_{index}`
-3. Numeric values must be positive
-4. Required fields cannot be null
-5. Enums must match allowed values
+2. Activity IDs follow format: `{YYYYMMDD}_{type}_{index}` (e.g., `20260115_str_1`)
+3. Exercise log IDs follow format: `{activity_id}_{exercise_name}_{set_number}` (e.g., `20260115_str_1_squat_1`)
+4. Exercise names normalized to snake_case (e.g., `bench_press`, not `Bench Press`)
+5. Numeric values must be positive
+6. Required fields cannot be null
+7. Each set is a separate row in exercise_log

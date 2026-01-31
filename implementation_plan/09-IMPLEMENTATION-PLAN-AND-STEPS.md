@@ -7,7 +7,7 @@
 | Branch | Purpose |
 |--------|---------|
 | `um/main` | Main development branch (protected) |
-| `um/feature/<name>` | Feature development |
+| `um/um/feature/<name>` | Feature development |
 | `um/bugfix/<name>` | Bug fixes |
 | `um/hotfix/<name>` | Critical production fixes |
 | `um/release/<version>` | Release preparation |
@@ -25,7 +25,7 @@ um/main (protected)
     │       │
     │       └── PR → Code Review → Merge to um/main
     │
-    └── um/release/v0.1.0
+    └── release/v0.1.0
             │
             └── Tag → Deploy
 ```
@@ -642,7 +642,7 @@ async def test_daily_skill_creates_note(client, mock_claude):
 **Dockerfiles:**
 ```dockerfile
 # backend/Dockerfile
-FROM python:3.12-slim
+FROM python:3.14-slim
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

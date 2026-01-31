@@ -6,7 +6,7 @@
       "name": "id",
       "type": "string",
       "required": true,
-      "description": "Composite key: {activity_id}_{exercise}_{set_number} (e.g., 20260115_str_1_squat_1)"
+      "description": "Composite key: {activity_id}_{exercise_name}_{set_number} (e.g., 20260115_str_1_squat_1)"
     },
     {
       "name": "activity_id",
@@ -21,7 +21,7 @@
       "format": "YYYY-MM-DD"
     },
     {
-      "name": "exercise",
+      "name": "exercise_name",
       "type": "string",
       "required": true,
       "description": "Exercise name in snake_case (e.g., leg_press, romanian_deadlift)"

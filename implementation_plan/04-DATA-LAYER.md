@@ -74,7 +74,7 @@ CREATE TABLE exercise_log (
     id VARCHAR PRIMARY KEY,           -- '20260131_str_1_squat_1'
     activity_id VARCHAR NOT NULL,     -- '20260131_str_1'
     date DATE NOT NULL,
-    exercise VARCHAR NOT NULL,
+    exercise_name VARCHAR NOT NULL,
     weight_kg DECIMAL(5,1),
     reps INTEGER,
     set_number INTEGER,
@@ -131,7 +131,7 @@ CREATE TABLE tasks (
 CREATE TABLE activities (
     id VARCHAR PRIMARY KEY,           -- '20260131_str_1'
     date DATE NOT NULL,
-    type VARCHAR NOT NULL,            -- 'strength', 'bjj', 'run', etc.
+    activity_type VARCHAR NOT NULL,   -- 'strength', 'bjj', 'run', etc.
     duration_minutes INTEGER,
     notes VARCHAR,
     source_file VARCHAR,

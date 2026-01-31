@@ -15,7 +15,7 @@
       "format": "YYYY-MM-DD"
     },
     {
-      "name": "type",
+      "name": "activity_type",
       "type": "string",
       "required": true,
       "allowed_values": ["strength", "bjj", "cardio", "yoga", "walk", "recovery", "other"],
