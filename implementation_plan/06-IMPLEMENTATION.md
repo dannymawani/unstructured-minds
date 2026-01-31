@@ -182,7 +182,7 @@ def init_database(db_path: Path) -> duckdb.DuckDBPyConnection:
         CREATE TABLE IF NOT EXISTS activities (
             id VARCHAR PRIMARY KEY,
             date DATE NOT NULL,
-            type VARCHAR NOT NULL,
+            activity_type VARCHAR NOT NULL,
             duration_minutes INTEGER,
             notes VARCHAR,
             source_file VARCHAR,
@@ -195,7 +195,7 @@ def init_database(db_path: Path) -> duckdb.DuckDBPyConnection:
             id VARCHAR PRIMARY KEY,
             activity_id VARCHAR NOT NULL,
             date DATE NOT NULL,
-            exercise VARCHAR NOT NULL,
+            exercise_name VARCHAR NOT NULL,
             weight_kg DECIMAL(5,1),
             reps INTEGER,
             set_number INTEGER,

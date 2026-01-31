@@ -187,8 +187,8 @@ User: "How many times did I train legs this month?"
 ┌─────────────────────────────────────────────────────────────────┐
 │  Claude System Prompt:                                          │
 │  You are a SQL assistant for DuckDB. Generate queries for:      │
-│  - exercise_log (id, activity_id, date, exercise, weight_kg...) │
-│  - activities (id, date, type, duration_minutes, notes)         │
+│  - exercise_log (id, activity_id, date, exercise_name, ...)     │
+│  - activities (id, date, activity_type, duration_minutes, ...)  │
 │  - daily_metrics (date, sleep_hours, mood, energy...)           │
 │  Return ONLY the SQL query, no explanation.                     │
 └─────────────────────────────────────────────────────────────────┘
@@ -198,7 +198,7 @@ Generated SQL:
 SELECT COUNT(DISTINCT activity_id)
 FROM exercise_log
 WHERE date >= DATE_TRUNC('month', CURRENT_DATE)
-  AND exercise IN ('squat', 'deadlift', 'leg press', 'lunges')
+  AND exercise_name IN ('squat', 'deadlift', 'leg press', 'lunges')
                     │
                     ▼
 Execute on DuckDB → Result: 8
