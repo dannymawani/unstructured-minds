@@ -57,13 +57,13 @@ class ClaudeClient:
         self.client = Anthropic(
             api_key=os.environ.get("ANTHROPIC_API_KEY")
         )
-        self.model = "claude-sonnet-4-20250514"  # Fast, good for extraction
-        self.model_advanced = "claude-opus-4-20250514"  # Complex tasks
+        self.model_fast = "claude-3-5-haiku-20241022"  # Extraction, SQL - cheap & fast
+        self.model_smart = "claude-sonnet-4-20250514"  # Complex reasoning
 
     async def extract(self, content: str, schema: dict) -> dict:
-        """Extract structured data from markdown."""
+        """Extract structured data from markdown using Haiku (fast & cheap)."""
         response = await self.client.messages.create(
-            model=self.model,
+            model=self.model_fast,  # Haiku for extraction
             max_tokens=4096,
             system=EXTRACTION_SYSTEM_PROMPT,
             messages=[{
@@ -76,7 +76,7 @@ class ClaudeClient:
     async def query(self, question: str, context: str) -> str:
         """Answer a natural language question."""
         response = await self.client.messages.create(
-            model=self.model,
+            model=self.model_fast,  # Haiku for simple queries
             max_tokens=2048,
             system=QUERY_SYSTEM_PROMPT,
             messages=[{
@@ -87,9 +87,9 @@ class ClaudeClient:
         return response.content[0].text
 
     async def execute_skill(self, skill: str, context: dict) -> dict:
-        """Execute a skill with given context."""
+        """Execute a skill with given context (uses smarter model for complex tasks)."""
         response = await self.client.messages.create(
-            model=self.model_advanced,
+            model=self.model_smart,  # Sonnet for complex skills
             max_tokens=8192,
             system=skill.system_prompt,
             messages=[{
@@ -305,13 +305,15 @@ Open in editor
 
 | Task | Model | Why |
 |------|-------|-----|
-| Data Extraction | claude-sonnet-4-20250514 | Fast, accurate for structured output |
-| Text-to-SQL | claude-sonnet-4-20250514 | Quick SQL generation |
-| Simple Skills | claude-sonnet-4-20250514 | Standard tasks |
-| Complex Skills | claude-opus-4-20250514 | Multi-step reasoning, creative |
-| Code Generation | claude-sonnet-4-20250514 | Good code output |
+| **Data Extraction** | claude-3-5-haiku | Fast, cheap, great for structured JSON output |
+| Text-to-SQL | claude-3-5-haiku | Quick SQL generation |
+| Simple Skills | claude-3-5-haiku | Standard tasks |
+| Complex Queries | claude-sonnet-4-20250514 | Multi-step reasoning |
+| Only if needed | claude-opus-4-20250514 | Expensive, rarely necessary |
 
-### Cost Estimation
+> **Key Change:** Use **Haiku for extraction** - it's 10x cheaper than Sonnet and excellent at structured output tasks.
+
+### Cost Estimation (with Haiku)
 
 ```
 Daily usage estimate:
@@ -322,10 +324,12 @@ Daily usage estimate:
 
 Daily total: ~30K input + 15K output tokens
 
-Sonnet pricing (estimate):
-- Input: $3/1M tokens → $0.09/day
-- Output: $15/1M tokens → $0.23/day
-- Total: ~$0.32/day or ~$10/month
+Haiku pricing:
+- Input: $0.25/1M tokens → $0.0075/day
+- Output: $1.25/1M tokens → $0.019/day
+- Total: ~$0.03/day or ~$1/month
+
+(vs ~$10/month with Sonnet for everything)
 ```
 
 ---
@@ -413,12 +417,33 @@ class OfflineAwareClient:
 
 ---
 
-## Open Questions
+## Resolved Design Decisions
 
-1. **Streaming:** Should extraction/queries stream responses?
-2. **Conversation History:** Keep chat history for context?
-3. **Function Calling:** Use Claude's tool use for structured output?
-4. **Rate Limiting:** How to handle API limits gracefully?
+### Streaming
+**Decision:** Yes - stream responses for queries and skill execution.
+- Better UX for longer responses
+- Users see output as it generates
+- Extraction does not stream (waits for complete JSON)
+
+### Conversation History
+**Decision:** Session-based history, cleared on app restart.
+- Previous messages included for context within a session
+- No persistent storage of chat history
+- Keeps context window manageable
+- Privacy-friendly (no long-term storage)
+
+### Tool Use for Extraction
+**Decision:** Yes - use Claude's tool use feature for data extraction.
+- Guarantees valid JSON schema compliance
+- More reliable than plain prompting
+- Schema defined as tool parameters
+- Eliminates JSON parsing errors
+
+### Rate Limiting
+**Decision:** Exponential backoff with retry (already in error handling section).
+- 3 retries with exponential backoff
+- Graceful degradation when limits hit
+- Queue system for offline/rate-limited scenarios (future)
 
 ---
 

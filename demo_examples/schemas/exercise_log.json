@@ -1,0 +1,67 @@
+{
+  "name": "exercise_log",
+  "description": "Individual exercises within training activities. References activities table via activity_id.",
+  "columns": [
+    {
+      "name": "id",
+      "type": "string",
+      "required": true,
+      "description": "Composite key: {activity_id}_{exercise}_{set_number} (e.g., 20260115_str_1_squat_1)"
+    },
+    {
+      "name": "activity_id",
+      "type": "string",
+      "required": true,
+      "description": "Foreign key to activities table: YYYYMMDD_type_index (e.g., 20260115_str_1)"
+    },
+    {
+      "name": "date",
+      "type": "date",
+      "required": true,
+      "format": "YYYY-MM-DD"
+    },
+    {
+      "name": "exercise",
+      "type": "string",
+      "required": true,
+      "description": "Exercise name in snake_case (e.g., leg_press, romanian_deadlift)"
+    },
+    {
+      "name": "weight_kg",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "reps",
+      "type": "integer",
+      "required": false
+    },
+    {
+      "name": "set_number",
+      "type": "integer",
+      "required": true,
+      "description": "Set number within this exercise for this activity"
+    },
+    {
+      "name": "duration_minutes",
+      "type": "integer",
+      "required": false
+    },
+    {
+      "name": "distance_km",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "notes",
+      "type": "string",
+      "required": false
+    },
+    {
+      "name": "source_file",
+      "type": "string",
+      "required": false,
+      "description": "Path to the markdown file this was extracted from"
+    }
+  ]
+}

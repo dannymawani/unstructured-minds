@@ -1,0 +1,21 @@
+id,activity_id,date,exercise,weight_kg,reps,set_number,duration_minutes,distance_km,notes,source_file
+20260115_str_1_squat_1,20260115_str_1,2026-01-15,squat,60,8,1,,,Warmup,Daily-Notes/2026-01/2026-01-15.md
+20260115_str_1_squat_2,20260115_str_1,2026-01-15,squat,80,5,2,,,Warmup,Daily-Notes/2026-01/2026-01-15.md
+20260115_str_1_squat_3,20260115_str_1,2026-01-15,squat,100,5,3,,,Working set,Daily-Notes/2026-01/2026-01-15.md
+20260115_str_1_squat_4,20260115_str_1,2026-01-15,squat,100,5,4,,,Working set,Daily-Notes/2026-01/2026-01-15.md
+20260115_str_1_squat_5,20260115_str_1,2026-01-15,squat,100,5,5,,,Working set,Daily-Notes/2026-01/2026-01-15.md
+20260115_str_1_romanian_deadlift_1,20260115_str_1,2026-01-15,romanian_deadlift,80,8,1,,,,Daily-Notes/2026-01/2026-01-15.md
+20260115_str_1_romanian_deadlift_2,20260115_str_1,2026-01-15,romanian_deadlift,80,8,2,,,,Daily-Notes/2026-01/2026-01-15.md
+20260115_str_1_romanian_deadlift_3,20260115_str_1,2026-01-15,romanian_deadlift,80,8,3,,,,Daily-Notes/2026-01/2026-01-15.md
+20260115_str_1_leg_press_1,20260115_str_1,2026-01-15,leg_press,150,12,1,,,,Daily-Notes/2026-01/2026-01-15.md
+20260115_str_1_leg_press_2,20260115_str_1,2026-01-15,leg_press,150,12,2,,,,Daily-Notes/2026-01/2026-01-15.md
+20260115_str_1_leg_press_3,20260115_str_1,2026-01-15,leg_press,150,10,3,,,Near failure,Daily-Notes/2026-01/2026-01-15.md
+20260115_str_1_calf_raise_1,20260115_str_1,2026-01-15,calf_raise,100,15,1,,,,Daily-Notes/2026-01/2026-01-15.md
+20260115_str_1_calf_raise_2,20260115_str_1,2026-01-15,calf_raise,100,15,2,,,,Daily-Notes/2026-01/2026-01-15.md
+20260116_rec_1_walk_1,20260116_rec_1,2026-01-16,walk,,,,30,,Active recovery,Daily-Notes/2026-01/2026-01-16.md
+20260117_bjj_1_bjj_drilling_1,20260117_bjj_1,2026-01-17,bjj_drilling,,,,30,,Guard passing drills,Daily-Notes/2026-01/2026-01-17.md
+20260117_bjj_1_bjj_sparring_1,20260117_bjj_1,2026-01-17,bjj_sparring,,,,45,,6 rounds 5 min each,Daily-Notes/2026-01/2026-01-17.md
+20260117_bjj_1_bjj_positional_1,20260117_bjj_1,2026-01-17,bjj_positional,,,,15,,Mount escapes,Daily-Notes/2026-01/2026-01-17.md
+20260117_rec_1_hip_mobility_1,20260117_rec_1,2026-01-17,hip_mobility,,,,10,,Hip 90/90 stretches,Daily-Notes/2026-01/2026-01-17.md
+20260117_rec_1_shoulder_mobility_1,20260117_rec_1,2026-01-17,shoulder_mobility,,,,10,,Band work,Daily-Notes/2026-01/2026-01-17.md
+20260117_rec_1_foam_rolling_1,20260117_rec_1,2026-01-17,foam_rolling,,,,10,,Full body,Daily-Notes/2026-01/2026-01-17.md

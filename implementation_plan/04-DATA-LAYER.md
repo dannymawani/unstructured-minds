@@ -34,10 +34,10 @@ All file I/O goes through a `StorageBackend` interface, enabling pluggable stora
 
 See [02-ARCHITECTURE.md](./02-ARCHITECTURE.md) for interface details.
 
-### Directory Structure (Local Filesystem)
+### Directory Structure (Docker Volumes)
 
 ```
-vault/                          # User's markdown notes
+vault/                          # User's markdown notes (volume mount)
 ├── Daily-Notes/
 │   └── 2026-01/
 │       ├── 2026-01-31.md
@@ -46,16 +46,21 @@ vault/                          # User's markdown notes
 ├── Work/
 └── ...
 
-.unstructured/                  # App data (hidden)
-├── config.json                 # User settings
-├── cache/                      # LLM response cache
-└── unstructured.duckdb         # Main database
+data/                           # App data (volume mount)
+├── unstructured.duckdb         # Main database
+├── exercise_log.csv            # Flat CSV files (no date folders)
+├── food_log.csv                # DuckDB filters by date column
+├── daily_metrics.csv
+├── daily_tasks.csv
+└── schemas/                    # JSON schemas for extraction
+    └── *.json
 
-data/                           # Exported CSVs (optional)
-├── exercise_log/
-├── daily_metrics/
-└── ...
+config/                         # Configuration (volume mount)
+├── settings.json
+└── cache/                      # LLM response cache
 ```
+
+> **Simplified:** Flat CSV files instead of date-partitioned folders. DuckDB queries efficiently at personal data volumes (~10K rows).
 
 ---
 
@@ -405,12 +410,40 @@ SELECT * FROM read_csv_auto('data/exercise_log/*.csv');
 
 ---
 
-## Open Questions
+## Resolved Design Decisions
 
-1. **Real-time vs batch:** Extract on every save, or batch process periodically?
-2. **Conflict resolution:** What if markdown and DuckDB disagree?
-3. **Schema evolution:** How to handle adding new columns?
-4. **Privacy:** Any data that shouldn't be sent to Claude API?
+### Extraction Timing
+**Decision:** Real-time extraction on save with debounce (2 seconds after last edit).
+- Extraction triggers automatically when a file is saved
+- Debouncing prevents excessive API calls during rapid edits
+- Batch processing available on app startup for changed files
+
+### Conflict Resolution
+**Decision:** Markdown always wins - DuckDB is a derived view.
+- If markdown and DuckDB disagree, re-extract from markdown
+- DuckDB can be fully regenerated from notes at any time
+- No manual database edits expected; if needed, edit the source markdown
+
+### Schema Evolution
+**Decision:** Additive only - new columns default to NULL.
+- Adding new columns does not require migrations
+- Existing records get NULL for new columns
+- Re-extraction can populate new columns for historical data if desired
+- No breaking changes to existing data
+
+### Privacy Filtering
+**Decision:** No filtering - all markdown files are sent to Claude for extraction.
+- Simplifies implementation
+- Users should not store sensitive data in the vault if concerned
+- Future: Could add opt-in filtering if needed
+
+### ID Generation
+**Decision:** Composite key pattern for exercise_log IDs.
+- Format: `{activity_id}_{exercise}_{set_number}`
+- Example: `20260131_str_1_squat_1`
+- Deterministic: same content always produces same IDs
+- Enables idempotent extraction (re-extracting replaces same rows)
+- Exercise names normalized to snake_case (e.g., `leg_press` not `leg press`)
 
 ---
 
