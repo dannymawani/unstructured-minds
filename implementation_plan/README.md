@@ -41,11 +41,11 @@ See the [main README](../README.md) for project overview.
 
 | Branch | Purpose |
 |--------|---------|
-| `um/main` | Main development branch (protected) |
-| `um/feature/<name>` | Feature branches |
-| `um/release/<version>` | Release branches |
+| `main` | Main development branch (protected) |
+| `feature/<name>` | Feature branches |
+| `release/<version>` | Release branches |
 
-All development happens in feature branches. PRs required to merge to `um/main`.
+All development happens in feature branches. PRs required to merge to `main`.
 
 See [09-IMPLEMENTATION-PLAN-AND-STEPS.md](./09-IMPLEMENTATION-PLAN-AND-STEPS.md) for full workflow.
 

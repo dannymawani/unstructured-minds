@@ -6,24 +6,24 @@
 
 | Branch | Purpose |
 |--------|---------|
-| `um/main` | Main development branch (protected) |
-| `um/feature/<name>` | Feature development |
-| `um/bugfix/<name>` | Bug fixes |
-| `um/hotfix/<name>` | Critical production fixes |
-| `um/release/<version>` | Release preparation |
+| `main` | Main development branch (protected) |
+| `feature/<name>` | Feature development |
+| `bugfix/<name>` | Bug fixes |
+| `hotfix/<name>` | Critical production fixes |
+| `release/<version>` | Release preparation |
 
 ### Branch Flow
 
 ```
-um/main (protected)
+main (protected)
     │
-    ├── um/feature/phase0-project-setup
+    ├── feature/phase0-project-setup
     │       │
-    │       └── PR → Code Review → Merge to um/main
+    │       └── PR → Code Review → Merge to main
     │
-    ├── um/feature/phase0-fastapi-backend
+    ├── feature/phase0-fastapi-backend
     │       │
-    │       └── PR → Code Review → Merge to um/main
+    │       └── PR → Code Review → Merge to main
     │
     └── release/v0.1.0
             │
@@ -32,7 +32,7 @@ um/main (protected)
 
 ### Branch Rules
 
-1. **Never commit directly to `um/main`**
+1. **Never commit directly to `main`**
 2. All changes via Pull Request
 3. Require at least 1 approval (self-review for solo dev)
 4. All tests must pass before merge
@@ -57,7 +57,7 @@ Each feature follows this cycle:
 │  • Write acceptance criteria                                                │
 │  • Design API contracts (if applicable)                                     │
 │  • Update architecture docs if needed                                       │
-│  • Create branch: um/feature/<name>                                         │
+│  • Create branch: feature/<name>                                         │
 │                                                                              │
 │  Output: Design doc or issue with clear requirements                        │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -96,9 +96,9 @@ Each feature follows this cycle:
 │  • Run CI pipeline (tests, linting, type checks)                           │
 │  • Code review (peer or self with checklist)                               │
 │  • Address feedback, update PR                                              │
-│  • Merge to um/main when approved                                           │
+│  • Merge to main when approved                                           │
 │                                                                              │
-│  Output: Merged, tested feature in um/main                                  │
+│  Output: Merged, tested feature in main                                  │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -108,26 +108,24 @@ Each feature follows this cycle:
 
 **Goal:** Working backend infrastructure, Docker setup, core APIs
 
-**Branch:** `um/feature/phase0-foundation`
-
 ### Step 0.1: Project Initialization
 
 | Task | Test | Acceptance Criteria |
 |------|------|---------------------|
 | Create repository | N/A | Repo exists at GitHub |
-| Create `um/main` branch | N/A | Branch protected |
+| Create `main` branch | N/A | Branch protected |
 | Set up `.gitignore` | N/A | Ignores venv, node_modules, .env, __pycache__ |
 | Add LICENSE | N/A | MIT license file |
 | Create README.md | N/A | Basic project description |
 
-**Branch:** `um/feature/phase0-init`
+**Branch:** `feature/phase0-init`
 
 ```bash
 # Commands
 git init unstructured-minds
 cd unstructured-minds
-git checkout -b um/main
-git checkout -b um/feature/phase0-init
+git checkout -b main
+git checkout -b feature/phase0-init
 ```
 
 ---
@@ -141,7 +139,7 @@ git checkout -b um/feature/phase0-init
 | Create activities.json schema | N/A | Activities table defined |
 | Validate ID generation patterns | N/A | Composite key format documented |
 
-**Branch:** `um/feature/phase0-schema-validation`
+**Branch:** `feature/phase0-schema-validation`
 
 **Reference repo:** `/Users/dmh/Code/obsedian`
 
@@ -162,7 +160,7 @@ git checkout -b um/feature/phase0-init
 | Configure pytest | `pytest --collect-only` | Tests discovered |
 | Add .env.example | N/A | Template exists |
 
-**Branch:** `um/feature/phase0-backend-structure`
+**Branch:** `feature/phase0-backend-structure`
 
 **Tests:**
 ```python
@@ -186,7 +184,7 @@ def test_required_modules_exist():
 | Implement LocalFilesystem | `test_local_read_write` | CRUD operations work |
 | Add factory function | `test_get_storage_backend` | Returns correct backend |
 
-**Branch:** `um/feature/phase0-storage`
+**Branch:** `feature/phase0-storage`
 
 **Tests:**
 ```python
@@ -226,7 +224,7 @@ async def test_delete(storage):
 | Test volume mounts | Write test file | File accessible on host |
 | Add .env.example | N/A | All vars documented |
 
-**Branch:** `um/feature/phase0-docker`
+**Branch:** `feature/phase0-docker`
 
 **Tests:**
 ```bash
@@ -248,7 +246,7 @@ docker-compose down
 | Add logging | N/A | Structured logs output |
 | Integrate StorageBackend | `test_storage_injection` | API uses storage layer |
 
-**Branch:** `um/feature/phase0-fastapi`
+**Branch:** `feature/phase0-fastapi`
 
 **Tests:**
 ```python
@@ -278,7 +276,7 @@ def test_config_loads():
 | Add connection manager | `test_connection` | Can connect/query |
 | Create migration system | `test_migrations` | Versions tracked |
 
-**Branch:** `um/feature/phase0-duckdb`
+**Branch:** `feature/phase0-duckdb`
 
 **Tests:**
 ```python
@@ -315,7 +313,7 @@ def test_insert_and_query(tmp_path):
 
 ---
 
-### Step 0.7: Claude Client
+### Step 0.8: Claude Client
 
 | Task | Test | Acceptance Criteria |
 |------|------|---------------------|
@@ -324,7 +322,7 @@ def test_insert_and_query(tmp_path):
 | Add query method | `test_query_mock` | Returns response |
 | Handle errors/retries | `test_retry_logic` | Retries on failure |
 
-**Branch:** `um/feature/phase0-claude`
+**Branch:** `feature/phase0-claude`
 
 **Tests:**
 ```python
@@ -340,7 +338,7 @@ def mock_anthropic():
 
 def test_client_init(mock_anthropic):
     client = ClaudeClient()
-    assert client.model_fast == "claude-3-5-haiku-20241022"
+    assert client.model_fast == "claude-haiku-4-5-20251001"
 
 async def test_extraction_returns_json(mock_anthropic):
     mock_response = AsyncMock()
@@ -357,26 +355,28 @@ async def test_extraction_returns_json(mock_anthropic):
 
 ### Phase 0 Completion Checklist
 
-- [ ] `um/feature/phase0-init` merged
-- [ ] `um/feature/phase0-schema-validation` merged
-- [ ] `um/feature/phase0-backend-structure` merged
-- [ ] `um/feature/phase0-storage` merged
-- [ ] `um/feature/phase0-docker` merged
-- [ ] `um/feature/phase0-fastapi` merged
-- [ ] `um/feature/phase0-duckdb` merged
-- [ ] `um/feature/phase0-claude` merged
+- [ ] `feature/phase0-init` merged
+- [ ] `feature/phase0-schema-validation` merged
+- [ ] `feature/phase0-backend-structure` merged
+- [ ] `feature/phase0-storage` merged
+- [ ] `feature/phase0-docker` merged
+- [ ] `feature/phase0-fastapi` merged
+- [ ] `feature/phase0-duckdb` merged (Step 0.7)
+- [ ] `feature/phase0-claude` merged (Step 0.8)
 - [ ] All tests passing
 - [ ] Docker Compose runs successfully
 - [ ] API accessible at localhost:8000
 - [ ] Schemas validated against obsidian reference
 
-**Release:** Tag `v0.1.0-alpha` on `um/main`
+**Release:** Tag `v0.1.0-alpha` on `main`
 
 ---
 
 ## Phase 1: Core MVP
 
 **Goal:** Usable app with editor, chat, daily note, extraction
+
+**Branch:** `feature/phase1-core-mvp`
 
 ### Step 1.1: Frontend Project Setup
 
@@ -387,7 +387,7 @@ async def test_extraction_returns_json(mock_anthropic):
 | Configure Tailwind | Styles apply | CSS works |
 | Add shadcn/ui | Components render | Button renders |
 
-**Branch:** `um/feature/phase1-frontend-setup`
+**Branch:** `feature/phase1-frontend-setup`
 
 **Tests:**
 ```typescript
@@ -412,7 +412,7 @@ test('shadcn button renders', () => {
 | Add markdown export | `test_markdown_export` | Returns valid MD |
 | Add auto-save | `test_auto_save` | Debounced save works |
 
-**Branch:** `um/feature/phase1-editor`
+**Branch:** `feature/phase1-editor`
 
 **Tests:**
 ```typescript
@@ -452,7 +452,7 @@ test('editor exports markdown', async () => {
 | POST /vault/file | `test_write_file` | Saves content |
 | DELETE /vault/file | `test_delete_file` | Removes file |
 
-**Branch:** `um/feature/phase1-vault-api`
+**Branch:** `feature/phase1-vault-api`
 
 **Tests:**
 ```python
@@ -486,7 +486,7 @@ def test_write_file(client, vault_with_files):
 | Add file selection | `test_select_file` | Callback fires |
 | Connect to API | `test_loads_files` | Fetches from backend |
 
-**Branch:** `um/feature/phase1-file-browser`
+**Branch:** `feature/phase1-file-browser`
 
 ---
 
@@ -499,7 +499,7 @@ def test_write_file(client, vault_with_files):
 | Connect to query API | `test_sends_query` | Calls backend |
 | Parse /skill commands | `test_skill_detection` | Detects /daily |
 
-**Branch:** `um/feature/phase1-chat`
+**Branch:** `feature/phase1-chat`
 
 ---
 
@@ -512,7 +512,7 @@ def test_write_file(client, vault_with_files):
 | Template generation | `test_template` | Proper structure |
 | Daily Note button | `test_button_creates_note` | One-click works |
 
-**Branch:** `um/feature/phase1-daily-skill`
+**Branch:** `feature/phase1-daily-skill`
 
 **Tests:**
 ```python
@@ -540,7 +540,7 @@ async def test_daily_skill_creates_note(client, mock_claude):
 | Upsert to DuckDB | `test_data_persists` | Data in database |
 | extraction_log tracking | `test_skip_unchanged` | Skips if hash matches |
 
-**Branch:** `um/feature/phase1-extraction`
+**Branch:** `feature/phase1-extraction`
 
 ---
 
@@ -554,7 +554,7 @@ async def test_daily_skill_creates_note(client, mock_claude):
 - [ ] Extraction populates DuckDB
 - [ ] All tests passing
 
-**Release:** Tag `v0.2.0-beta` on `um/main`
+**Release:** Tag `v0.2.0-beta` on `main`
 
 ---
 
@@ -570,7 +570,7 @@ async def test_daily_skill_creates_note(client, mock_claude):
 | GET /dashboard/metrics-trends | `test_metrics_trends` | Returns time series |
 | GET /dashboard/exercise-progress | `test_exercise_progress` | Returns progress |
 
-**Branch:** `um/feature/phase2-dashboard-api`
+**Branch:** `feature/phase2-dashboard-api`
 
 ---
 
@@ -582,7 +582,7 @@ async def test_daily_skill_creates_note(client, mock_claude):
 | MetricsTrends component | `test_trends_render` | Line chart works |
 | Dashboard layout | `test_layout` | Responsive grid |
 
-**Branch:** `um/feature/phase2-dashboard-ui`
+**Branch:** `feature/phase2-dashboard-ui`
 
 ---
 
@@ -595,7 +595,7 @@ async def test_daily_skill_creates_note(client, mock_claude):
 | Theme selection | `test_theme_toggle` | Dark/light works |
 | API key management | `test_api_key_secure` | Stored securely |
 
-**Branch:** `um/feature/phase2-settings`
+**Branch:** `feature/phase2-settings`
 
 ---
 
@@ -607,7 +607,7 @@ async def test_daily_skill_creates_note(client, mock_claude):
 | Save (Cmd+S) | `test_cmd_s` | Saves file |
 | New daily note (Cmd+D) | `test_cmd_d` | Creates note |
 
-**Branch:** `um/feature/phase2-shortcuts`
+**Branch:** `feature/phase2-shortcuts`
 
 ---
 
@@ -620,7 +620,7 @@ async def test_daily_skill_creates_note(client, mock_claude):
 - [ ] Keyboard shortcuts work
 - [ ] All tests passing
 
-**Release:** Tag `v0.3.0-rc` on `um/main`
+**Release:** Tag `v0.3.0-rc` on `main`
 
 ---
 
@@ -637,7 +637,7 @@ async def test_daily_skill_creates_note(client, mock_claude):
 | Create docker-compose.yml | `docker-compose up` | Services start |
 | Configure volume mounts | Test file persistence | Data persists |
 
-**Branch:** `um/feature/phase3-docker`
+**Branch:** `feature/phase3-docker`
 
 **Dockerfiles:**
 ```dockerfile
@@ -673,7 +673,7 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 | Set up health checks | Services report healthy | Health OK |
 | Add .env.example | N/A | All vars documented |
 
-**Branch:** `um/feature/phase3-compose`
+**Branch:** `feature/phase3-compose`
 
 **docker-compose.yml:**
 ```yaml
@@ -707,7 +707,7 @@ services:
 | Add rate limiting | N/A | API protected |
 | Create .dockerignore | Build clean | No junk in image |
 
-**Branch:** `um/feature/phase3-production`
+**Branch:** `feature/phase3-production`
 
 ---
 
@@ -720,7 +720,7 @@ services:
 - [ ] All features work in containers
 - [ ] README documents deployment steps
 
-**Release:** Tag `v1.0.0` on `um/main`
+**Release:** Tag `v1.0.0` on `main`
 
 ---
 
@@ -734,9 +734,9 @@ name: CI
 
 on:
   push:
-    branches: [um/main]
+    branches: [main]
   pull_request:
-    branches: [um/main]
+    branches: [main]
 
 jobs:
   backend-tests:
