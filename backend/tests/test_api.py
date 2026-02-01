@@ -123,3 +123,138 @@ class TestConfig:
         from src.config import settings
         # Without API key, should be False
         assert isinstance(settings.claude_enabled, bool)
+
+
+class TestVaultListFiles:
+    """Tests for vault file listing endpoint."""
+
+    def test_list_files_empty_vault(self, client: TestClient) -> None:
+        """Test listing files in empty vault."""
+        response = client.get("/vault/files")
+        assert response.status_code == 200
+        data = response.json()
+        assert "files" in data
+        assert data["files"] == []
+
+    def test_list_files_with_files(self, client: TestClient, test_settings) -> None:
+        """Test listing files after creating some."""
+        # Create test files
+        vault_path = test_settings.vault_path
+        (vault_path / "test.md").write_text("# Test")
+        (vault_path / "notes").mkdir()
+        (vault_path / "notes" / "note1.md").write_text("# Note 1")
+
+        response = client.get("/vault/files")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["files"]) > 0
+
+    def test_list_files_with_prefix(self, client: TestClient, test_settings) -> None:
+        """Test listing files with prefix filter."""
+        vault_path = test_settings.vault_path
+        (vault_path / "daily").mkdir()
+        (vault_path / "daily" / "2026-01-31.md").write_text("# Daily")
+        (vault_path / "other.md").write_text("# Other")
+
+        response = client.get("/vault/files?prefix=daily")
+        assert response.status_code == 200
+        data = response.json()
+        # Should have files from daily folder
+        paths = [f["path"] for f in data["files"]]
+        assert any("daily" in p for p in paths)
+
+
+class TestVaultReadFile:
+    """Tests for vault file read endpoint."""
+
+    def test_read_file_success(self, client: TestClient, test_settings) -> None:
+        """Test reading a file."""
+        vault_path = test_settings.vault_path
+        (vault_path / "test.md").write_text("# Hello World")
+
+        response = client.get("/vault/file?path=test.md")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["path"] == "test.md"
+        assert data["content"] == "# Hello World"
+
+    def test_read_file_not_found(self, client: TestClient) -> None:
+        """Test reading a nonexistent file."""
+        response = client.get("/vault/file?path=nonexistent.md")
+        assert response.status_code == 404
+
+    def test_read_file_path_required(self, client: TestClient) -> None:
+        """Test that path parameter is required."""
+        response = client.get("/vault/file")
+        assert response.status_code == 422  # Validation error
+
+
+class TestVaultWriteFile:
+    """Tests for vault file write endpoint."""
+
+    def test_write_file_success(self, client: TestClient, test_settings) -> None:
+        """Test writing a file."""
+        response = client.post(
+            "/vault/file",
+            json={"path": "new-file.md", "content": "# New Content"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["path"] == "new-file.md"
+        assert data["success"] is True
+
+        # Verify file was written
+        vault_path = test_settings.vault_path
+        assert (vault_path / "new-file.md").exists()
+        assert (vault_path / "new-file.md").read_text() == "# New Content"
+
+    def test_write_file_creates_directories(self, client: TestClient, test_settings) -> None:
+        """Test writing a file creates parent directories."""
+        response = client.post(
+            "/vault/file",
+            json={"path": "nested/dir/file.md", "content": "# Nested"},
+        )
+        assert response.status_code == 200
+
+        vault_path = test_settings.vault_path
+        assert (vault_path / "nested" / "dir" / "file.md").exists()
+
+    def test_write_file_overwrites(self, client: TestClient, test_settings) -> None:
+        """Test writing overwrites existing file."""
+        vault_path = test_settings.vault_path
+        (vault_path / "existing.md").write_text("# Original")
+
+        response = client.post(
+            "/vault/file",
+            json={"path": "existing.md", "content": "# Updated"},
+        )
+        assert response.status_code == 200
+        assert (vault_path / "existing.md").read_text() == "# Updated"
+
+
+class TestVaultDeleteFile:
+    """Tests for vault file delete endpoint."""
+
+    def test_delete_file_success(self, client: TestClient, test_settings) -> None:
+        """Test deleting a file."""
+        vault_path = test_settings.vault_path
+        (vault_path / "delete-me.md").write_text("# Delete me")
+
+        response = client.delete("/vault/file?path=delete-me.md")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["path"] == "delete-me.md"
+        assert data["success"] is True
+
+        # Verify file was deleted
+        assert not (vault_path / "delete-me.md").exists()
+
+    def test_delete_file_not_found(self, client: TestClient) -> None:
+        """Test deleting a nonexistent file."""
+        response = client.delete("/vault/file?path=nonexistent.md")
+        assert response.status_code == 404
+
+    def test_delete_file_path_required(self, client: TestClient) -> None:
+        """Test that path parameter is required."""
+        response = client.delete("/vault/file")
+        assert response.status_code == 422
