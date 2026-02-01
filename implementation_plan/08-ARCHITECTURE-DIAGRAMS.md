@@ -17,8 +17,8 @@
 | | DuckDB | 1.4 | Embedded analytics |
 | | Anthropic SDK | 0.45.x | Claude API client |
 | | Watchdog | 6.x | File system monitoring |
-| **AI** | Claude Haiku | claude-3-5-haiku | Extraction (fast, cheap) |
-| | Claude Sonnet | claude-sonnet-4 | Complex queries |
+| **AI** | Claude Haiku 4.5 | claude-haiku-4-5-20251001 | Extraction (fast, cheap) |
+| | Claude Sonnet 4.5 | claude-sonnet-4-5-20250929 | Complex queries |
 
 ---
 
@@ -71,8 +71,8 @@
 ┃   ┌─────────────────────────────────────────────────────────────────────┐    ┃
 ┃   │                     Claude API (Anthropic)                          │    ┃
 ┃   │                                                                     │    ┃
-┃   │   claude-3-5-haiku ──────  Extraction, SQL (fast & cheap)          │    ┃
-┃   │   claude-sonnet-4  ──────  Complex skills, reasoning               │    ┃
+┃   │   claude-haiku-4-5  ─────  Extraction, SQL (fast & cheap)          │    ┃
+┃   │   claude-sonnet-4-5 ─────  Complex skills, reasoning               │    ┃
 ┃   │                                                                     │    ┃
 ┃   └─────────────────────────────────────────────────────────────────────┘    ┃
 ┃                                                                               ┃

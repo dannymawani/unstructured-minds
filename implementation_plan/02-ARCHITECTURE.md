@@ -185,12 +185,12 @@ The architecture includes a pluggable storage backend to support multiple storag
 
 ## Open Technical Questions
 
-1. **DuckDB location:** Single file or per-table files?
-2. **Claude context:** How much vault content to include in prompts?
-3. **Offline mode:** Cache Claude responses? Use local model fallback?
+1. **DuckDB location:** Single file or per-table files? --> single file if that is the easiest
+2. **Claude context:** How much vault content to include in prompts? --> make it flexible and context based
+3. **Offline mode:** Cache Claude responses? Use local model fallback? --> yes
 4. ~~**Sync:** If multi-device, how? (CRDTs? Git? Cloud?)~~ → Resolved via Storage Backend
-5. **Skill format:** Keep current .md format or define new spec?
-6. **Storage backend selection:** UI for switching backends? Migration tools?
+5. **Skill format:** Keep current .md format or define new spec? --> new spec but stil .md
+6. **Storage backend selection:** UI for switching backends? Migration tools? --> not sure
 
 ---
 

@@ -581,8 +581,8 @@ Data extraction from notes to structured JSON is a well-defined task. Using Sonn
 3. **Haiku for extraction, Sonnet for complex** - Cheap (~$1-3/month)
 
 ### Decision
-**Haiku (claude-3-5-haiku) for extraction and simple tasks.**
-Sonnet only for complex reasoning when needed.
+**Haiku 4.5 (claude-haiku-4-5-20251001) for extraction and simple tasks.**
+Sonnet 4.5 only for complex reasoning when needed.
 
 ### Consequences
 - ~10x cost reduction for extraction tasks

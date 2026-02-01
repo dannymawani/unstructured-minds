@@ -130,10 +130,10 @@ So that the app acts as my AI assistant, not just a note-taker
 
 ## Open Questions
 
-1. Should the app read existing Obsidian vaults or start fresh?
-2. How much of the current Python scripts should be rewritten vs wrapped?
-3. Should we support multiple vaults?
-4. What's the licensing model if this becomes a product?
+1. Should the app read existing Obsidian vaults or start fresh? --> start fresh
+2. How much of the current Python scripts should be rewritten vs wrapped? --> rewritten when it makes sense
+3. Should we support multiple vaults? --> only one vault - should be vaultless and tied to the user
+4. What's the licensing model if this becomes a product? --> i should own this
 
 ---
 
