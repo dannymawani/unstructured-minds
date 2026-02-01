@@ -1,0 +1,31 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: unstructured-minds-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - VAULT_PATH=/vault
+      - DATA_PATH=/data
+      - HOST=0.0.0.0
+      - PORT=8000
+      - DEBUG=${DEBUG:-false}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    volumes:
+      # Mount vault for markdown notes
+      - ${VAULT_PATH:-./vault}:/vault:rw
+      # Mount data directory for DuckDB and CSVs
+      - ${DATA_PATH:-./data}:/data:rw
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  vault:
+  data:
