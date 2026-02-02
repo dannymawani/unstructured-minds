@@ -1,0 +1,420 @@
+"""Extraction pipeline for processing markdown notes."""
+
+import hashlib
+import uuid
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any, Optional
+
+from ..claude import ClaudeClient
+from ..db import DatabaseManager
+from .schemas import COMBINED_EXTRACTION_SCHEMA
+
+
+@dataclass
+class ExtractionResult:
+    """Result of an extraction operation."""
+
+    success: bool
+    file_path: str
+    file_hash: str
+    data: Optional[dict[str, Any]] = None
+    error: Optional[str] = None
+    records_inserted: dict[str, int] = field(default_factory=dict)
+
+
+class ExtractionPipeline:
+    """Pipeline for extracting structured data from markdown notes."""
+
+    def __init__(
+        self,
+        db: DatabaseManager,
+        claude: Optional[ClaudeClient] = None,
+    ) -> None:
+        """Initialize extraction pipeline.
+
+        Args:
+            db: Database manager for storing extracted data
+            claude: Claude client for AI extraction (optional)
+        """
+        self.db = db
+        self.claude = claude
+
+    def _compute_hash(self, content: str) -> str:
+        """Compute hash of content for change detection.
+
+        Args:
+            content: File content
+
+        Returns:
+            SHA256 hash
+        """
+        return hashlib.sha256(content.encode()).hexdigest()
+
+    def _should_extract(self, file_path: str, file_hash: str) -> bool:
+        """Check if file needs extraction.
+
+        Args:
+            file_path: Path to the file
+            file_hash: Hash of current content
+
+        Returns:
+            True if extraction needed
+        """
+        result = self.db.execute(
+            """
+            SELECT file_hash FROM extraction_log
+            WHERE file_path = ? AND success = TRUE
+            ORDER BY extracted_at DESC LIMIT 1
+            """,
+            [file_path],
+        ).fetchall()
+        if not result:
+            return True
+        return result[0][0] != file_hash
+
+    def _log_extraction(
+        self,
+        file_path: str,
+        file_hash: str,
+        success: bool,
+        error: Optional[str] = None,
+    ) -> None:
+        """Log extraction attempt.
+
+        Args:
+            file_path: Path to the file
+            file_hash: Hash of content
+            success: Whether extraction succeeded
+            error: Error message if failed
+        """
+        self.db.execute(
+            """
+            INSERT INTO extraction_log (file_path, file_hash, success, error_message)
+            VALUES (?, ?, ?, ?)
+            """,
+            [file_path, file_hash, success, error],
+        )
+
+    def _extract_date_from_path(self, file_path: str) -> Optional[str]:
+        """Try to extract date from file path.
+
+        Expects format like Daily-Notes/YYYY-MM/YYYY-MM-DD.md
+
+        Args:
+            file_path: Path to the file
+
+        Returns:
+            Date string or None
+        """
+        # Try to get filename as date
+        parts = file_path.replace("\\", "/").split("/")
+        filename = parts[-1].replace(".md", "")
+
+        # Check if filename is a date
+        try:
+            datetime.strptime(filename, "%Y-%m-%d")
+            return filename
+        except ValueError:
+            pass
+
+        return None
+
+    def _generate_id(self) -> str:
+        """Generate a unique ID.
+
+        Returns:
+            UUID string
+        """
+        return str(uuid.uuid4())
+
+    def _store_daily_metrics(
+        self,
+        date: str,
+        metrics: dict[str, Any],
+        source_file: str,
+    ) -> int:
+        """Store daily metrics in database.
+
+        Args:
+            date: Date string
+            metrics: Metrics data
+            source_file: Source file path
+
+        Returns:
+            Number of records inserted
+        """
+        if not metrics:
+            return 0
+
+        # Use REPLACE to handle updates
+        self.db.execute(
+            """
+            INSERT OR REPLACE INTO daily_metrics
+            (date, sleep_hours, sleep_quality, energy, mood, stress, notes, source_file)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                date,
+                metrics.get("sleep_hours"),
+                metrics.get("sleep_quality"),
+                metrics.get("energy"),
+                metrics.get("mood"),
+                metrics.get("stress"),
+                metrics.get("notes"),
+                source_file,
+            ],
+        )
+        return 1
+
+    def _store_activities(
+        self,
+        date: str,
+        activities: list[dict[str, Any]],
+        source_file: str,
+    ) -> int:
+        """Store activities and exercises in database.
+
+        Args:
+            date: Date string
+            activities: List of activity data
+            source_file: Source file path
+
+        Returns:
+            Number of exercise records inserted
+        """
+        if not activities:
+            return 0
+
+        records = 0
+        for i, activity in enumerate(activities):
+            activity_id = f"{date.replace('-', '')}_{activity.get('activity_type', 'other')}_{i+1}"
+
+            # Insert activity record
+            self.db.execute(
+                """
+                INSERT OR REPLACE INTO activities
+                (id, date, activity_type, duration_minutes, notes, source_file)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    activity_id,
+                    date,
+                    activity.get("activity_type", "other"),
+                    activity.get("duration_minutes"),
+                    activity.get("notes"),
+                    source_file,
+                ],
+            )
+
+            # Insert exercise records
+            for j, exercise in enumerate(activity.get("exercises", [])):
+                exercise_id = self._generate_id()
+                self.db.execute(
+                    """
+                    INSERT OR REPLACE INTO exercise_log
+                    (id, activity_id, date, exercise_name, weight_kg, reps, set_number,
+                     duration_minutes, distance_km, notes, source_file)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    [
+                        exercise_id,
+                        activity_id,
+                        date,
+                        exercise.get("name", "unknown"),
+                        exercise.get("weight_kg"),
+                        exercise.get("reps"),
+                        j + 1,
+                        exercise.get("duration_minutes"),
+                        exercise.get("distance_km"),
+                        exercise.get("notes"),
+                        source_file,
+                    ],
+                )
+                records += 1
+
+        return records
+
+    def _store_tasks(
+        self,
+        date: str,
+        tasks: list[dict[str, Any]],
+        source_file: str,
+    ) -> int:
+        """Store tasks in database.
+
+        Args:
+            date: Date string
+            tasks: List of task data
+            source_file: Source file path
+
+        Returns:
+            Number of records inserted
+        """
+        if not tasks:
+            return 0
+
+        records = 0
+        for task in tasks:
+            task_id = self._generate_id()
+            completed_at = datetime.now() if task.get("status") == "done" else None
+
+            self.db.execute(
+                """
+                INSERT INTO tasks
+                (id, date, description, status, completed_at, category, priority, source_file)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    task_id,
+                    date,
+                    task.get("description", ""),
+                    task.get("status", "todo"),
+                    completed_at,
+                    task.get("category"),
+                    task.get("priority"),
+                    source_file,
+                ],
+            )
+            records += 1
+
+        return records
+
+    def _store_meals(
+        self,
+        date: str,
+        meals: list[dict[str, Any]],
+        source_file: str,
+    ) -> int:
+        """Store food log entries in database.
+
+        Args:
+            date: Date string
+            meals: List of meal data
+            source_file: Source file path
+
+        Returns:
+            Number of records inserted
+        """
+        if not meals:
+            return 0
+
+        records = 0
+        for meal in meals:
+            meal_id = self._generate_id()
+            self.db.execute(
+                """
+                INSERT INTO food_log
+                (id, date, meal_type, time, description, calories,
+                 protein_g, carbs_g, fat_g, notes, source_file)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    meal_id,
+                    date,
+                    meal.get("meal_type"),
+                    meal.get("time"),
+                    meal.get("description", ""),
+                    meal.get("calories"),
+                    meal.get("protein_g"),
+                    meal.get("carbs_g"),
+                    meal.get("fat_g"),
+                    meal.get("notes"),
+                    source_file,
+                ],
+            )
+            records += 1
+
+        return records
+
+    async def extract(
+        self,
+        file_path: str,
+        content: str,
+        force: bool = False,
+    ) -> ExtractionResult:
+        """Extract structured data from markdown content.
+
+        Args:
+            file_path: Path to the file (for logging/deduplication)
+            content: Markdown content to extract from
+            force: Force extraction even if already processed
+
+        Returns:
+            Extraction result
+        """
+        file_hash = self._compute_hash(content)
+
+        # Check if already extracted
+        if not force and not self._should_extract(file_path, file_hash):
+            return ExtractionResult(
+                success=True,
+                file_path=file_path,
+                file_hash=file_hash,
+                data=None,
+                error="Already extracted (no changes)",
+            )
+
+        # Check if Claude is available
+        if not self.claude or not self.claude.is_configured:
+            return ExtractionResult(
+                success=False,
+                file_path=file_path,
+                file_hash=file_hash,
+                error="Claude API not configured",
+            )
+
+        try:
+            # Extract data using Claude
+            data = await self.claude.extract(content, COMBINED_EXTRACTION_SCHEMA)
+
+            # Get date from extracted data or file path
+            date = data.get("date") or self._extract_date_from_path(file_path)
+            if not date:
+                # Use today if no date found
+                date = datetime.now().strftime("%Y-%m-%d")
+
+            # Store extracted data
+            records_inserted = {}
+
+            if data.get("daily_metrics"):
+                records_inserted["daily_metrics"] = self._store_daily_metrics(
+                    date, data["daily_metrics"], file_path
+                )
+
+            if data.get("activities"):
+                records_inserted["exercises"] = self._store_activities(
+                    date, data["activities"], file_path
+                )
+
+            if data.get("tasks"):
+                records_inserted["tasks"] = self._store_tasks(
+                    date, data["tasks"], file_path
+                )
+
+            if data.get("meals"):
+                records_inserted["meals"] = self._store_meals(
+                    date, data["meals"], file_path
+                )
+
+            # Log successful extraction
+            self._log_extraction(file_path, file_hash, True)
+
+            return ExtractionResult(
+                success=True,
+                file_path=file_path,
+                file_hash=file_hash,
+                data=data,
+                records_inserted=records_inserted,
+            )
+
+        except Exception as e:
+            # Log failed extraction
+            self._log_extraction(file_path, file_hash, False, str(e))
+
+            return ExtractionResult(
+                success=False,
+                file_path=file_path,
+                file_hash=file_hash,
+                error=str(e),
+            )
