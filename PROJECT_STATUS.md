@@ -1,6 +1,6 @@
 # Project Status - Unstructured Minds
 
-**Last Updated:** 2026-02-01
+**Last Updated:** 2026-02-02
 
 ---
 
@@ -26,17 +26,17 @@ Unstructured Minds transforms natural language notes into structured, queryable 
 
 **Commit:** `386fb67` - "Implement Phase 0: Backend foundation"
 
-### Phase 1: Core MVP (In Progress)
+### Phase 1: Core MVP ✅
 
 | Step | Description | Status |
 |------|-------------|--------|
 | 1.1 | Frontend project setup | ✅ Complete |
 | 1.2 | Milkdown editor component | ✅ Complete |
 | 1.3 | Vault API endpoints | ✅ Complete |
-| 1.4 | File browser component | ⏳ Pending |
-| 1.5 | Chat interface | ⏳ Pending |
-| 1.6 | Daily note skill | ⏳ Pending |
-| 1.7 | Data extraction | ⏳ Pending |
+| 1.4 | File browser component | ✅ Complete |
+| 1.5 | Chat interface | ✅ Complete |
+| 1.6 | Daily note skill | ✅ Complete |
+| 1.7 | Data extraction | ✅ Complete |
 
 **Commit:** `9387653` - "Implement Phase 1 core: frontend, editor, vault API"
 
@@ -44,79 +44,18 @@ Unstructured Minds transforms natural language notes into structured, queryable 
 
 ## Next Steps
 
-### Step 1.4: File Browser Component
+### Phase 2: Polish
 
-**Goal:** Create a file tree sidebar for navigating vault files
-
-**Tasks:**
-- [ ] Create `FileTree` component with folder expand/collapse
-- [ ] Add file selection with click handler
-- [ ] Add new file/folder creation buttons
-- [ ] Connect to vault API (`GET /vault/files`)
-- [ ] Add tests
-
-**Files to create:**
-- `frontend/src/components/FileTree/FileTree.tsx`
-- `frontend/src/components/FileTree/FileTreeItem.tsx`
-- `frontend/src/components/FileTree/__tests__/FileTree.test.tsx`
-
----
-
-### Step 1.5: Chat Interface
-
-**Goal:** Add a chat panel for natural language queries
+**Goal:** Dashboards, settings, themes, UX refinement
 
 **Tasks:**
-- [ ] Create `ChatPanel` component
-- [ ] Add message display (user/assistant bubbles)
-- [ ] Add input with submit
-- [ ] Create chat API endpoint (`POST /chat`)
-- [ ] Integrate with Claude client
-- [ ] Add tests
+- [ ] Dashboard API endpoints (weekly activity, metrics trends, exercise progress)
+- [ ] Dashboard UI components
+- [ ] Settings panel
+- [ ] Dark/light theme support
+- [ ] Keyboard shortcuts (Cmd+K, Cmd+S, Cmd+D)
 
-**Files to create:**
-- `frontend/src/components/Chat/ChatPanel.tsx`
-- `frontend/src/components/Chat/ChatMessage.tsx`
-- `backend/src/api/chat.py`
-
----
-
-### Step 1.6: Daily Note Skill
-
-**Goal:** Implement `/daily` command to create daily notes
-
-**Tasks:**
-- [ ] Create skill definition format
-- [ ] Add `/daily` skill that creates note from template
-- [ ] Create skill execution endpoint (`POST /skills/execute`)
-- [ ] Add date-based file naming (`Daily-Notes/YYYY-MM/YYYY-MM-DD.md`)
-- [ ] Integrate with Claude for content generation (optional)
-- [ ] Add tests
-
-**Files to create:**
-- `backend/src/skills/daily.py`
-- `backend/src/api/skills.py`
-- `backend/skills/daily.md` (skill definition)
-
----
-
-### Step 1.7: Data Extraction
-
-**Goal:** Extract structured data from markdown notes
-
-**Tasks:**
-- [ ] Implement file watcher for vault changes
-- [ ] Create extraction pipeline
-- [ ] Define extraction schemas (exercise_log, daily_metrics, etc.)
-- [ ] Use Claude tool use for guaranteed JSON output
-- [ ] Store extracted data in DuckDB
-- [ ] Add extraction log tracking
-- [ ] Add tests
-
-**Files to create/modify:**
-- `backend/src/watcher/file_watcher.py`
-- `backend/src/extraction/pipeline.py`
-- `backend/src/extraction/schemas.py`
+See `implementation_plan/09-IMPLEMENTATION-PLAN-AND-STEPS.md` for detailed steps.
 
 ---
 
@@ -124,9 +63,9 @@ Unstructured Minds transforms natural language notes into structured, queryable 
 
 | Component | Tests | Status |
 |-----------|-------|--------|
-| Backend | 58 | ✅ All passing |
-| Frontend | 10 | ✅ All passing |
-| **Total** | **68** | ✅ |
+| Backend | 107 | ✅ All passing |
+| Frontend | 38 | ✅ All passing |
+| **Total** | **145** | ✅ |
 
 ---
 
@@ -198,8 +137,17 @@ docker-compose down  # Stop services
 | Database | `backend/src/db/schema.py` |
 | Storage | `backend/src/storage/local.py` |
 | Claude Client | `backend/src/claude/client.py` |
+| Extraction Pipeline | `backend/src/extraction/pipeline.py` |
+| Extraction Schemas | `backend/src/extraction/schemas.py` |
+| File Watcher | `backend/src/watcher/file_watcher.py` |
+| Extraction API | `backend/src/api/extraction.py` |
 | Frontend Entry | `frontend/src/main.tsx` |
 | Editor | `frontend/src/components/Editor/MarkdownEditor.tsx` |
+| File Browser | `frontend/src/components/FileTree/FileTree.tsx` |
+| Chat Panel | `frontend/src/components/Chat/ChatPanel.tsx` |
+| Chat API | `backend/src/api/chat.py` |
+| Skills API | `backend/src/api/skills.py` |
+| Daily Note Skill | `backend/src/skills/daily.py` |
 | UI Components | `frontend/src/components/ui/` |
 
 ---
