@@ -1,0 +1,567 @@
+"""Dashboard API endpoints."""
+
+from datetime import date, timedelta
+from typing import Any, Optional
+
+from fastapi import APIRouter, Depends, Query, Request
+from pydantic import BaseModel
+
+from ..db import DatabaseManager
+
+
+router = APIRouter(prefix="/dashboard", tags=["dashboard"])
+
+
+class Period(BaseModel):
+    """Time period for dashboard queries."""
+
+    start_date: str
+    end_date: str
+    days: int
+
+
+class ActivitySummary(BaseModel):
+    """Summary of activities by type."""
+
+    activity_type: str
+    count: int
+    total_duration_minutes: int
+
+
+class WeeklyActivityResponse(BaseModel):
+    """Response for weekly activity endpoint."""
+
+    activities: list[ActivitySummary]
+    total_duration_minutes: int
+    period: Period
+
+
+class MetricEntry(BaseModel):
+    """Single day of metrics."""
+
+    date: str
+    sleep_hours: Optional[float] = None
+    sleep_quality: Optional[int] = None
+    energy: Optional[int] = None
+    mood: Optional[int] = None
+    stress: Optional[int] = None
+
+
+class MetricsTrendsResponse(BaseModel):
+    """Response for metrics trends endpoint."""
+
+    metrics: list[MetricEntry]
+    period: Period
+
+
+class ExerciseProgressEntry(BaseModel):
+    """Single day of exercise progress."""
+
+    date: str
+    max_weight_kg: Optional[float] = None
+    total_reps: int
+    total_sets: int
+
+
+class ExerciseSummary(BaseModel):
+    """Summary statistics for an exercise."""
+
+    current_max: Optional[float] = None
+    all_time_max: Optional[float] = None
+    total_volume: int
+    total_sessions: int
+
+
+class ExerciseProgressResponse(BaseModel):
+    """Response for exercise progress endpoint."""
+
+    exercise: str
+    progress: list[ExerciseProgressEntry]
+    summary: ExerciseSummary
+    period: Period
+
+
+class DashboardSummaryResponse(BaseModel):
+    """Response for dashboard summary endpoint."""
+
+    total_activities: int
+    total_exercises: int
+    streak_days: int
+    last_activity_date: Optional[str] = None
+    period: Period
+
+
+class HeatmapDay(BaseModel):
+    """Single day data for heatmap."""
+
+    date: str
+    count: int
+    duration_minutes: int
+
+
+class HeatmapResponse(BaseModel):
+    """Response for heatmap endpoint."""
+
+    days: list[HeatmapDay]
+    year: int
+    max_count: int
+    max_duration: int
+
+
+class CorrelationEntry(BaseModel):
+    """Single day of correlation data."""
+
+    date: str
+    sleep_hours: Optional[float] = None
+    energy: Optional[int] = None
+    mood: Optional[int] = None
+    stress: Optional[int] = None
+    activity_minutes: Optional[int] = None
+
+
+class Correlations(BaseModel):
+    """Correlation coefficients between metrics."""
+
+    sleep_mood: Optional[float] = None
+    sleep_energy: Optional[float] = None
+    activity_mood: Optional[float] = None
+    activity_energy: Optional[float] = None
+    stress_mood: Optional[float] = None
+
+
+class CorrelationResponse(BaseModel):
+    """Response for correlation endpoint."""
+
+    entries: list[CorrelationEntry]
+    correlations: Correlations
+
+
+def get_db(request: Request) -> DatabaseManager:
+    """Get database manager from app state."""
+    return request.app.state.db
+
+
+def get_period(days: int) -> Period:
+    """Calculate period from days."""
+    end = date.today()
+    start = end - timedelta(days=days - 1)
+    return Period(
+        start_date=str(start),
+        end_date=str(end),
+        days=days,
+    )
+
+
+def calculate_correlation(x: list[float], y: list[float]) -> Optional[float]:
+    """Calculate Pearson correlation coefficient between two lists.
+
+    Returns None if there's insufficient data or no variance.
+    """
+    if len(x) < 3 or len(y) < 3 or len(x) != len(y):
+        return None
+
+    n = len(x)
+    sum_x = sum(x)
+    sum_y = sum(y)
+    sum_xy = sum(xi * yi for xi, yi in zip(x, y))
+    sum_x2 = sum(xi ** 2 for xi in x)
+    sum_y2 = sum(yi ** 2 for yi in y)
+
+    # Calculate denominator
+    denominator = ((n * sum_x2 - sum_x ** 2) * (n * sum_y2 - sum_y ** 2)) ** 0.5
+
+    if denominator == 0:
+        return None
+
+    # Calculate correlation
+    correlation = (n * sum_xy - sum_x * sum_y) / denominator
+    return round(correlation, 3)
+
+
+@router.get("/weekly-activity", response_model=WeeklyActivityResponse)
+def get_weekly_activity(
+    days: int = Query(default=7, ge=1, le=365),
+    db: DatabaseManager = Depends(get_db),
+) -> WeeklyActivityResponse:
+    """Get activity summary for the specified period.
+
+    Args:
+        days: Number of days to include (default 7)
+        db: Database manager
+
+    Returns:
+        Activity summary grouped by type
+    """
+    period = get_period(days)
+
+    result = db.execute(
+        """
+        SELECT
+            activity_type,
+            COUNT(*) as count,
+            COALESCE(SUM(duration_minutes), 0) as total_duration
+        FROM activities
+        WHERE date >= ? AND date <= ?
+        GROUP BY activity_type
+        ORDER BY total_duration DESC
+        """,
+        [period.start_date, period.end_date],
+    ).fetchall()
+
+    activities = [
+        ActivitySummary(
+            activity_type=row[0],
+            count=row[1],
+            total_duration_minutes=int(row[2]),
+        )
+        for row in result
+    ]
+
+    total_duration = sum(a.total_duration_minutes for a in activities)
+
+    return WeeklyActivityResponse(
+        activities=activities,
+        total_duration_minutes=total_duration,
+        period=period,
+    )
+
+
+@router.get("/metrics-trends", response_model=MetricsTrendsResponse)
+def get_metrics_trends(
+    days: int = Query(default=7, ge=1, le=365),
+    db: DatabaseManager = Depends(get_db),
+) -> MetricsTrendsResponse:
+    """Get daily metrics trends for the specified period.
+
+    Args:
+        days: Number of days to include (default 7)
+        db: Database manager
+
+    Returns:
+        Daily metrics sorted by date
+    """
+    period = get_period(days)
+
+    result = db.execute(
+        """
+        SELECT
+            date,
+            sleep_hours,
+            sleep_quality,
+            energy,
+            mood,
+            stress
+        FROM daily_metrics
+        WHERE date >= ? AND date <= ?
+        ORDER BY date ASC
+        """,
+        [period.start_date, period.end_date],
+    ).fetchall()
+
+    metrics = [
+        MetricEntry(
+            date=str(row[0]),
+            sleep_hours=float(row[1]) if row[1] is not None else None,
+            sleep_quality=row[2],
+            energy=row[3],
+            mood=row[4],
+            stress=row[5],
+        )
+        for row in result
+    ]
+
+    return MetricsTrendsResponse(
+        metrics=metrics,
+        period=period,
+    )
+
+
+@router.get("/exercise-progress", response_model=ExerciseProgressResponse)
+def get_exercise_progress(
+    exercise: str = Query(..., description="Exercise name to track"),
+    days: int = Query(default=30, ge=1, le=365),
+    db: DatabaseManager = Depends(get_db),
+) -> ExerciseProgressResponse:
+    """Get progress for a specific exercise.
+
+    Args:
+        exercise: Exercise name
+        days: Number of days to include (default 30)
+        db: Database manager
+
+    Returns:
+        Exercise progress with daily max and summary stats
+    """
+    period = get_period(days)
+
+    # Get daily progress
+    result = db.execute(
+        """
+        SELECT
+            date,
+            MAX(weight_kg) as max_weight,
+            SUM(reps) as total_reps,
+            COUNT(*) as total_sets
+        FROM exercise_log
+        WHERE exercise_name = ? AND date >= ? AND date <= ?
+        GROUP BY date
+        ORDER BY date ASC
+        """,
+        [exercise, period.start_date, period.end_date],
+    ).fetchall()
+
+    progress = [
+        ExerciseProgressEntry(
+            date=str(row[0]),
+            max_weight_kg=float(row[1]) if row[1] is not None else None,
+            total_reps=row[2] or 0,
+            total_sets=row[3] or 0,
+        )
+        for row in result
+    ]
+
+    # Calculate summary
+    summary_result = db.execute(
+        """
+        SELECT
+            MAX(weight_kg) as all_time_max,
+            SUM(COALESCE(weight_kg, 0) * COALESCE(reps, 0)) as total_volume,
+            COUNT(DISTINCT date) as total_sessions
+        FROM exercise_log
+        WHERE exercise_name = ?
+        """,
+        [exercise],
+    ).fetchone()
+
+    # Get current max (from most recent session)
+    current_max_result = db.execute(
+        """
+        SELECT MAX(weight_kg)
+        FROM exercise_log
+        WHERE exercise_name = ? AND date = (
+            SELECT MAX(date) FROM exercise_log WHERE exercise_name = ?
+        )
+        """,
+        [exercise, exercise],
+    ).fetchone()
+
+    summary = ExerciseSummary(
+        current_max=float(current_max_result[0]) if current_max_result and current_max_result[0] else None,
+        all_time_max=float(summary_result[0]) if summary_result and summary_result[0] else None,
+        total_volume=int(summary_result[1]) if summary_result and summary_result[1] else 0,
+        total_sessions=summary_result[2] if summary_result else 0,
+    )
+
+    return ExerciseProgressResponse(
+        exercise=exercise,
+        progress=progress,
+        summary=summary,
+        period=period,
+    )
+
+
+@router.get("/summary", response_model=DashboardSummaryResponse)
+def get_dashboard_summary(
+    days: int = Query(default=30, ge=1, le=365),
+    db: DatabaseManager = Depends(get_db),
+) -> DashboardSummaryResponse:
+    """Get overall dashboard summary.
+
+    Args:
+        days: Number of days to include (default 30)
+        db: Database manager
+
+    Returns:
+        Dashboard overview with totals and streak
+    """
+    period = get_period(days)
+
+    # Get activity counts
+    activity_count = db.execute(
+        """
+        SELECT COUNT(*) FROM activities
+        WHERE date >= ? AND date <= ?
+        """,
+        [period.start_date, period.end_date],
+    ).fetchone()[0]
+
+    # Get exercise counts
+    exercise_count = db.execute(
+        """
+        SELECT COUNT(*) FROM exercise_log
+        WHERE date >= ? AND date <= ?
+        """,
+        [period.start_date, period.end_date],
+    ).fetchone()[0]
+
+    # Get last activity date
+    last_activity = db.execute(
+        "SELECT MAX(date) FROM activities"
+    ).fetchone()[0]
+
+    # Calculate streak (consecutive days with activities ending today or yesterday)
+    streak = 0
+    check_date = date.today()
+    while True:
+        has_activity = db.execute(
+            "SELECT COUNT(*) FROM activities WHERE date = ?",
+            [str(check_date)],
+        ).fetchone()[0]
+
+        if has_activity > 0:
+            streak += 1
+            check_date -= timedelta(days=1)
+        elif streak == 0 and check_date == date.today():
+            # Allow starting from yesterday if no activity today yet
+            check_date -= timedelta(days=1)
+        else:
+            break
+
+        # Safety limit
+        if streak > 365:
+            break
+
+    return DashboardSummaryResponse(
+        total_activities=activity_count,
+        total_exercises=exercise_count,
+        streak_days=streak,
+        last_activity_date=str(last_activity) if last_activity else None,
+        period=period,
+    )
+
+
+@router.get("/heatmap", response_model=HeatmapResponse)
+def get_heatmap_data(
+    year: int = Query(default=None, ge=2020, le=2100, description="Year to show"),
+    db: DatabaseManager = Depends(get_db),
+) -> HeatmapResponse:
+    """Get activity heatmap data for a specific year.
+
+    Returns activity count and duration for each day of the year.
+
+    Args:
+        year: Year to get data for (default: current year)
+        db: Database manager
+
+    Returns:
+        List of days with activity counts and durations
+    """
+    if year is None:
+        year = date.today().year
+
+    start_date = f"{year}-01-01"
+    end_date = f"{year}-12-31"
+
+    result = db.execute(
+        """
+        SELECT
+            date,
+            COUNT(*) as count,
+            COALESCE(SUM(duration_minutes), 0) as duration
+        FROM activities
+        WHERE date >= ? AND date <= ?
+        GROUP BY date
+        ORDER BY date ASC
+        """,
+        [start_date, end_date],
+    ).fetchall()
+
+    days = [
+        HeatmapDay(
+            date=str(row[0]),
+            count=row[1],
+            duration_minutes=int(row[2]),
+        )
+        for row in result
+    ]
+
+    max_count = max((d.count for d in days), default=0)
+    max_duration = max((d.duration_minutes for d in days), default=0)
+
+    return HeatmapResponse(
+        days=days,
+        year=year,
+        max_count=max_count,
+        max_duration=max_duration,
+    )
+
+
+@router.get("/correlation", response_model=CorrelationResponse)
+def get_correlation_data(
+    days: int = Query(default=30, ge=7, le=365),
+    db: DatabaseManager = Depends(get_db),
+) -> CorrelationResponse:
+    """Get metric correlation data for analysis.
+
+    Calculates correlations between various metrics to identify patterns.
+
+    Args:
+        days: Number of days to include (default 30, minimum 7)
+        db: Database manager
+
+    Returns:
+        Daily entries and calculated correlation coefficients
+    """
+    period = get_period(days)
+
+    # Get metrics with activity data joined
+    result = db.execute(
+        """
+        SELECT
+            m.date,
+            m.sleep_hours,
+            m.energy,
+            m.mood,
+            m.stress,
+            COALESCE(a.total_minutes, 0) as activity_minutes
+        FROM daily_metrics m
+        LEFT JOIN (
+            SELECT date, SUM(duration_minutes) as total_minutes
+            FROM activities
+            GROUP BY date
+        ) a ON m.date = a.date
+        WHERE m.date >= ? AND m.date <= ?
+        ORDER BY m.date ASC
+        """,
+        [period.start_date, period.end_date],
+    ).fetchall()
+
+    entries = [
+        CorrelationEntry(
+            date=str(row[0]),
+            sleep_hours=float(row[1]) if row[1] is not None else None,
+            energy=row[2],
+            mood=row[3],
+            stress=row[4],
+            activity_minutes=row[5],
+        )
+        for row in result
+    ]
+
+    # Calculate correlations using entries with complete data
+    sleep_values = []
+    energy_values = []
+    mood_values = []
+    stress_values = []
+    activity_values = []
+
+    for e in entries:
+        if e.sleep_hours is not None and e.energy is not None and e.mood is not None and e.stress is not None:
+            sleep_values.append(e.sleep_hours)
+            energy_values.append(float(e.energy))
+            mood_values.append(float(e.mood))
+            stress_values.append(float(e.stress))
+            activity_values.append(float(e.activity_minutes or 0))
+
+    correlations = Correlations(
+        sleep_mood=calculate_correlation(sleep_values, mood_values),
+        sleep_energy=calculate_correlation(sleep_values, energy_values),
+        activity_mood=calculate_correlation(activity_values, mood_values),
+        activity_energy=calculate_correlation(activity_values, energy_values),
+        stress_mood=calculate_correlation(stress_values, mood_values),
+    )
+
+    return CorrelationResponse(
+        entries=entries,
+        correlations=correlations,
+    )

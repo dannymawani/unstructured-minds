@@ -3,10 +3,13 @@
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ..claude import ClaudeClient
 from ..db import DatabaseManager
+from ..middleware import limiter
+from ..middleware.rate_limit import RATE_LIMIT_CLAUDE_API
+from ..middleware.validation import MAX_QUERY_LENGTH
 
 
 router = APIRouter()
@@ -22,8 +25,8 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     """Request for chat completion."""
 
-    message: str
-    context: Optional[str] = None
+    message: str = Field(..., min_length=1, max_length=MAX_QUERY_LENGTH)
+    context: Optional[str] = Field(default=None, max_length=MAX_QUERY_LENGTH * 2)
 
 
 class ChatResponse(BaseModel):
@@ -112,8 +115,10 @@ async def gather_context(db: DatabaseManager, query: str) -> str:
 
 
 @router.post("/chat", response_model=ChatResponse)
+@limiter.limit(RATE_LIMIT_CLAUDE_API)
 async def chat(
     request: ChatRequest,
+    http_request: Request,
     db: DatabaseManager = Depends(get_db),
     claude: ClaudeClient = Depends(get_claude),
 ) -> ChatResponse:

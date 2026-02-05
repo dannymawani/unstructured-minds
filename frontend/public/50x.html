@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Service Unavailable - Unstructured Minds</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e4e4e7;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            text-align: center;
+            max-width: 500px;
+        }
+        .icon {
+            font-size: 64px;
+            margin-bottom: 24px;
+            opacity: 0.8;
+        }
+        h1 {
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #fff;
+        }
+        p {
+            font-size: 16px;
+            line-height: 1.6;
+            color: #a1a1aa;
+            margin-bottom: 24px;
+        }
+        .error-code {
+            font-size: 14px;
+            color: #71717a;
+            margin-bottom: 32px;
+        }
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #3b82f6;
+            color: #fff;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+        .btn:hover {
+            background: #2563eb;
+        }
+        .retry-hint {
+            margin-top: 24px;
+            font-size: 14px;
+            color: #71717a;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">&#9888;</div>
+        <h1>Service Temporarily Unavailable</h1>
+        <p>
+            We're experiencing technical difficulties. The server is currently
+            unable to handle your request. Please try again in a few moments.
+        </p>
+        <p class="error-code">Error 5xx</p>
+        <a href="/" class="btn">Return to Home</a>
+        <p class="retry-hint">
+            If the problem persists, please check that all services are running.
+        </p>
+    </div>
+</body>
+</html>

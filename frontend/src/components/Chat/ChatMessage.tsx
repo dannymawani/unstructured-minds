@@ -1,15 +1,112 @@
 import { cn } from '@/lib/utils'
-import { User, Bot } from 'lucide-react'
+import { User, Bot, Database, ChevronDown, ChevronUp } from 'lucide-react'
+import { useState } from 'react'
+
+export interface QueryData {
+  columns: string[]
+  data: Record<string, unknown>[]
+  sql?: string
+  rowCount: number
+}
 
 export interface Message {
   id: string
   role: 'user' | 'assistant'
   content: string
   timestamp?: Date
+  queryData?: QueryData
 }
 
 interface ChatMessageProps {
   message: Message
+}
+
+function DataTable({ queryData }: { queryData: QueryData }) {
+  const [showSql, setShowSql] = useState(false)
+  const { columns, data, sql, rowCount } = queryData
+
+  if (!data || data.length === 0) {
+    return null
+  }
+
+  const formatValue = (value: unknown): string => {
+    if (value === null || value === undefined) return '-'
+    if (typeof value === 'number') {
+      // Format numbers nicely
+      if (Number.isInteger(value)) return value.toLocaleString()
+      return value.toLocaleString(undefined, { maximumFractionDigits: 2 })
+    }
+    return String(value)
+  }
+
+  return (
+    <div className="mt-3 space-y-2">
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <Database className="h-3 w-3" />
+        <span>{rowCount} row{rowCount !== 1 ? 's' : ''} returned</span>
+      </div>
+
+      <div className="overflow-x-auto rounded-md border">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/50">
+            <tr>
+              {columns.map((col) => (
+                <th
+                  key={col}
+                  className="px-3 py-2 text-left font-medium text-muted-foreground whitespace-nowrap"
+                >
+                  {col.replace(/_/g, ' ')}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {data.slice(0, 10).map((row, i) => (
+              <tr
+                key={i}
+                className={cn(
+                  'border-t',
+                  i % 2 === 0 ? 'bg-background' : 'bg-muted/20'
+                )}
+              >
+                {columns.map((col) => (
+                  <td key={col} className="px-3 py-2 whitespace-nowrap">
+                    {formatValue(row[col])}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {data.length > 10 && (
+          <div className="px-3 py-2 text-xs text-muted-foreground bg-muted/30 border-t">
+            Showing 10 of {data.length} rows
+          </div>
+        )}
+      </div>
+
+      {sql && (
+        <div className="text-xs">
+          <button
+            onClick={() => setShowSql(!showSql)}
+            className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {showSql ? (
+              <ChevronUp className="h-3 w-3" />
+            ) : (
+              <ChevronDown className="h-3 w-3" />
+            )}
+            {showSql ? 'Hide' : 'Show'} SQL query
+          </button>
+          {showSql && (
+            <pre className="mt-2 p-2 bg-muted rounded-md overflow-x-auto text-xs font-mono">
+              {sql}
+            </pre>
+          )}
+        </div>
+      )}
+    </div>
+  )
 }
 
 export function ChatMessage({ message }: ChatMessageProps) {
@@ -51,6 +148,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
         <div className="text-sm whitespace-pre-wrap break-words">
           {message.content}
         </div>
+        {message.queryData && <DataTable queryData={message.queryData} />}
       </div>
     </div>
   )

@@ -26,6 +26,15 @@ Unstructured Minds transforms natural language notes into structured, queryable 
 
 **Commit:** `386fb67` - "Implement Phase 0: Backend foundation"
 
+### Phase 2: Polish (In Progress)
+
+| Step | Description | Status |
+|------|-------------|--------|
+| 2.1 | Dashboard API | ✅ Complete |
+| 2.2 | Dashboard UI | ✅ Complete |
+| 2.3 | Settings Panel | ⏳ Pending |
+| 2.4 | Keyboard Shortcuts | ⏳ Pending |
+
 ### Phase 1: Core MVP ✅
 
 | Step | Description | Status |

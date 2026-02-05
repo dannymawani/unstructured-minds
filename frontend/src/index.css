@@ -1,5 +1,6 @@
 @import "tailwindcss";
 
+/* Light theme (default) */
 @theme {
   --color-background: hsl(0 0% 100%);
   --color-foreground: hsl(222.2 84% 4.9%);
@@ -23,6 +24,29 @@
   --radius: 0.5rem;
 }
 
+/* Dark theme */
+:root.dark {
+  --color-background: hsl(240 10% 3.9%);
+  --color-foreground: hsl(0 0% 98%);
+  --color-card: hsl(240 10% 3.9%);
+  --color-card-foreground: hsl(0 0% 98%);
+  --color-popover: hsl(240 10% 3.9%);
+  --color-popover-foreground: hsl(0 0% 98%);
+  --color-primary: hsl(0 0% 98%);
+  --color-primary-foreground: hsl(240 5.9% 10%);
+  --color-secondary: hsl(240 3.7% 15.9%);
+  --color-secondary-foreground: hsl(0 0% 98%);
+  --color-muted: hsl(240 3.7% 15.9%);
+  --color-muted-foreground: hsl(240 5% 64.9%);
+  --color-accent: hsl(240 3.7% 15.9%);
+  --color-accent-foreground: hsl(0 0% 98%);
+  --color-destructive: hsl(0 62.8% 30.6%);
+  --color-destructive-foreground: hsl(0 0% 98%);
+  --color-border: hsl(240 3.7% 15.9%);
+  --color-input: hsl(240 3.7% 15.9%);
+  --color-ring: hsl(240 4.9% 83.9%);
+}
+
 body {
   background-color: var(--color-background);
   color: var(--color-foreground);
@@ -31,4 +55,41 @@ body {
 
 * {
   border-color: var(--color-border);
+}
+
+/* Safe area insets for mobile devices with notches */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.safe-area-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* Touch-friendly minimum tap targets */
+.touch-target {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+/* Mobile viewport fix */
+html {
+  height: -webkit-fill-available;
+}
+
+body {
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
+}
+
+/* Prevent pull-to-refresh on mobile */
+body {
+  overscroll-behavior-y: contain;
+}
+
+/* Improve text selection on touch devices */
+@media (pointer: coarse) {
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
 }
