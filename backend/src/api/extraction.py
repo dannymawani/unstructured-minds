@@ -3,11 +3,14 @@
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ..claude import ClaudeClient
 from ..db import DatabaseManager
 from ..extraction import ExtractionPipeline
+from ..middleware import limiter, validate_file_path, PathValidationError
+from ..middleware.rate_limit import RATE_LIMIT_EXTRACTION
+from ..middleware.validation import MAX_FILE_PATH_LENGTH
 from ..storage import StorageBackend
 
 
@@ -17,8 +20,13 @@ router = APIRouter()
 class ExtractRequest(BaseModel):
     """Request to extract data from a file."""
 
-    file_path: str
+    file_path: str = Field(..., max_length=MAX_FILE_PATH_LENGTH)
     force: bool = False  # Force re-extraction even if already processed
+    schema_name: Optional[str] = Field(
+        None,
+        max_length=50,
+        description="Schema name to use for extraction (default: combined)",
+    )
 
 
 class ExtractResponse(BaseModel):
@@ -34,8 +42,13 @@ class ExtractResponse(BaseModel):
 class ExtractBatchRequest(BaseModel):
     """Request to extract data from multiple files."""
 
-    file_paths: list[str]
+    file_paths: list[str] = Field(..., max_length=50)  # Limit batch size
     force: bool = False
+    schema_name: Optional[str] = Field(
+        None,
+        max_length=50,
+        description="Schema name to use for extraction (default: combined)",
+    )
 
 
 class ExtractBatchResponse(BaseModel):
@@ -63,8 +76,10 @@ def get_claude(request: Request) -> ClaudeClient:
 
 
 @router.post("/extract", response_model=ExtractResponse)
+@limiter.limit(RATE_LIMIT_EXTRACTION)
 async def extract_file(
     request: ExtractRequest,
+    http_request: Request,
     db: DatabaseManager = Depends(get_db),
     storage: StorageBackend = Depends(get_storage),
     claude: ClaudeClient = Depends(get_claude),
@@ -73,6 +88,7 @@ async def extract_file(
 
     Args:
         request: Extraction request with file path
+        http_request: HTTP request for rate limiting
         db: Database manager
         storage: Storage backend
         claude: Claude client
@@ -80,18 +96,32 @@ async def extract_file(
     Returns:
         Extraction result
     """
+    # Validate file path
+    try:
+        validate_file_path(request.file_path)
+    except PathValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     # Read file content
     try:
         content_bytes = await storage.read(request.file_path)
         content = content_bytes.decode("utf-8")
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"File not found: {request.file_path}")
+    except ValueError as e:
+        # Path traversal caught by storage backend
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error reading file: {str(e)}")
 
     # Run extraction
     pipeline = ExtractionPipeline(db, claude)
-    result = await pipeline.extract(request.file_path, content, force=request.force)
+    result = await pipeline.extract(
+        request.file_path,
+        content,
+        force=request.force,
+        schema_name=request.schema_name,
+    )
 
     return ExtractResponse(
         success=result.success,
@@ -103,8 +133,10 @@ async def extract_file(
 
 
 @router.post("/extract/batch", response_model=ExtractBatchResponse)
+@limiter.limit(RATE_LIMIT_EXTRACTION)
 async def extract_batch(
     request: ExtractBatchRequest,
+    http_request: Request,
     db: DatabaseManager = Depends(get_db),
     storage: StorageBackend = Depends(get_storage),
     claude: ClaudeClient = Depends(get_claude),
@@ -113,6 +145,7 @@ async def extract_batch(
 
     Args:
         request: Batch extraction request
+        http_request: HTTP request for rate limiting
         db: Database manager
         storage: Storage backend
         claude: Claude client
@@ -120,6 +153,13 @@ async def extract_batch(
     Returns:
         Batch extraction results
     """
+    # Validate all file paths first
+    for file_path in request.file_paths:
+        try:
+            validate_file_path(file_path)
+        except PathValidationError as e:
+            raise HTTPException(status_code=400, detail=f"Invalid path '{file_path}': {str(e)}")
+
     pipeline = ExtractionPipeline(db, claude)
     results = []
     successful = 0
@@ -129,7 +169,12 @@ async def extract_batch(
         try:
             content_bytes = await storage.read(file_path)
             content = content_bytes.decode("utf-8")
-            result = await pipeline.extract(file_path, content, force=request.force)
+            result = await pipeline.extract(
+                file_path,
+                content,
+                force=request.force,
+                schema_name=request.schema_name,
+            )
 
             if result.success:
                 successful += 1

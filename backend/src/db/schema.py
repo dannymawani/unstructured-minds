@@ -107,7 +107,69 @@ def init_database(db_path: Path | str) -> duckdb.DuckDBPyConnection:
         )
     """)
 
+    # Create indexes for performance optimization
+    # These significantly speed up common queries on large datasets
+    _create_indexes(conn)
+
     return conn
+
+
+def _create_indexes(conn: duckdb.DuckDBPyConnection) -> None:
+    """Create database indexes for query performance.
+
+    DuckDB uses these indexes to speed up:
+    - Date-based filtering for dashboard queries
+    - File path lookups for extraction tracking
+    - Activity joins and lookups
+
+    Args:
+        conn: DuckDB connection
+    """
+    # Index on exercise_log date for time-range queries
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_exercise_date
+        ON exercise_log(date)
+    """)
+
+    # Index on daily_metrics date for dashboard queries
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_metrics_date
+        ON daily_metrics(date)
+    """)
+
+    # Index on extraction_log file_path for tracking processed files
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_extraction_path
+        ON extraction_log(file_path)
+    """)
+
+    # Index on food_log date for nutrition queries
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_food_date
+        ON food_log(date)
+    """)
+
+    # Index on tasks date and status for kanban/task views
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_tasks_date
+        ON tasks(date)
+    """)
+
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_tasks_status
+        ON tasks(status)
+    """)
+
+    # Index on activities for dashboard queries
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_activities_date
+        ON activities(date)
+    """)
+
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_activities_type
+        ON activities(activity_type)
+    """)
 
 
 def get_table_names(conn: duckdb.DuckDBPyConnection) -> list[str]:

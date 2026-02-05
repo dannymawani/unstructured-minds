@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { Plus, FolderPlus, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { FileTreeItem, type FileNode } from './FileTreeItem'
@@ -13,6 +14,11 @@ interface FileTreeProps {
   onFileSelect: (path: string) => void
   selectedFile?: string
   apiBaseUrl?: string
+}
+
+interface FlattenedNode {
+  node: FileNode
+  depth: number
 }
 
 function buildTree(files: FileInfo[]): FileNode[] {
@@ -57,6 +63,31 @@ function buildTree(files: FileInfo[]): FileNode[] {
   return roots
 }
 
+/**
+ * Flatten tree structure for virtual scrolling
+ * Only includes visible nodes based on expanded state
+ */
+function flattenTree(
+  nodes: FileNode[],
+  expanded: Set<string>,
+  depth = 0
+): FlattenedNode[] {
+  const result: FlattenedNode[] = []
+
+  for (const node of nodes) {
+    result.push({ node, depth })
+
+    if (node.isDirectory && expanded.has(node.path) && node.children) {
+      result.push(...flattenTree(node.children, expanded, depth + 1))
+    }
+  }
+
+  return result
+}
+
+// Memoized FileTreeItem to prevent unnecessary re-renders
+const MemoizedFileTreeItem = memo(FileTreeItem)
+
 export function FileTree({
   onFileSelect,
   selectedFile,
@@ -66,6 +97,7 @@ export function FileTree({
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const parentRef = useRef<HTMLDivElement>(null)
 
   const fetchFiles = useCallback(async () => {
     setLoading(true)
@@ -89,7 +121,8 @@ export function FileTree({
     fetchFiles()
   }, [fetchFiles])
 
-  const handleToggle = (path: string) => {
+  // Memoize toggle handler to prevent re-renders
+  const handleToggle = useCallback((path: string) => {
     setExpanded((prev) => {
       const next = new Set(prev)
       if (next.has(path)) {
@@ -99,9 +132,17 @@ export function FileTree({
       }
       return next
     })
-  }
+  }, [])
 
-  const handleCreateFile = async () => {
+  // Memoize select handler
+  const handleSelect = useCallback(
+    (path: string) => {
+      onFileSelect(path)
+    },
+    [onFileSelect]
+  )
+
+  const handleCreateFile = useCallback(async () => {
     const name = prompt('Enter file name (e.g., notes/my-note.md):')
     if (!name) return
 
@@ -120,9 +161,9 @@ export function FileTree({
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create file')
     }
-  }
+  }, [apiBaseUrl, fetchFiles, onFileSelect])
 
-  const handleCreateFolder = async () => {
+  const handleCreateFolder = useCallback(async () => {
     const name = prompt('Enter folder name:')
     if (!name) return
 
@@ -142,25 +183,23 @@ export function FileTree({
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create folder')
     }
-  }
+  }, [apiBaseUrl, fetchFiles])
 
-  const renderTree = (nodes: FileNode[], depth = 0): React.ReactNode => {
-    return nodes.map((node) => (
-      <div key={node.path} role="group">
-        <FileTreeItem
-          node={node}
-          depth={depth}
-          expanded={expanded.has(node.path)}
-          selected={selectedFile === node.path}
-          onToggle={handleToggle}
-          onSelect={onFileSelect}
-        />
-        {node.isDirectory && expanded.has(node.path) && node.children && (
-          renderTree(node.children, depth + 1)
-        )}
-      </div>
-    ))
-  }
+  // Flatten tree for virtual scrolling - memoized to avoid recomputation
+  const flattenedNodes = useMemo(
+    () => flattenTree(files, expanded),
+    [files, expanded]
+  )
+
+  // Virtual scrolling setup
+  const virtualizer = useVirtualizer({
+    count: flattenedNodes.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 28, // Estimated row height in pixels
+    overscan: 10, // Render extra items above/below visible area
+  })
+
+  const virtualItems = virtualizer.getVirtualItems()
 
   return (
     <div className="flex flex-col h-full">
@@ -170,7 +209,7 @@ export function FileTree({
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6"
+            className="h-10 w-10 sm:h-6 sm:w-6"
             onClick={handleCreateFile}
             title="New file"
           >
@@ -179,7 +218,7 @@ export function FileTree({
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6"
+            className="h-10 w-10 sm:h-6 sm:w-6"
             onClick={handleCreateFolder}
             title="New folder"
           >
@@ -188,7 +227,7 @@ export function FileTree({
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6"
+            className="h-10 w-10 sm:h-6 sm:w-6"
             onClick={fetchFiles}
             title="Refresh"
           >
@@ -196,7 +235,12 @@ export function FileTree({
           </Button>
         </div>
       </div>
-      <div className="flex-1 overflow-auto py-1" role="tree" aria-label="File browser">
+      <div
+        ref={parentRef}
+        className="flex-1 overflow-auto py-1"
+        role="tree"
+        aria-label="File browser"
+      >
         {loading && (
           <p className="px-4 py-2 text-sm text-muted-foreground">Loading...</p>
         )}
@@ -208,7 +252,42 @@ export function FileTree({
             No files yet. Create one to get started.
           </p>
         )}
-        {!loading && !error && renderTree(files)}
+        {!loading && !error && flattenedNodes.length > 0 && (
+          <div
+            style={{
+              height: `${virtualizer.getTotalSize()}px`,
+              width: '100%',
+              position: 'relative',
+            }}
+          >
+            {virtualItems.map((virtualItem) => {
+              const { node, depth } = flattenedNodes[virtualItem.index]
+              return (
+                <div
+                  key={node.path}
+                  role="group"
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: `${virtualItem.size}px`,
+                    transform: `translateY(${virtualItem.start}px)`,
+                  }}
+                >
+                  <MemoizedFileTreeItem
+                    node={node}
+                    depth={depth}
+                    expanded={expanded.has(node.path)}
+                    selected={selectedFile === node.path}
+                    onToggle={handleToggle}
+                    onSelect={handleSelect}
+                  />
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
     </div>
   )

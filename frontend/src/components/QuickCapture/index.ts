@@ -1,0 +1,1 @@
+export { QuickCapture } from './QuickCapture'

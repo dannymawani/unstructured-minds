@@ -1,14 +1,17 @@
 """Extraction pipeline for processing markdown notes."""
 
 import hashlib
+import json
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Optional
 
 from ..claude import ClaudeClient
+from ..config import settings
 from ..db import DatabaseManager
-from .schemas import COMBINED_EXTRACTION_SCHEMA
+from .schemas import COMBINED_EXTRACTION_SCHEMA, EXTRACTION_SCHEMAS
 
 
 @dataclass
@@ -39,6 +42,110 @@ class ExtractionPipeline:
         """
         self.db = db
         self.claude = claude
+        self._schemas_dir = settings.data_path / "schemas"
+
+    def _load_custom_schema(self, name: str) -> Optional[dict[str, Any]]:
+        """Load a custom schema from disk and convert to JSON Schema format.
+
+        Args:
+            name: Schema name
+
+        Returns:
+            JSON Schema dict or None if not found
+        """
+        path = self._schemas_dir / f"{name}.json"
+        if not path.exists():
+            return None
+
+        try:
+            with open(path) as f:
+                schema_def = json.load(f)
+
+            # Convert SchemaDefinition format to JSON Schema
+            return self._convert_definition_to_json_schema(schema_def)
+        except (json.JSONDecodeError, IOError, KeyError):
+            return None
+
+    def _convert_definition_to_json_schema(
+        self, schema_def: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Convert a SchemaDefinition dict to JSON Schema format.
+
+        Args:
+            schema_def: Schema definition from file
+
+        Returns:
+            JSON Schema dict
+        """
+        properties = {}
+        required = []
+
+        for field in schema_def.get("fields", []):
+            field_schema: dict[str, Any] = {"type": field["type"]}
+
+            if field.get("description"):
+                field_schema["description"] = field["description"]
+
+            if field["type"] in ("integer", "number"):
+                if field.get("min") is not None:
+                    field_schema["minimum"] = field["min"]
+                if field.get("max") is not None:
+                    field_schema["maximum"] = field["max"]
+
+            if field["type"] == "string" and field.get("enum"):
+                field_schema["enum"] = field["enum"]
+
+            if field["type"] == "array":
+                field_schema["items"] = {"type": "string"}
+
+            properties[field["name"]] = field_schema
+
+            if field.get("required"):
+                required.append(field["name"])
+
+        json_schema: dict[str, Any] = {
+            "type": "object",
+            "description": schema_def.get("description", ""),
+            "properties": properties,
+        }
+
+        if required:
+            json_schema["required"] = required
+
+        # Add extraction hints as a description enhancement if provided
+        if schema_def.get("extraction_hints"):
+            json_schema["description"] = (
+                f"{json_schema['description']}\n\n"
+                f"Extraction hints: {schema_def['extraction_hints']}"
+            )
+
+        return json_schema
+
+    def get_schema(self, name: Optional[str] = None) -> dict[str, Any]:
+        """Get a schema by name.
+
+        Args:
+            name: Schema name (None for combined/default schema)
+
+        Returns:
+            JSON Schema dict
+
+        Raises:
+            ValueError: If schema not found
+        """
+        if name is None or name == "combined":
+            return COMBINED_EXTRACTION_SCHEMA
+
+        # Check built-in schemas
+        if name in EXTRACTION_SCHEMAS:
+            return EXTRACTION_SCHEMAS[name]
+
+        # Check custom schemas
+        custom = self._load_custom_schema(name)
+        if custom:
+            return custom
+
+        raise ValueError(f"Schema not found: {name}")
 
     def _compute_hash(self, content: str) -> str:
         """Compute hash of content for change detection.
@@ -327,11 +434,69 @@ class ExtractionPipeline:
 
         return records
 
+    def _store_custom_extraction(
+        self,
+        schema_name: str,
+        date: str,
+        data: dict[str, Any],
+        source_file: str,
+    ) -> int:
+        """Store custom schema extracted data as JSON.
+
+        Custom schema data is stored in a generic custom_extractions table
+        as JSON for flexibility.
+
+        Args:
+            schema_name: Name of the custom schema
+            date: Date string
+            data: Extracted data
+            source_file: Source file path
+
+        Returns:
+            Number of records inserted
+        """
+        if not data:
+            return 0
+
+        extraction_id = self._generate_id()
+
+        # Ensure custom_extractions table exists
+        self.db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS custom_extractions (
+                id VARCHAR PRIMARY KEY,
+                schema_name VARCHAR NOT NULL,
+                date DATE,
+                data JSON NOT NULL,
+                source_file VARCHAR,
+                extracted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+
+        self.db.execute(
+            """
+            INSERT INTO custom_extractions
+            (id, schema_name, date, data, source_file)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            [
+                extraction_id,
+                schema_name,
+                date,
+                json.dumps(data),
+                source_file,
+            ],
+        )
+
+        return 1
+
     async def extract(
         self,
         file_path: str,
         content: str,
         force: bool = False,
+        schema_name: Optional[str] = None,
     ) -> ExtractionResult:
         """Extract structured data from markdown content.
 
@@ -339,6 +504,7 @@ class ExtractionPipeline:
             file_path: Path to the file (for logging/deduplication)
             content: Markdown content to extract from
             force: Force extraction even if already processed
+            schema_name: Optional schema name to use for extraction
 
         Returns:
             Extraction result
@@ -365,8 +531,19 @@ class ExtractionPipeline:
             )
 
         try:
+            # Get the schema to use
+            try:
+                schema = self.get_schema(schema_name)
+            except ValueError as e:
+                return ExtractionResult(
+                    success=False,
+                    file_path=file_path,
+                    file_hash=file_hash,
+                    error=str(e),
+                )
+
             # Extract data using Claude
-            data = await self.claude.extract(content, COMBINED_EXTRACTION_SCHEMA)
+            data = await self.claude.extract(content, schema)
 
             # Get date from extracted data or file path
             date = data.get("date") or self._extract_date_from_path(file_path)
@@ -377,25 +554,39 @@ class ExtractionPipeline:
             # Store extracted data
             records_inserted = {}
 
-            if data.get("daily_metrics"):
-                records_inserted["daily_metrics"] = self._store_daily_metrics(
-                    date, data["daily_metrics"], file_path
-                )
+            # Check if this is a custom schema extraction
+            is_custom_schema = (
+                schema_name is not None
+                and schema_name not in EXTRACTION_SCHEMAS
+                and schema_name != "combined"
+            )
 
-            if data.get("activities"):
-                records_inserted["exercises"] = self._store_activities(
-                    date, data["activities"], file_path
+            if is_custom_schema:
+                # Store as custom extraction
+                records_inserted["custom"] = self._store_custom_extraction(
+                    schema_name, date, data, file_path
                 )
+            else:
+                # Standard built-in schema extraction
+                if data.get("daily_metrics"):
+                    records_inserted["daily_metrics"] = self._store_daily_metrics(
+                        date, data["daily_metrics"], file_path
+                    )
 
-            if data.get("tasks"):
-                records_inserted["tasks"] = self._store_tasks(
-                    date, data["tasks"], file_path
-                )
+                if data.get("activities"):
+                    records_inserted["exercises"] = self._store_activities(
+                        date, data["activities"], file_path
+                    )
 
-            if data.get("meals"):
-                records_inserted["meals"] = self._store_meals(
-                    date, data["meals"], file_path
-                )
+                if data.get("tasks"):
+                    records_inserted["tasks"] = self._store_tasks(
+                        date, data["tasks"], file_path
+                    )
+
+                if data.get("meals"):
+                    records_inserted["meals"] = self._store_meals(
+                        date, data["meals"], file_path
+                    )
 
             # Log successful extraction
             self._log_extraction(file_path, file_hash, True)

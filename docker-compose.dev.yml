@@ -1,0 +1,71 @@
+# =============================================================================
+# Unstructured Minds - Development Docker Compose Overrides
+# =============================================================================
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# Or set COMPOSE_FILE in your shell:
+#   export COMPOSE_FILE=docker-compose.yml:docker-compose.dev.yml
+#   docker compose up
+#
+# Features:
+#   - Source code mounted for hot reload
+#   - Debug ports exposed
+#   - Development environment settings
+#   - Faster rebuild with cache
+#
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # Backend - Development Mode
+  # ---------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      # Use cache for faster rebuilds
+      cache_from:
+        - unstructured-minds-backend:latest
+    volumes:
+      # Mount source code for hot reload
+      - ./backend/src:/app/src:ro
+      # Mount vault and data
+      - ${VAULT_PATH:-./vault}:/app/vault:rw
+      - ${DATA_PATH:-./data}:/app/data:rw
+    environment:
+      - DEBUG=true
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+    # Override command for hot reload
+    command: ["python", "-m", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    # Expose debug port for remote debugging
+    ports:
+      - "8000:8000"
+      - "5678:5678"  # debugpy port
+
+  # ---------------------------------------------------------------------------
+  # Frontend - Development Mode
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    volumes:
+      # Mount source code for hot reload
+      - ./frontend/src:/app/src:ro
+      - ./frontend/public:/app/public:ro
+      - ./frontend/index.html:/app/index.html:ro
+      - ./frontend/vite.config.ts:/app/vite.config.ts:ro
+      # Anonymous volume to preserve node_modules from container
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - VITE_API_URL=http://localhost:8000
+    ports:
+      - "5173:5173"
+    # Don't wait for backend to be healthy in dev
+    depends_on:
+      - backend
+    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
