@@ -10,41 +10,65 @@ status: planning
 # {{title}}
 
 ## Overview
-Brief description of the project.
 
-## Goals
-- [ ] Goal 1
-- [ ] Goal 2
-- [ ] Goal 3
+**Description**: Brief description of the project
+**Business Value**: Why this project matters
 
-## Timeline
-| Milestone | Target Date | Status |
-|-----------|-------------|--------|
-| Planning  | {{date}}    | Active |
-| Development |           | Pending |
-| Review    |             | Pending |
-| Launch    |             | Pending |
+## Goals & Objectives
+
+### Primary Goals
+1.
+2.
+3.
+
+### Success Metrics
+- [ ] Metric 1: Target value
+- [ ] Metric 2: Target value
+
+## Technical Scope
+
+### In Scope
+-
+-
+
+### Out of Scope
+-
+-
+
+### Technologies
+- **Languages**:
+- **Frameworks**:
+- **Infrastructure**:
+
+## Timeline & Milestones
+
+| Phase | Description | Target Date | Status |
+|-------|-------------|-------------|--------|
+| Planning | Requirements & design | {{date}} | Active |
+| Development | Core implementation | | Pending |
+| Testing | QA & validation | | Pending |
+| Deployment | Production release | | Pending |
 
 ## Tasks
 
-### Phase 1: Planning
-- [ ]
+### Current Sprint
+- [ ] Task 1
+- [ ] Task 2
 
-### Phase 2: Development
-- [ ]
-
-### Phase 3: Review
-- [ ]
-
-## Resources
-- Links:
-- Documents:
-- Contacts:
-
-## Notes
-
+### Backlog
+- [ ] Future task 1
 
 ## Risks & Blockers
+
+| Risk | Impact | Mitigation |
+|------|--------|------------|
+| Risk 1 | High | Mitigation plan |
+
+## Resources & Links
+
+-
+
+## Notes
 
 
 ---

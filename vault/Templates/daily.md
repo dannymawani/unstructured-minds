@@ -13,9 +13,7 @@ tags:
 -
 
 ## Today's Focus
-
 - [ ]
-
 - [ ]
 
 ## Work
@@ -30,9 +28,14 @@ tags:
 - **Focus**:
 
 ### Energy & Recovery
-- Sleep:
-- Energy Level:
-- Nutrition:
+- Sleep: /10
+- Energy Level: /10
+- Nutrition: /10
+
+## End of Day
+- Mood: /10
+- What went well:
+- What could improve:
 
 ---
 *Created at {{time}}*

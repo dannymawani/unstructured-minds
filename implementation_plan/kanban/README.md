@@ -37,34 +37,34 @@ Brief description of what needs to be done.
 - Criterion 2
 ```
 
+## Storage
+
+Tasks are stored in the DuckDB `kanban_tasks` table. The markdown files in this directory are the original source but the canonical data now lives in DuckDB.
+
+To re-import from markdown files: `python3 scripts/migrate_kanban_to_duckdb.py`
+
 ## Viewing the Board
 
-The Kanban board can be viewed in the web UI:
-
-1. Start the backend: `cd backend && python -m uvicorn src.main:app --reload`
-2. Start the frontend: `cd frontend && npm run dev`
+1. Start with Docker: `docker compose -f docker-compose.dev.yml up`
+2. Open http://localhost:5173
 3. Click the **Kanban** tab in the header
 
 ## API Endpoints
 
-- `GET /kanban/board` - Get all tasks organized by column
+- `GET /kanban/board` - Get all tasks organized by column (with optional `?phase=` filter)
 - `GET /kanban/task/{id}` - Get a specific task
 - `POST /kanban/task/{id}/move?new_status=<status>` - Move task to new column
-
-## Current Status
-
-| Column | Count |
-|--------|-------|
-| Done | 16 |
-| In Progress | 0 |
-| Not Started | 23 |
-| **Total** | **39** |
+- `POST /kanban/task` - Create a new task
+- `PATCH /kanban/task/{id}` - Update task fields
+- `DELETE /kanban/task/{id}` - Delete a task
 
 ## Phases Overview
 
 - **Phase 0**: Foundation (complete)
 - **Phase 1**: Core MVP (complete)
-- **Phase 2**: Polish (in progress)
+- **Phase 2**: Polish (complete)
 - **Phase 3**: Deployment
 - **Phase 4**: Advanced Features
 - **Phase 5**: Extensibility
+- **Phase 6**: Before Starting (complete) - Docker validation, skills, design manual
+- **Phase 7**: Data Integration & Features (complete) - Data migration, extraction timing, editor UX, task integration
