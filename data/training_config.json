@@ -1,0 +1,43 @@
+{
+  "athlete": {
+    "name": "Danny Mawani Holmgaard",
+    "height_cm": 183,
+    "weight_kg": 94,
+    "age": 35,
+    "bjj_days": ["Tuesday", "Sunday"],
+    "timezone": "Europe/Copenhagen"
+  },
+  "recovery": {
+    "large_muscles_hours": 72,
+    "medium_muscles_hours": 48,
+    "small_muscles_hours": 24,
+    "bjj_recovery_hours": 24,
+    "cardio_recovery_hours": 24
+  },
+  "targets": {
+    "strength_sessions_per_week": 3,
+    "bjj_sessions_per_week": 2,
+    "cardio_sessions_per_week": 1,
+    "daily_protein_g": 180,
+    "daily_calories": 2500,
+    "sleep_hours": 8,
+    "min_energy_for_training": 6
+  },
+  "core_lifts": [
+    "squat",
+    "deadlift",
+    "bench_press",
+    "military_press"
+  ],
+  "preferences": {
+    "workout_duration_min": 60,
+    "warmup_sets": 2,
+    "working_sets_range": [3, 5],
+    "progressive_overload_increment_kg": 1.5,
+    "deload_week_frequency": 4
+  },
+  "constraints": {
+    "avoid_exercises": [],
+    "injury_restrictions": []
+  }
+}

@@ -53,6 +53,7 @@ class FileWriteResponse(BaseModel):
 
     path: str
     success: bool
+    extracted: bool = False
 
 
 class FileDeleteResponse(BaseModel):
@@ -188,16 +189,20 @@ async def read_file(
 
 @router.post("/vault/file", response_model=FileWriteResponse)
 async def write_file(
+    request_obj: Request,
     request: FileWriteRequest,
+    extract: bool = Query(True, description="Whether to trigger Claude extraction after save"),
     storage: StorageBackend = Depends(get_storage),
 ) -> FileWriteResponse:
     """Write a file to the vault.
 
     Args:
         request: File path and content
+        extract: If False, save to disk only (no Claude extraction).
+                 Used by autosave to avoid unnecessary API calls.
 
     Returns:
-        Success status
+        Success status and whether extraction was triggered
     """
     # Validate path for security
     try:
@@ -230,7 +235,21 @@ async def write_file(
                 },
             )
 
-        return FileWriteResponse(path=request.path, success=True)
+        # Only trigger extraction if requested
+        did_extract = False
+        if extract and request.path.endswith(".md"):
+            try:
+                claude = request_obj.app.state.claude
+                db = request_obj.app.state.db
+                if claude.is_configured:
+                    from ..extraction import ExtractionPipeline
+                    pipeline = ExtractionPipeline(db, claude)
+                    result = await pipeline.extract(request.path, request.content)
+                    did_extract = result.success
+            except Exception:
+                pass  # Extraction failure shouldn't fail the save
+
+        return FileWriteResponse(path=request.path, success=True, extracted=did_extract)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:

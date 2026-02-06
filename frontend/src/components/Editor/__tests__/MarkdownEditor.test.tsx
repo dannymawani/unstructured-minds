@@ -47,15 +47,15 @@ describe('MarkdownEditor', () => {
     expect(container.querySelector('.milkdown-editor')).toBeInTheDocument()
   })
 
-  it('accepts onSave prop for auto-save', () => {
-    const onSave = vi.fn()
+  it('accepts onAutosave prop for auto-save', () => {
+    const onAutosave = vi.fn()
     const onChange = vi.fn()
 
     const { container } = render(
       <MarkdownEditor
         content="# Test"
         onChange={onChange}
-        onSave={onSave}
+        onAutosave={onAutosave}
         autoSaveDelay={100}
       />
     )

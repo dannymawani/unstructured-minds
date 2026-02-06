@@ -57,11 +57,14 @@ Markdown Note → Claude Extraction → CSV/DuckDB → Natural Language Query
 ### CSV Storage Structure
 ```
 data/
-├── exercise_log.csv      # Single file per data type
-├── food_log.csv          # DuckDB handles filtering by date
+├── exercise_log.csv          # Single file per data type
+├── food_log.csv              # DuckDB handles filtering by date
 ├── daily_metrics.csv
 ├── daily_tasks.csv
-└── schemas/*.json
+├── schemas/*.json
+├── exercise_definitions.json  # Exercise name aliases and muscle groups
+├── training_config.json       # Athlete profile, recovery targets
+└── injury_config.json         # Active injuries and constraints
 ```
 
 > **Simplified:** No date-partitioned folders. DuckDB queries flat CSVs efficiently at personal data volumes.
@@ -74,6 +77,57 @@ The `demo_examples/` folder contains reference implementations showing:
 - Schema definitions
 
 Use these as the ground truth for how extraction should work.
+
+## Development Workflow
+
+### Mandatory Process
+
+Every feature or change follows this sequence:
+
+```
+Plan → Approve → Implement → Test → Review → Deploy
+```
+
+1. **Plan** — Create kanban task, write description + acceptance criteria, use plan mode for non-trivial features
+2. **Approve** — Review plan before writing code, confirm scope
+3. **Implement** — Create `feature/{name}` branch, write focused commits, no direct commits to `main`
+4. **Test** — Run `/test` before committing, add tests for new functionality
+5. **Review** — Run `/code-review` before merging
+6. **Deploy** — Merge to `main`, move kanban task to `done/`, verify Docker
+
+### Branching Rules
+
+- **Never commit directly to `main`** — always use feature branches
+- Branch names: `feature/{name}` for features, `fix/{issue}` for bugfixes
+- One feature per branch, rebase on main before merging
+
+### Pre-Work Checklist
+
+- [ ] Docker is running: `docker compose -f docker-compose.dev.yml up -d`
+- [ ] Tests pass: `cd backend && pytest` + `cd frontend && npm test`
+- [ ] Feature branch created: `git checkout -b feature/{name}`
+- [ ] Kanban task exists
+
+---
+
+## Brand & Design
+
+For visual identity, colors, typography, and component styling, see:
+- **`DESIGN_MANUAL.md`** — Full design system document (generated via `/design-manual`)
+- **`brand-guidelines` skill** — Quick reference for colors, fonts, CSS variables
+
+### Quick Color Reference
+
+| Color | Hex | Usage |
+|-------|-----|-------|
+| Teal | `#14b8a6` | Primary accent, CTAs |
+| Dark | `#0f172a` | Text, dark backgrounds |
+| Light | `#f8fafc` | Light backgrounds |
+| Amber | `#f59e0b` | Warnings, highlights |
+| Indigo | `#6366f1` | Links |
+| Rose | `#f43f5e` | Errors, destructive |
+
+---
 
 ## Implementation Docs
 
@@ -105,6 +159,7 @@ All planning documents are in `/implementation_plan/`:
 | Fix Issue | `/fix-issue #123` | Fix a GitHub issue by number |
 | PR Summary | `/pr-summary #123` | Summarize a PR for review |
 | Daily Note | `/daily-note` | Create a daily note from template |
+| Design Manual | `/design-manual` | Generate/update DESIGN_MANUAL.md |
 
 ### Background Skills (Auto-loaded by Claude)
 
@@ -113,6 +168,12 @@ These skills provide context automatically when relevant:
 - `python-conventions` - Python best practices
 - `frontend-patterns` - React/Milkdown patterns
 - `extract-data` - Data extraction patterns
+- `brand-guidelines` - Project colors, typography, CSS variables, logo concept
+- `data-integration` - Migration from date-partitioned CSVs to flat DuckDB tables
+- `performance-optimization` - Three-tier save model (autosave/Cmd+S/navigation)
+- `editor-ux` - Template discoverability, WYSIWYG toolbar, autosave, raw toggle
+- `task-integration` - Personal task kanban, two-way markdown sync, task API
+- `dev-workflow` - Mandatory plan/approve/test/deploy process, branching rules
 
 ### Custom Agents
 
@@ -146,4 +207,4 @@ These skills provide context automatically when relevant:
 
 ---
 
-**Last Updated**: 2026-01-31
+**Last Updated**: 2026-02-06

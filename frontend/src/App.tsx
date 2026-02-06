@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, lazy, Suspense } from 'react'
+import { useState, useCallback, useMemo, useRef, useEffect, lazy, Suspense } from 'react'
 import { Button } from '@/components/ui/button'
 import { FileTree } from '@/components/FileTree'
 import { MarkdownEditor } from '@/components/Editor/MarkdownEditor'
@@ -57,7 +57,8 @@ function App() {
   const [view, setView] = useState<View>('editor')
   const [selectedFile, setSelectedFile] = useState<string | undefined>()
   const [content, setContent] = useState('')
-  const [isSaving, setIsSaving] = useState(false)
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'extracting' | 'saved'>('idle')
+  const isDirtyRef = useRef(false)
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false)
   const [isSidebarVisible, setIsSidebarVisible] = useState(true)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
@@ -102,14 +103,16 @@ function App() {
 
   const handleContentChange = useCallback((markdown: string) => {
     setContent(markdown)
+    isDirtyRef.current = true
   }, [])
 
-  const handleSave = useCallback(async () => {
+  // Autosave: disk only, no extraction (called by 60s interval)
+  const handleAutosave = useCallback(async () => {
     if (!selectedFile) return
 
-    setIsSaving(true)
+    setSaveState('saving')
     try {
-      const response = await fetch(`${API_BASE_URL}/vault/file`, {
+      const response = await fetch(`${API_BASE_URL}/vault/file?extract=false`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path: selectedFile, content }),
@@ -117,11 +120,52 @@ function App() {
       if (!response.ok) {
         throw new Error('Failed to save file')
       }
+      isDirtyRef.current = false
+      setSaveState('saved')
+      setTimeout(() => setSaveState('idle'), 2000)
     } catch (err) {
       console.error('Error saving file:', err)
-    } finally {
-      setIsSaving(false)
+      setSaveState('idle')
     }
+  }, [selectedFile, content])
+
+  // Explicit save: disk + extraction (Cmd+S)
+  const handleSave = useCallback(async () => {
+    if (!selectedFile) return
+
+    setSaveState('extracting')
+    try {
+      const response = await fetch(`${API_BASE_URL}/vault/file?extract=true`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: selectedFile, content }),
+      })
+      if (!response.ok) {
+        throw new Error('Failed to save file')
+      }
+      isDirtyRef.current = false
+      setSaveState('saved')
+      setTimeout(() => setSaveState('idle'), 2000)
+    } catch (err) {
+      console.error('Error saving file:', err)
+      setSaveState('idle')
+    }
+  }, [selectedFile, content])
+
+  // Extract on file switch if content is dirty
+  const prevFileRef = useRef<string | undefined>(selectedFile)
+  useEffect(() => {
+    if (prevFileRef.current && prevFileRef.current !== selectedFile && isDirtyRef.current) {
+      // Fire save+extract for the file we're leaving
+      const prevFile = prevFileRef.current
+      fetch(`${API_BASE_URL}/vault/file?extract=true`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: prevFile, content }),
+      }).catch((err) => console.error('Error saving on file switch:', err))
+      isDirtyRef.current = false
+    }
+    prevFileRef.current = selectedFile
   }, [selectedFile, content])
 
   // Toggle sidebar visibility
@@ -302,8 +346,14 @@ function App() {
         action: openQuickCapture,
         description: 'Quick capture',
       },
+      {
+        key: 't',
+        meta: true,
+        action: openTemplatePicker,
+        description: 'New note from template',
+      },
     ],
-    [handleSave, openCommandPalette, toggleSidebar, createDailyNote, openSearch, openQuickCapture]
+    [handleSave, openCommandPalette, toggleSidebar, createDailyNote, openSearch, openQuickCapture, openTemplatePicker]
   )
 
   // Register keyboard shortcuts
@@ -359,6 +409,8 @@ function App() {
             onFileSelect={handleFileSelect}
             selectedFile={selectedFile}
             apiBaseUrl={API_BASE_URL}
+            onCreateDailyNote={createDailyNote}
+            onOpenTemplatePicker={openTemplatePicker}
           />
         )}
         {sidebarTab === 'tags' && (
@@ -444,9 +496,11 @@ function App() {
         </div>
 
         <div className="flex items-center gap-1 sm:gap-2">
-          {isSaving && (
+          {saveState !== 'idle' && (
             <span className="text-xs sm:text-sm text-muted-foreground hidden sm:inline">
-              Saving...
+              {saveState === 'saving' && 'Saving...'}
+              {saveState === 'extracting' && 'Saving & extracting...'}
+              {saveState === 'saved' && 'Saved'}
             </span>
           )}
 
@@ -528,7 +582,7 @@ function App() {
                   <MarkdownEditor
                     content={content}
                     onChange={handleContentChange}
-                    onSave={handleSave}
+                    onAutosave={handleAutosave}
                   />
                 </div>
               ) : (

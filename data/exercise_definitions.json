@@ -1,0 +1,233 @@
+{
+  "deadlift": {
+    "display": "Deadlift",
+    "aliases": ["dødløft", "dødløft (deadlift)"],
+    "muscle_groups": ["back", "hamstrings", "glutes", "core", "lower_back"],
+    "category": "compound",
+    "recovery_hours": 72
+  },
+  "squat": {
+    "display": "Squat",
+    "aliases": [],
+    "muscle_groups": ["quads", "glutes", "core", "lower_back"],
+    "category": "compound",
+    "recovery_hours": 72
+  },
+  "bench_press": {
+    "display": "Bench Press",
+    "aliases": [],
+    "muscle_groups": ["chest"],
+    "category": "compound",
+    "recovery_hours": 48
+  },
+  "military_press": {
+    "display": "Military Press",
+    "aliases": ["shoulder press"],
+    "muscle_groups": ["shoulders", "core"],
+    "category": "compound",
+    "recovery_hours": 48
+  },
+  "shoulder_press": {
+    "display": "Shoulder Press",
+    "aliases": ["military press"],
+    "muscle_groups": ["shoulders", "core"],
+    "category": "compound",
+    "recovery_hours": 48
+  },
+  "seated_bench_press_machine": {
+    "display": "Seated Bench Press Machine",
+    "aliases": [],
+    "muscle_groups": ["chest"],
+    "category": "compound",
+    "recovery_hours": 48
+  },
+  "bench_press_machine": {
+    "display": "Bench Press Machine",
+    "aliases": [],
+    "muscle_groups": ["chest"],
+    "category": "compound",
+    "recovery_hours": 48
+  },
+  "pulldown": {
+    "display": "Pulldown",
+    "aliases": [],
+    "muscle_groups": ["back"],
+    "category": "back",
+    "recovery_hours": 48
+  },
+  "barbell_row": {
+    "display": "Barbell Row",
+    "aliases": [],
+    "muscle_groups": ["back", "core"],
+    "category": "back",
+    "recovery_hours": 48
+  },
+  "dumbbell_row": {
+    "display": "Dumbbell Row",
+    "aliases": [],
+    "muscle_groups": ["back", "core"],
+    "category": "back",
+    "recovery_hours": 48
+  },
+  "pull_up_machine": {
+    "display": "Pull Up Machine",
+    "aliases": [],
+    "muscle_groups": ["back", "core"],
+    "category": "back",
+    "recovery_hours": 48
+  },
+  "dip_assist_machine": {
+    "display": "Dip Assist Machine",
+    "aliases": [],
+    "muscle_groups": ["chest", "triceps"],
+    "category": "compound",
+    "recovery_hours": 48
+  },
+  "incline_dumbbell_press": {
+    "display": "Incline Dumbbell Press",
+    "aliases": ["skrå dumbbell press", "skrå dumbbell press (incline)"],
+    "muscle_groups": ["chest"],
+    "category": "chest",
+    "recovery_hours": 48
+  },
+  "chest_cable_press": {
+    "display": "Chest Cable Press",
+    "aliases": [],
+    "muscle_groups": ["chest"],
+    "category": "chest",
+    "recovery_hours": 48
+  },
+  "floor_press": {
+    "display": "Floor Press",
+    "aliases": [],
+    "muscle_groups": ["chest", "triceps"],
+    "category": "chest",
+    "recovery_hours": 48
+  },
+  "leg_press": {
+    "display": "Leg Press",
+    "aliases": [],
+    "muscle_groups": ["quads", "glutes"],
+    "category": "legs",
+    "recovery_hours": 48
+  },
+  "single_leg_press": {
+    "display": "Single Leg Press",
+    "aliases": [],
+    "muscle_groups": ["quads", "glutes"],
+    "category": "legs",
+    "recovery_hours": 48
+  },
+  "leg_curl": {
+    "display": "Leg Curl",
+    "aliases": [],
+    "muscle_groups": ["hamstrings"],
+    "category": "legs",
+    "recovery_hours": 48
+  },
+  "leg_extension": {
+    "display": "Leg Extension",
+    "aliases": [],
+    "muscle_groups": ["quads"],
+    "category": "legs",
+    "recovery_hours": 48
+  },
+  "cossack_squats": {
+    "display": "Cossack Squats",
+    "aliases": [],
+    "muscle_groups": ["quads", "adductors", "glutes"],
+    "category": "legs",
+    "recovery_hours": 48
+  },
+  "good_mornings": {
+    "display": "Good Mornings",
+    "aliases": [],
+    "muscle_groups": ["hamstrings", "lower_back", "core"],
+    "category": "legs",
+    "recovery_hours": 48
+  },
+  "adductor_machine": {
+    "display": "Adductor Machine",
+    "aliases": [],
+    "muscle_groups": ["adductors"],
+    "category": "legs",
+    "recovery_hours": 24
+  },
+  "abductor_machine": {
+    "display": "Abductor Machine",
+    "aliases": [],
+    "muscle_groups": ["abductors"],
+    "category": "legs",
+    "recovery_hours": 24
+  },
+  "triceps_rope_extension": {
+    "display": "Triceps Rope Extension",
+    "aliases": [],
+    "muscle_groups": ["triceps"],
+    "category": "arms",
+    "recovery_hours": 24
+  },
+  "triceps_cable_extension": {
+    "display": "Triceps Cable Extension",
+    "aliases": [],
+    "muscle_groups": ["triceps"],
+    "category": "arms",
+    "recovery_hours": 24
+  },
+  "seated_triceps_extension": {
+    "display": "Seated Triceps Extension",
+    "aliases": [],
+    "muscle_groups": ["triceps"],
+    "category": "arms",
+    "recovery_hours": 24
+  },
+  "cable_triceps_extension": {
+    "display": "Cable Triceps Extension",
+    "aliases": [],
+    "muscle_groups": ["triceps"],
+    "category": "arms",
+    "recovery_hours": 24
+  },
+  "triceps_single_arm_cable_extensions": {
+    "display": "Triceps Single Arm Cable Extensions",
+    "aliases": [],
+    "muscle_groups": ["triceps"],
+    "category": "arms",
+    "recovery_hours": 24
+  },
+  "biceps_cable_curl": {
+    "display": "Biceps Cable Curl",
+    "aliases": [],
+    "muscle_groups": ["biceps"],
+    "category": "arms",
+    "recovery_hours": 24
+  },
+  "biceps_preacher_curl_machine": {
+    "display": "Biceps Preacher Curl Machine",
+    "aliases": [],
+    "muscle_groups": ["biceps"],
+    "category": "arms",
+    "recovery_hours": 24
+  },
+  "arm_biceps_curl_machine": {
+    "display": "Arm Biceps Curl Machine",
+    "aliases": [],
+    "muscle_groups": ["biceps"],
+    "category": "arms",
+    "recovery_hours": 24
+  },
+  "kettlebell_swing": {
+    "display": "Kettlebell Swing",
+    "aliases": [],
+    "muscle_groups": ["hamstrings", "glutes", "core"],
+    "category": "functional",
+    "recovery_hours": 24
+  },
+  "kettlebell_single_arm_swing": {
+    "display": "Kettlebell Single Arm Swing",
+    "aliases": [],
+    "muscle_groups": ["hamstrings", "glutes", "core"],
+    "category": "functional",
+    "recovery_hours": 24
+  }
+}

@@ -28,7 +28,7 @@ export function TaskModal({ task, onClose, onMove }: TaskModalProps) {
   ]
 
   // Parse markdown content for better display
-  const sections = parseMarkdownSections(task.content)
+  const sections = parseMarkdownSections(task.content || '')
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
@@ -51,9 +51,11 @@ export function TaskModal({ task, onClose, onMove }: TaskModalProps) {
                   {task.priority}
                 </span>
               )}
-              <span className="text-xs bg-zinc-700 text-zinc-300 px-2 py-1 rounded">
-                {task.filename}
-              </span>
+              {task.branch && (
+                <span className="text-xs bg-zinc-700 text-zinc-300 px-2 py-1 rounded">
+                  {task.branch}
+                </span>
+              )}
             </div>
           </div>
           <button
