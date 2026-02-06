@@ -3,6 +3,8 @@
 import importlib.util
 import json
 import logging
+import sys
+import types
 from pathlib import Path
 from typing import Any, Optional
 
@@ -80,6 +82,22 @@ class PluginManager:
                 return None
 
             module = importlib.util.module_from_spec(spec)
+
+            # Set up package context so relative imports work
+            plugins_root = Path(__file__).resolve().parent
+            try:
+                rel = plugin_path.resolve().parent.relative_to(plugins_root)
+                base_pkg = __name__.rsplit(".", 1)[0]  # e.g. "src.plugins"
+                pkg = f"{base_pkg}.{'.'.join(rel.parts)}" if rel.parts else base_pkg
+                module.__package__ = pkg
+                if pkg not in sys.modules:
+                    pkg_mod = types.ModuleType(pkg)
+                    pkg_mod.__package__ = pkg
+                    pkg_mod.__path__ = [str(plugin_path.parent)]
+                    sys.modules[pkg] = pkg_mod
+            except ValueError:
+                pass  # Plugin outside plugins dir; relative imports won't work
+
             spec.loader.exec_module(module)
 
             # Find Plugin subclass in module

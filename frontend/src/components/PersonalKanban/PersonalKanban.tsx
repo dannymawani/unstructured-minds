@@ -2,15 +2,13 @@ import { useState, useEffect, useCallback } from 'react'
 import {
   DndContext,
   DragOverlay,
-  DragStartEvent,
-  DragOverEvent,
-  DragEndEvent,
   closestCorners,
   PointerSensor,
   useSensor,
   useSensors,
   useDroppable,
 } from '@dnd-kit/core'
+import type { DragStartEvent, DragOverEvent, DragEndEvent } from '@dnd-kit/core'
 import {
   SortableContext,
   verticalListSortingStrategy,

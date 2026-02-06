@@ -7,7 +7,6 @@ import {
   toggleStrongCommand,
   toggleEmphasisCommand,
   toggleInlineCodeCommand,
-  toggleLinkCommand,
   wrapInHeadingCommand,
   wrapInBulletListCommand,
   wrapInOrderedListCommand,
@@ -22,12 +21,6 @@ import type { EditorState } from '@milkdown/prose/state'
 // ============================================================
 // Slash Menu Plugin
 // ============================================================
-
-interface SlashItem {
-  label: string
-  icon: string
-  action: () => void
-}
 
 function createSlashMenuElement(getEditor: () => any, hide: () => void): HTMLElement {
   const el = document.createElement('div')
@@ -84,7 +77,7 @@ export function useSlashPlugin() {
 
     editor.config((ctx: any) => {
       ctx.set(slash.key, {
-        view: (view: EditorView) => {
+        view: (_view: EditorView) => {
           const provider = new SlashProvider({
             content: el,
             debounce: 50,
@@ -163,7 +156,7 @@ export function useTooltipPlugin() {
 
     editor.config((ctx: any) => {
       ctx.set(tooltip.key, {
-        view: (view: EditorView) => {
+        view: (_view: EditorView) => {
           const provider = new TooltipProvider({
             content: el,
             debounce: 50,
