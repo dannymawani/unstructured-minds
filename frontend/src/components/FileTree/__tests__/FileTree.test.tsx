@@ -253,7 +253,7 @@ describe('FileTree', () => {
     render(<FileTree onFileSelect={vi.fn()} />)
 
     await waitFor(() => {
-      expect(screen.getByTitle('New file')).toBeInTheDocument()
+      expect(screen.getByTitle('New note')).toBeInTheDocument()
       expect(screen.getByTitle('New folder')).toBeInTheDocument()
       expect(screen.getByTitle('Refresh')).toBeInTheDocument()
     })

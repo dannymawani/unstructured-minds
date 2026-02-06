@@ -15,6 +15,11 @@
 #   - Development environment settings
 #   - Faster rebuild with cache
 #
+# Note: If you change package.json dependencies, run:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml down -v
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+# This clears the anonymous node_modules volume so fresh deps are installed.
+#
 # =============================================================================
 
 services:
@@ -28,6 +33,8 @@ services:
       # Use cache for faster rebuilds
       cache_from:
         - unstructured-minds-backend:latest
+    # Run as root in dev to avoid bind-mount permission issues
+    user: "0:0"
     volumes:
       # Mount source code for hot reload
       - ./backend/src:/app/src:ro
@@ -59,12 +66,24 @@ services:
       - ./frontend/index.html:/app/index.html:ro
       - ./frontend/vite.config.ts:/app/vite.config.ts:ro
       # Anonymous volume to preserve node_modules from container
+      # If you update package.json, run: docker compose down -v && docker compose up --build
       - /app/node_modules
     environment:
       - NODE_ENV=development
+      # Client-side API URL (used by browser, reaches host-mapped backend port)
       - VITE_API_URL=http://localhost:8000
+      # Server-side proxy target (used by Vite dev server inside the container)
+      - VITE_API_PROXY_TARGET=http://backend:8000
+    # Override ports: only expose Vite dev server, not nginx port 80
     ports:
       - "5173:5173"
+    # Override health check for Vite dev server (base targets nginx on port 80)
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5173"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
     # Don't wait for backend to be healthy in dev
     depends_on:
       - backend

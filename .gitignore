@@ -74,3 +74,9 @@ logs/
 tmp/
 temp/
 *.tmp
+
+# Existing data (personal/sensitive - imported from Obsidian)
+existing_data/
+
+# Planning scratch files
+next_step.md

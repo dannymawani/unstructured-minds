@@ -15,8 +15,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy dependency specification
+# Copy dependency specification and source for hatchling build
 COPY pyproject.toml .
+COPY src/ ./src/
 
 # Create a virtual environment and install dependencies
 RUN python -m venv /opt/venv

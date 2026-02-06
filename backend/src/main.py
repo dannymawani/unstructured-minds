@@ -25,6 +25,7 @@ from .api.export import router as export_router, import_router
 from .api.calendar import router as calendar_router
 from .api.templates import router as templates_router
 from .api.tags import router as tags_router
+from .api.tasks import router as tasks_router
 from .api.health import router as health_router, set_start_time
 from .api.metrics import router as metrics_router
 from .api.insights import router as insights_router
@@ -33,11 +34,9 @@ from .api.webhooks import router as webhooks_router
 from .claude import ClaudeClient
 from .plugins import PluginManager
 from .db import DatabaseManager
-from .extraction import ExtractionPipeline
 from .middleware import limiter, SecurityHeadersMiddleware, RequestLoggingMiddleware
 from .storage import get_storage_backend
 from .watcher import FileWatcher
-from .webhooks import dispatch_event, WebhookEvent
 
 # Configure structured logging
 configure_logging(
@@ -47,73 +46,20 @@ configure_logging(
 logger = get_logger(__name__)
 
 
-def create_extraction_callback(
-    storage,
-    db: DatabaseManager,
-    claude: ClaudeClient,
-) -> callable:
-    """Create a callback function for file change extraction.
+def create_file_change_callback() -> callable:
+    """Create a callback function for file change events.
 
-    Args:
-        storage: Storage backend
-        db: Database manager
-        claude: Claude client
+    Extraction is no longer triggered by file watcher — it is handled
+    explicitly by the POST /vault/file endpoint when ?extract=true.
+    The watcher callback now only logs changes for debugging.
 
     Returns:
         Callback function
     """
 
     def on_file_change(file_path: str) -> None:
-        """Handle file change by triggering extraction."""
-        if not claude.is_configured:
-            logger.debug("extraction_skipped", file=file_path, reason="claude_not_configured")
-            return
-
-        async def extract():
-            import time
-            start_time = time.perf_counter()
-            try:
-                content_bytes = await storage.read(file_path)
-                content = content_bytes.decode("utf-8")
-                pipeline = ExtractionPipeline(db, claude)
-                result = await pipeline.extract(file_path, content)
-                duration_ms = (time.perf_counter() - start_time) * 1000
-
-                if result.success and result.data:
-                    logger.info(
-                        "extraction_completed",
-                        file=file_path,
-                        records_inserted=result.records_inserted,
-                        duration_ms=round(duration_ms, 2),
-                    )
-                    # Dispatch webhook event for successful extraction
-                    await dispatch_event(
-                        WebhookEvent.EXTRACTION_COMPLETED.value,
-                        {
-                            "file_path": file_path,
-                            "records_inserted": result.records_inserted,
-                            "data": result.data,
-                        },
-                    )
-                elif result.error and "Already extracted" not in result.error:
-                    logger.warning(
-                        "extraction_failed",
-                        file=file_path,
-                        error=result.error,
-                        duration_ms=round(duration_ms, 2),
-                    )
-            except FileNotFoundError:
-                logger.debug("extraction_skipped", file=file_path, reason="file_not_found")
-            except Exception as e:
-                logger.error("extraction_error", file=file_path, error=str(e))
-
-        # Schedule the async extraction
-        try:
-            loop = asyncio.get_running_loop()
-            loop.create_task(extract())
-        except RuntimeError:
-            # No running loop, run synchronously
-            asyncio.run(extract())
+        """Handle file change event (logging only)."""
+        logger.debug("file_changed", file=file_path)
 
     return on_file_change
 
@@ -166,10 +112,10 @@ async def lifespan(app: FastAPI):
     # Initialize file watcher for auto-extraction
     watcher: Optional[FileWatcher] = None
     if settings.vault_path.exists():
-        extraction_callback = create_extraction_callback(storage, db, claude)
+        file_change_callback = create_file_change_callback()
         watcher = FileWatcher(
             vault_path=settings.vault_path,
-            on_change=extraction_callback,
+            on_change=file_change_callback,
             debounce_seconds=1.0,
         )
         watcher.start(loop=asyncio.get_running_loop())
@@ -243,6 +189,7 @@ app.include_router(import_router)
 app.include_router(calendar_router)
 app.include_router(templates_router)
 app.include_router(tags_router)
+app.include_router(tasks_router)
 app.include_router(insights_router)
 app.include_router(plugins_router)
 app.include_router(webhooks_router)

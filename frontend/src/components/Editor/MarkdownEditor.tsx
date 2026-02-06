@@ -5,38 +5,48 @@ import { gfm } from '@milkdown/kit/preset/gfm'
 import { history } from '@milkdown/kit/plugin/history'
 import { listener, listenerCtx } from '@milkdown/kit/plugin/listener'
 import { Milkdown, MilkdownProvider, useEditor } from '@milkdown/react'
+import { slash, tooltip, useSlashPlugin, useTooltipPlugin } from './EditorPlugins'
 
 interface EditorContentProps {
   content: string
   onChange: (markdown: string) => void
-  onSave?: () => void
+  onAutosave?: () => void
   autoSaveDelay?: number
 }
 
 function EditorContent({
   content,
   onChange,
-  onSave,
-  autoSaveDelay = 2000,
+  onAutosave,
+  autoSaveDelay = 60000,
 }: EditorContentProps) {
-  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const autoSaveIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const isDirtyRef = useRef(false)
+
+  // Start interval-based autosave (disk-only, no extraction)
+  useEffect(() => {
+    if (!onAutosave) return
+
+    autoSaveIntervalRef.current = setInterval(() => {
+      if (isDirtyRef.current) {
+        isDirtyRef.current = false
+        onAutosave()
+      }
+    }, autoSaveDelay)
+
+    return () => {
+      if (autoSaveIntervalRef.current) {
+        clearInterval(autoSaveIntervalRef.current)
+      }
+    }
+  }, [onAutosave, autoSaveDelay])
 
   const handleChange = useCallback(
     (markdown: string) => {
       onChange(markdown)
-
-      // Auto-save with debounce
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current)
-      }
-
-      if (onSave) {
-        saveTimeoutRef.current = setTimeout(() => {
-          onSave()
-        }, autoSaveDelay)
-      }
+      isDirtyRef.current = true
     },
-    [onChange, onSave, autoSaveDelay]
+    [onChange]
   )
 
   useEditor((root) => {
@@ -49,6 +59,8 @@ function EditorContent({
       .use(gfm)
       .use(history)
       .use(listener)
+      .use(slash)
+      .use(tooltip)
       .config((ctx) => {
         ctx.get(listenerCtx).markdownUpdated((_ctx, markdown) => {
           handleChange(markdown)
@@ -56,14 +68,17 @@ function EditorContent({
       })
   }, [content])
 
-  // Cleanup timeout on unmount
+  useSlashPlugin()
+  useTooltipPlugin()
+
+  // Flush unsaved content on unmount
   useEffect(() => {
     return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current)
+      if (isDirtyRef.current && onAutosave) {
+        onAutosave()
       }
     }
-  }, [])
+  }, [onAutosave])
 
   return <Milkdown />
 }
@@ -71,7 +86,7 @@ function EditorContent({
 interface MarkdownEditorProps {
   content: string
   onChange: (markdown: string) => void
-  onSave?: () => void
+  onAutosave?: () => void
   autoSaveDelay?: number
 }
 
