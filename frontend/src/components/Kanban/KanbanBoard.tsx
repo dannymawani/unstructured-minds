@@ -6,17 +6,20 @@ import { TaskModal } from './TaskModal'
 
 export interface KanbanTask {
   id: string
-  filename: string
   title: string
   phase: string | null
   priority: string | null
   status: string
+  branch: string | null
+  depends_on: string | null
   description: string | null
-  content: string
+  content: string | null
+  completed_at: string | null
 }
 
 interface Column {
   name: string
+  status: string
   tasks: KanbanTask[]
 }
 

@@ -95,6 +95,23 @@ def init_database(db_path: Path | str) -> duckdb.DuckDBPyConnection:
         )
     """)
 
+    # Kanban tasks table (dev planning tasks)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS kanban_tasks (
+            id VARCHAR PRIMARY KEY,
+            title VARCHAR NOT NULL,
+            phase VARCHAR,
+            priority VARCHAR,
+            status VARCHAR NOT NULL DEFAULT 'not_started',
+            branch VARCHAR,
+            depends_on VARCHAR,
+            description VARCHAR,
+            content TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            completed_at TIMESTAMP
+        )
+    """)
+
     # Extraction log table
     conn.execute("""
         CREATE TABLE IF NOT EXISTS extraction_log (
@@ -158,6 +175,17 @@ def _create_indexes(conn: duckdb.DuckDBPyConnection) -> None:
     conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_tasks_status
         ON tasks(status)
+    """)
+
+    # Index on kanban_tasks for board queries
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_kanban_status
+        ON kanban_tasks(status)
+    """)
+
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_kanban_phase
+        ON kanban_tasks(phase)
     """)
 
     # Index on activities for dashboard queries

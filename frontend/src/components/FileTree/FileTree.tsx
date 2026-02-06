@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { Plus, FolderPlus, RefreshCw } from 'lucide-react'
+import { Plus, FolderPlus, RefreshCw, FileText, CalendarDays, LayoutTemplate, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { FileTreeItem, type FileNode } from './FileTreeItem'
 
@@ -14,6 +14,8 @@ interface FileTreeProps {
   onFileSelect: (path: string) => void
   selectedFile?: string
   apiBaseUrl?: string
+  onCreateDailyNote?: () => void
+  onOpenTemplatePicker?: () => void
 }
 
 interface FlattenedNode {
@@ -92,11 +94,15 @@ export function FileTree({
   onFileSelect,
   selectedFile,
   apiBaseUrl = '',
+  onCreateDailyNote,
+  onOpenTemplatePicker,
 }: FileTreeProps) {
   const [files, setFiles] = useState<FileNode[]>([])
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isNewMenuOpen, setIsNewMenuOpen] = useState(false)
+  const newMenuRef = useRef<HTMLDivElement>(null)
   const parentRef = useRef<HTMLDivElement>(null)
 
   const fetchFiles = useCallback(async () => {
@@ -185,6 +191,18 @@ export function FileTree({
     }
   }, [apiBaseUrl, fetchFiles])
 
+  // Close new menu on click outside
+  useEffect(() => {
+    if (!isNewMenuOpen) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (newMenuRef.current && !newMenuRef.current.contains(e.target as Node)) {
+        setIsNewMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [isNewMenuOpen])
+
   // Flatten tree for virtual scrolling - memoized to avoid recomputation
   const flattenedNodes = useMemo(
     () => flattenTree(files, expanded),
@@ -206,15 +224,54 @@ export function FileTree({
       <div className="flex items-center justify-between px-2 py-2 border-b">
         <span className="text-sm font-medium">Files</span>
         <div className="flex gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-10 w-10 sm:h-6 sm:w-6"
-            onClick={handleCreateFile}
-            title="New file"
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
+          <div className="relative" ref={newMenuRef}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-10 w-10 sm:h-6 sm:w-6"
+              onClick={() => setIsNewMenuOpen(prev => !prev)}
+              title="New note"
+            >
+              <Plus className="h-4 w-4" />
+              <ChevronDown className="h-2.5 w-2.5 ml-0.5" />
+            </Button>
+            {isNewMenuOpen && (
+              <div className="absolute right-0 top-full mt-1 w-48 rounded-md border bg-popover shadow-md z-50">
+                <div className="py-1">
+                  <button
+                    className="flex w-full items-center gap-2 px-3 py-1.5 text-sm hover:bg-accent"
+                    onClick={() => { setIsNewMenuOpen(false); handleCreateFile() }}
+                  >
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    Blank Note
+                  </button>
+                  {onCreateDailyNote && (
+                    <button
+                      className="flex w-full items-center gap-2 px-3 py-1.5 text-sm hover:bg-accent"
+                      onClick={() => { setIsNewMenuOpen(false); onCreateDailyNote() }}
+                    >
+                      <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                      Today's Note
+                      <span className="ml-auto text-xs text-muted-foreground">Cmd+D</span>
+                    </button>
+                  )}
+                  {onOpenTemplatePicker && (
+                    <>
+                      <div className="my-1 border-t" />
+                      <button
+                        className="flex w-full items-center gap-2 px-3 py-1.5 text-sm hover:bg-accent"
+                        onClick={() => { setIsNewMenuOpen(false); onOpenTemplatePicker() }}
+                      >
+                        <LayoutTemplate className="h-4 w-4 text-muted-foreground" />
+                        From Template...
+                        <span className="ml-auto text-xs text-muted-foreground">Cmd+T</span>
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
           <Button
             variant="ghost"
             size="icon"
