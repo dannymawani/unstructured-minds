@@ -207,9 +207,16 @@ class TestExtractionPipeline:
     async def test_force_re_extraction(self, mock_db, mock_claude):
         """Test forcing re-extraction."""
         content_hash = ExtractionPipeline(mock_db)._compute_hash("content")
-        mock_db.execute = MagicMock(return_value=MockResult([
-            (content_hash,)
-        ]))
+
+        # Return different results depending on the query:
+        # - extraction_log queries get the hash tuple
+        # - task/data queries get empty results
+        def smart_execute(sql, params=None):
+            if "extraction_log" in sql:
+                return MockResult([(content_hash,)])
+            return MockResult([])
+
+        mock_db.execute = MagicMock(side_effect=smart_execute)
         pipeline = ExtractionPipeline(mock_db, mock_claude)
 
         result = await pipeline.extract("test.md", "content", force=True)

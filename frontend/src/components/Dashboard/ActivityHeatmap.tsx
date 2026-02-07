@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
+import { Grid3x3 } from 'lucide-react';
 
 interface HeatmapDay {
   date: string;
@@ -21,7 +22,7 @@ interface ActivityHeatmapProps {
 
 // Color scale based on activity intensity (using duration)
 const INTENSITY_COLORS = [
-  'bg-zinc-800 dark:bg-zinc-800',         // 0 - no activity
+  'bg-muted',                              // 0 - no activity
   'bg-green-900/60 dark:bg-green-900/60', // 1 - light
   'bg-green-700/70 dark:bg-green-700/70', // 2 - moderate
   'bg-green-500/80 dark:bg-green-500/80', // 3 - active
@@ -180,7 +181,7 @@ export function ActivityHeatmap({
 
   if (loading) {
     return (
-      <div className="bg-zinc-800 rounded-lg p-4 h-48 animate-pulse" data-testid="heatmap-loading" />
+      <div className="bg-card rounded-md shadow-sm p-4 h-48 animate-pulse" data-testid="heatmap-loading" />
     );
   }
 
@@ -196,10 +197,13 @@ export function ActivityHeatmap({
   const totalDuration = data?.days.reduce((sum, d) => sum + d.duration_minutes, 0) || 0;
 
   return (
-    <div className="bg-zinc-800 rounded-lg p-4" data-testid="activity-heatmap">
+    <div className="bg-card rounded-md shadow-sm p-4" data-testid="activity-heatmap">
       <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-semibold text-white">Activity Heatmap</h3>
-        <div className="flex gap-4 text-sm text-zinc-400">
+        <div className="flex items-center gap-2">
+          <Grid3x3 className="w-5 h-5 text-green-400" />
+          <h3 className="text-lg font-semibold text-foreground">Activity Heatmap</h3>
+        </div>
+        <div className="flex gap-4 text-sm text-muted-foreground">
           <span>{totalActivities} activities</span>
           <span>{Math.round(totalDuration / 60)} hrs total</span>
         </div>
@@ -210,7 +214,7 @@ export function ActivityHeatmap({
         {monthLabels.map((label, idx) => (
           <div
             key={idx}
-            className="text-xs text-zinc-500"
+            className="text-xs text-muted-foreground"
             style={{
               position: 'relative',
               left: `${label.weekIndex * 14}px`,
@@ -229,7 +233,7 @@ export function ActivityHeatmap({
           {DAYS.map((day, idx) => (
             <div
               key={day}
-              className="text-xs text-zinc-500 h-[12px] flex items-center"
+              className="text-xs text-muted-foreground h-[12px] flex items-center"
               style={{ visibility: idx % 2 === 0 ? 'hidden' : 'visible' }}
             >
               {day.slice(0, 3)}
@@ -253,7 +257,7 @@ export function ActivityHeatmap({
                 return (
                   <div
                     key={dayIdx}
-                    className={`w-[12px] h-[12px] rounded-sm cursor-pointer transition-all hover:ring-1 hover:ring-zinc-400 ${
+                    className={`w-[12px] h-[12px] rounded-sm cursor-pointer transition-all hover:ring-1 hover:ring-muted-foreground ${
                       isInYear ? INTENSITY_COLORS[intensity] : 'bg-transparent'
                     }`}
                     onMouseEnter={(e) => handleMouseEnter(e, day)}
@@ -268,7 +272,7 @@ export function ActivityHeatmap({
       </div>
 
       {/* Legend */}
-      <div className="flex items-center gap-2 mt-3 text-xs text-zinc-400">
+      <div className="flex items-center gap-2 mt-3 text-xs text-muted-foreground">
         <span>Less</span>
         {INTENSITY_COLORS.map((color, idx) => (
           <div key={idx} className={`w-[12px] h-[12px] rounded-sm ${color}`} />
@@ -279,16 +283,16 @@ export function ActivityHeatmap({
       {/* Tooltip */}
       {tooltip.visible && (
         <div
-          className="fixed z-50 bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm pointer-events-none transform -translate-x-1/2 -translate-y-full"
+          className="fixed z-50 bg-popover text-popover-foreground rounded-md shadow-lg border border-border px-3 py-2 text-sm pointer-events-none transform -translate-x-1/2 -translate-y-full"
           style={{ left: tooltip.x, top: tooltip.y }}
         >
-          <div className="font-medium text-white">{tooltip.date}</div>
+          <div className="font-medium text-foreground">{tooltip.date}</div>
           {tooltip.count > 0 ? (
-            <div className="text-zinc-400">
+            <div className="text-muted-foreground">
               {tooltip.count} {tooltip.count === 1 ? 'activity' : 'activities'} ({tooltip.duration} min)
             </div>
           ) : (
-            <div className="text-zinc-500">No activities</div>
+            <div className="text-muted-foreground">No activities</div>
           )}
         </div>
       )}
