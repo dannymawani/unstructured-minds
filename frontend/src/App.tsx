@@ -120,7 +120,18 @@ function App() {
     setContent(newContent)
     contentRef.current = newContent
     isDirtyRef.current = true
-  }, [])
+
+    // Save to disk immediately so content isn't lost on refresh
+    if (selectedFile) {
+      fetch(`${API_BASE_URL}/vault/file?extract=false`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: selectedFile, content: newContent }),
+      }).then(() => {
+        isDirtyRef.current = false
+      }).catch((err) => console.error('Error saving note-assist update:', err))
+    }
+  }, [selectedFile])
 
   // Autosave: disk only, no extraction (called by 60s interval)
   const handleAutosave = useCallback(async () => {
