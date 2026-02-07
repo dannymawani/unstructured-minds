@@ -51,6 +51,23 @@ class TaskCreateRequest(BaseModel):
     deadline: Optional[date] = None
 
 
+class BulkCompleteRequest(BaseModel):
+    statuses: list[str] = Field(
+        default=["backlog", "in_progress"],
+        description="Which statuses to mark as done",
+    )
+    backdate_days: int = Field(
+        default=8,
+        ge=0,
+        le=365,
+        description="Backdate completed_at by this many days so tasks are hidden by hide_old filter",
+    )
+
+
+class BulkCompleteResponse(BaseModel):
+    updated: int
+
+
 # =============================================================================
 # Helpers
 # =============================================================================
@@ -320,3 +337,38 @@ async def create_task(
     columns = [desc[0] for desc in result.description]
     row = result.fetchone()
     return _row_to_task(row, columns)
+
+
+@router.post("/bulk-complete", response_model=BulkCompleteResponse)
+async def bulk_complete_tasks(
+    request: BulkCompleteRequest,
+    db: DatabaseManager = Depends(get_db),
+) -> BulkCompleteResponse:
+    """Mark all tasks matching given statuses as done with backdated completed_at.
+
+    Backdating ensures tasks are hidden by the default hide_old filter (7 days).
+    """
+    valid_statuses = {"backlog", "in_progress", "done", "cancelled"}
+    for s in request.statuses:
+        if s not in valid_statuses:
+            raise HTTPException(status_code=400, detail=f"Invalid status: {s}")
+
+    if not request.statuses:
+        return BulkCompleteResponse(updated=0)
+
+    placeholders = ", ".join("?" for _ in request.statuses)
+    completed_at = (datetime.now() - timedelta(days=request.backdate_days)).isoformat()
+
+    count_result = db.execute(
+        f"SELECT COUNT(*) FROM tasks WHERE status IN ({placeholders})",
+        request.statuses,
+    )
+    count = count_result.fetchone()[0]
+
+    if count > 0:
+        db.execute(
+            f"UPDATE tasks SET status = 'done', completed_at = ? WHERE status IN ({placeholders})",
+            [completed_at] + request.statuses,
+        )
+
+    return BulkCompleteResponse(updated=count)
