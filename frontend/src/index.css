@@ -298,13 +298,15 @@ body {
 }
 
 /* =============================================================================
-   Slash Menu & Floating Toolbar
+   Slash Menu & Editor Toolbar
    ============================================================================= */
 
 .slash-menu {
   z-index: 50;
 }
 
-.floating-toolbar {
-  z-index: 50;
+.editor-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }

@@ -5,7 +5,8 @@ import { gfm } from '@milkdown/kit/preset/gfm'
 import { history } from '@milkdown/kit/plugin/history'
 import { listener, listenerCtx } from '@milkdown/kit/plugin/listener'
 import { Milkdown, MilkdownProvider, useEditor } from '@milkdown/react'
-import { slash, tooltip, useSlashPlugin, useTooltipPlugin } from './EditorPlugins'
+import { slash, useSlashPlugin } from './EditorPlugins'
+import { EditorToolbar } from './EditorToolbar'
 
 interface EditorContentProps {
   content: string
@@ -60,7 +61,6 @@ function EditorContent({
       .use(history)
       .use(listener)
       .use(slash)
-      .use(tooltip)
       .config((ctx) => {
         ctx.get(listenerCtx).markdownUpdated((_ctx, markdown) => {
           handleChange(markdown)
@@ -69,7 +69,6 @@ function EditorContent({
   }, [content])
 
   useSlashPlugin()
-  useTooltipPlugin()
 
   // Flush unsaved content on unmount
   useEffect(() => {
@@ -80,7 +79,12 @@ function EditorContent({
     }
   }, [onAutosave])
 
-  return <Milkdown />
+  return (
+    <>
+      <EditorToolbar />
+      <Milkdown />
+    </>
+  )
 }
 
 interface MarkdownEditorProps {
