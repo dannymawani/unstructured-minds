@@ -26,6 +26,7 @@ class KanbanTask(BaseModel):
     depends_on: Optional[str] = None
     description: Optional[str] = None
     content: Optional[str] = None
+    deadline: Optional[str] = None
     completed_at: Optional[str] = None
 
 
@@ -47,6 +48,7 @@ class KanbanTaskCreate(BaseModel):
     depends_on: Optional[str] = None
     description: Optional[str] = None
     content: Optional[str] = None
+    deadline: Optional[str] = Field(None, max_length=100, description="Deadline (e.g. 'Friday', '2026-02-14', 'end of sprint')")
 
 
 class KanbanTaskUpdate(BaseModel):
@@ -58,6 +60,7 @@ class KanbanTaskUpdate(BaseModel):
     depends_on: Optional[str] = None
     description: Optional[str] = None
     content: Optional[str] = None
+    deadline: Optional[str] = Field(None, max_length=100)
 
 
 # =============================================================================
@@ -87,6 +90,7 @@ def _row_to_task(row: tuple, columns: list[str]) -> KanbanTask:
         depends_on=data.get("depends_on"),
         description=data.get("description"),
         content=data.get("content"),
+        deadline=data.get("deadline"),
         completed_at=str(data["completed_at"]) if data.get("completed_at") else None,
     )
 
@@ -184,10 +188,10 @@ async def create_task(
         raise HTTPException(status_code=409, detail=f"Task with id '{task_id}' already exists")
 
     db.execute(
-        """INSERT INTO kanban_tasks (id, title, phase, priority, status, branch, depends_on, description, content)
-           VALUES (?, ?, ?, ?, 'not_started', ?, ?, ?, ?)""",
+        """INSERT INTO kanban_tasks (id, title, phase, priority, status, branch, depends_on, description, content, deadline)
+           VALUES (?, ?, ?, ?, 'not_started', ?, ?, ?, ?, ?)""",
         [task_id, request.title, request.phase, request.priority, request.branch,
-         request.depends_on, request.description, request.content],
+         request.depends_on, request.description, request.content, request.deadline],
     )
 
     result = db.execute("SELECT * FROM kanban_tasks WHERE id = ?", [task_id])
@@ -209,7 +213,7 @@ async def update_task(
 
     updates = []
     values: list = []
-    for field in ("title", "phase", "priority", "status", "branch", "depends_on", "description", "content"):
+    for field in ("title", "phase", "priority", "status", "branch", "depends_on", "description", "content", "deadline"):
         val = getattr(request, field, None)
         if val is not None:
             updates.append(f"{field} = ?")

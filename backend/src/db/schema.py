@@ -107,10 +107,17 @@ def init_database(db_path: Path | str) -> duckdb.DuckDBPyConnection:
             depends_on VARCHAR,
             description VARCHAR,
             content TEXT,
+            deadline VARCHAR,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             completed_at TIMESTAMP
         )
     """)
+
+    # Migration: add deadline column if missing (existing databases)
+    try:
+        conn.execute("SELECT deadline FROM kanban_tasks LIMIT 0")
+    except duckdb.BinderException:
+        conn.execute("ALTER TABLE kanban_tasks ADD COLUMN deadline VARCHAR")
 
     # File index table for fast file lookups
     conn.execute("""

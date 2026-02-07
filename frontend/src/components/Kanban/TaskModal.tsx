@@ -57,6 +57,12 @@ export function TaskModal({ task, onClose, onMove, onDelete }: TaskModalProps) {
                   {task.branch}
                 </span>
               )}
+              {task.deadline && (
+                <span className="flex items-center gap-1 text-xs bg-amber-500/20 text-amber-400 px-2 py-1 rounded">
+                  <Clock className="w-3 h-3" />
+                  {task.deadline}
+                </span>
+              )}
             </div>
           </div>
           <button
