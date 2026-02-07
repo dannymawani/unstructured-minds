@@ -1,12 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { useInstance } from '@milkdown/react'
 import { SlashProvider, slashFactory } from '@milkdown/kit/plugin/slash'
-import { TooltipProvider, tooltipFactory } from '@milkdown/kit/plugin/tooltip'
 import { callCommand } from '@milkdown/utils'
 import {
-  toggleStrongCommand,
-  toggleEmphasisCommand,
-  toggleInlineCodeCommand,
   wrapInHeadingCommand,
   wrapInBulletListCommand,
   wrapInOrderedListCommand,
@@ -14,7 +10,6 @@ import {
   createCodeBlockCommand,
   insertHrCommand,
 } from '@milkdown/kit/preset/commonmark'
-import { toggleStrikethroughCommand } from '@milkdown/kit/preset/gfm'
 import type { EditorView } from '@milkdown/prose/view'
 import type { EditorState } from '@milkdown/prose/state'
 
@@ -105,86 +100,3 @@ export function useSlashPlugin() {
   }, [loading, getEditor])
 }
 
-// ============================================================
-// Floating Toolbar Plugin
-// ============================================================
-
-function createToolbarElement(getEditor: () => any): HTMLElement {
-  const el = document.createElement('div')
-  el.className = 'floating-toolbar flex items-center gap-0.5 rounded-md border bg-popover shadow-md p-1'
-  el.style.zIndex = '50'
-
-  const buttons: { label: string; title: string; commandFn: () => (ctx: any) => boolean }[] = [
-    { label: '<b>B</b>', title: 'Bold', commandFn: () => callCommand(toggleStrongCommand.key) },
-    { label: '<i>I</i>', title: 'Italic', commandFn: () => callCommand(toggleEmphasisCommand.key) },
-    { label: '<s>S</s>', title: 'Strikethrough', commandFn: () => callCommand(toggleStrikethroughCommand.key) },
-    { label: '<code>&lt;&gt;</code>', title: 'Inline Code', commandFn: () => callCommand(toggleInlineCodeCommand.key) },
-  ]
-
-  buttons.forEach((item) => {
-    const btn = document.createElement('button')
-    btn.className = 'rounded px-2 py-1 text-sm hover:bg-accent cursor-pointer'
-    btn.title = item.title
-    btn.innerHTML = item.label
-    btn.addEventListener('mousedown', (e) => {
-      e.preventDefault()
-      const editor = getEditor()
-      if (editor) {
-        editor.action(item.commandFn())
-      }
-    })
-    el.appendChild(btn)
-  })
-
-  return el
-}
-
-export const tooltip = tooltipFactory('editor-tooltip')
-
-export function useTooltipPlugin() {
-  const [loading, getEditor] = useInstance()
-  const tooltipElRef = useRef<HTMLElement | null>(null)
-  const providerRef = useRef<TooltipProvider | null>(null)
-
-  useEffect(() => {
-    if (loading) return
-
-    const editor = getEditor()
-    if (!editor) return
-
-    const el = createToolbarElement(getEditor)
-    tooltipElRef.current = el
-    document.body.appendChild(el)
-
-    editor.config((ctx: any) => {
-      ctx.set(tooltip.key, {
-        view: (_view: EditorView) => {
-          const provider = new TooltipProvider({
-            content: el,
-            debounce: 50,
-            shouldShow: (view: EditorView) => {
-              const { selection } = view.state
-              const { empty } = selection
-              return !empty
-            },
-          })
-          providerRef.current = provider
-
-          return {
-            update: (updatedView: EditorView, prevState?: EditorState) => {
-              provider.update(updatedView, prevState)
-            },
-            destroy: () => {
-              provider.destroy()
-            },
-          }
-        },
-      })
-    })
-
-    return () => {
-      providerRef.current?.destroy()
-      el.remove()
-    }
-  }, [loading, getEditor])
-}

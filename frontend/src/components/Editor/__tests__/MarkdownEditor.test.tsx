@@ -47,6 +47,13 @@ describe('MarkdownEditor', () => {
     expect(container.querySelector('.milkdown-editor')).toBeInTheDocument()
   })
 
+  it('renders editor toolbar', () => {
+    const { container } = render(
+      <MarkdownEditor content="# Hello" onChange={() => {}} />
+    )
+    expect(container.querySelector('.editor-toolbar')).toBeInTheDocument()
+  })
+
   it('accepts onAutosave prop for auto-save', () => {
     const onAutosave = vi.fn()
     const onChange = vi.fn()
