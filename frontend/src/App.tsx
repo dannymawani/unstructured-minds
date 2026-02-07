@@ -83,17 +83,20 @@ function App() {
         throw new Error('Failed to fetch file')
       }
       const data = await response.json()
-      setContent(data.content)
+      return data.content as string
     } catch (err) {
       console.error('Error loading file:', err)
-      setContent('')
+      return ''
     }
   }, [])
 
   const handleFileSelect = useCallback(
-    (path: string) => {
+    async (path: string) => {
+      // Fetch content FIRST, then update selectedFile so the editor
+      // remounts (via key={selectedFile}) with the correct content
+      const fileContent = await fetchFileContent(path)
+      setContent(fileContent)
       setSelectedFile(path)
-      fetchFileContent(path)
       // Close mobile sidebar after selection
       if (isMobile || isTablet) {
         setIsMobileSidebarOpen(false)
@@ -188,31 +191,19 @@ function App() {
     const dailyNotePath = `Daily-Notes/${year}-${month}/${year}-${month}-${day}.md`
 
     try {
-      // Try to create the daily note via API (it will return existing content if file exists)
-      const response = await fetch(`${API_BASE_URL}/vault/daily-note`, {
+      await fetch(`${API_BASE_URL}/vault/daily-note`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date: `${year}-${month}-${day}` }),
       })
-
-      if (response.ok) {
-        // Switch to editor view and select the daily note
-        setView('editor')
-        setSelectedFile(dailyNotePath)
-        fetchFileContent(dailyNotePath)
-      } else {
-        // Fallback: just try to open the file directly
-        setView('editor')
-        setSelectedFile(dailyNotePath)
-        fetchFileContent(dailyNotePath)
-      }
     } catch (err) {
       console.error('Error creating daily note:', err)
-      // Fallback: try to open the file anyway
-      setView('editor')
-      setSelectedFile(dailyNotePath)
-      fetchFileContent(dailyNotePath)
     }
+    // Always open the file - fetch content first, then set selectedFile
+    const fileContent = await fetchFileContent(dailyNotePath)
+    setContent(fileContent)
+    setView('editor')
+    setSelectedFile(dailyNotePath)
   }, [fetchFileContent])
 
   // Open command palette
@@ -237,20 +228,22 @@ function App() {
 
   // Handle search result selection
   const handleSearchSelect = useCallback(
-    (path: string) => {
+    async (path: string) => {
+      const fileContent = await fetchFileContent(path)
+      setContent(fileContent)
       setView('editor')
       setSelectedFile(path)
-      fetchFileContent(path)
     },
     [fetchFileContent]
   )
 
   // Handle template creation result
   const handleTemplateSelect = useCallback(
-    (path: string) => {
+    async (path: string) => {
+      const fileContent = await fetchFileContent(path)
+      setContent(fileContent)
       setView('editor')
       setSelectedFile(path)
-      fetchFileContent(path)
     },
     [fetchFileContent]
   )
@@ -261,29 +254,23 @@ function App() {
       const [year, month] = date.split('-')
       const dailyNotePath = `Daily-Notes/${year}-${month}/${date}.md`
 
-      if (hasNote) {
-        // Open existing note
-        setView('editor')
-        setSelectedFile(dailyNotePath)
-        fetchFileContent(dailyNotePath)
-      } else {
-        // Create new note via API
+      if (!hasNote) {
+        // Create new note via API first
         try {
-          const response = await fetch(`${API_BASE_URL}/calendar/daily-note`, {
+          await fetch(`${API_BASE_URL}/calendar/daily-note`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ date }),
           })
-
-          if (response.ok) {
-            setView('editor')
-            setSelectedFile(dailyNotePath)
-            fetchFileContent(dailyNotePath)
-          }
         } catch (err) {
           console.error('Error creating daily note:', err)
         }
       }
+      // Fetch content first, then set selectedFile
+      const fileContent = await fetchFileContent(dailyNotePath)
+      setContent(fileContent)
+      setView('editor')
+      setSelectedFile(dailyNotePath)
     },
     [fetchFileContent]
   )
@@ -367,7 +354,7 @@ function App() {
       {/* Sidebar tab buttons */}
       <div className="flex border-b">
         <button
-          className={`flex-1 flex items-center justify-center gap-1 px-2 py-2 text-xs font-medium transition-colors min-h-[44px] ${
+          className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 sm:py-1 text-xs font-medium transition-colors min-h-[44px] sm:min-h-0 ${
             sidebarTab === 'files'
               ? 'bg-accent text-accent-foreground border-b-2 border-primary'
               : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
@@ -379,7 +366,7 @@ function App() {
           Files
         </button>
         <button
-          className={`flex-1 flex items-center justify-center gap-1 px-2 py-2 text-xs font-medium transition-colors min-h-[44px] ${
+          className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 sm:py-1 text-xs font-medium transition-colors min-h-[44px] sm:min-h-0 ${
             sidebarTab === 'tags'
               ? 'bg-accent text-accent-foreground border-b-2 border-primary'
               : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
@@ -391,7 +378,7 @@ function App() {
           Tags
         </button>
         <button
-          className={`flex-1 flex items-center justify-center gap-1 px-2 py-2 text-xs font-medium transition-colors min-h-[44px] ${
+          className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 sm:py-1 text-xs font-medium transition-colors min-h-[44px] sm:min-h-0 ${
             sidebarTab === 'links'
               ? 'bg-accent text-accent-foreground border-b-2 border-primary'
               : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
@@ -525,7 +512,7 @@ function App() {
             onClick={openSearch}
             aria-label="Search notes"
             title="Search notes (Cmd+Shift+F)"
-            className="min-w-[44px] min-h-[44px] p-0 sm:p-2"
+            className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 p-0 sm:p-2"
           >
             <Search className="w-4 h-4 sm:w-4 sm:h-4" />
           </Button>
@@ -534,7 +521,7 @@ function App() {
             size="sm"
             onClick={toggleTheme}
             aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-            className="min-w-[44px] min-h-[44px] p-0 sm:p-2"
+            className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 p-0 sm:p-2"
           >
             {theme === 'dark' ? (
               <Sun className="w-4 h-4" />
@@ -546,7 +533,7 @@ function App() {
             variant="outline"
             size="sm"
             onClick={() => setIsSettingsOpen(true)}
-            className="gap-1 min-h-[44px] sm:min-h-0"
+            className="gap-1 min-h-[44px] sm:min-h-0 sm:h-8"
           >
             <Settings className="w-4 h-4" />
             <span className="hidden sm:inline">Settings</span>

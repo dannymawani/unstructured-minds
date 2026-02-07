@@ -6,11 +6,19 @@ from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def _find_env_file() -> str:
+    """Find .env file in current dir or project root (parent of backend/)."""
+    for candidate in [Path(".env"), Path(__file__).resolve().parents[2] / ".env"]:
+        if candidate.exists():
+            return str(candidate)
+    return ".env"
+
+
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=_find_env_file(),
         env_file_encoding="utf-8",
         extra="ignore",
     )

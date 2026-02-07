@@ -54,8 +54,8 @@ function FileTreeItemComponent({
   const className = useMemo(
     () =>
       cn(
-        'flex items-center gap-1 px-2 py-2 sm:py-1 cursor-pointer text-sm',
-        'min-h-[44px] sm:min-h-0',
+        'flex items-center gap-1 px-2 py-1.5 sm:py-0.5 cursor-pointer text-sm',
+        'min-h-[44px] sm:min-h-[28px]',
         'hover:bg-accent rounded-sm',
         'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1',
         selected && 'bg-accent text-accent-foreground'

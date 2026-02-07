@@ -1,5 +1,5 @@
 import { useEffect, useCallback } from 'react'
-import { X, CheckCircle, Clock, PlayCircle } from 'lucide-react'
+import { X, CheckCircle, Clock, PlayCircle, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { KanbanTask } from './KanbanBoard'
 
@@ -7,9 +7,10 @@ interface TaskModalProps {
   task: KanbanTask
   onClose: () => void
   onMove: (taskId: string, newStatus: string) => void
+  onDelete?: (taskId: string) => void
 }
 
-export function TaskModal({ task, onClose, onMove }: TaskModalProps) {
+export function TaskModal({ task, onClose, onMove, onDelete }: TaskModalProps) {
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape') {
       onClose()
@@ -82,6 +83,19 @@ export function TaskModal({ task, onClose, onMove }: TaskModalProps) {
               {label}
             </Button>
           ))}
+          {onDelete && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (confirm('Delete this task?')) onDelete(task.id)
+              }}
+              className="gap-1.5 ml-auto text-red-400 hover:text-red-300 hover:bg-red-500/10"
+            >
+              <Trash2 className="w-4 h-4" />
+              Delete
+            </Button>
+          )}
         </div>
 
         {/* Content */}
