@@ -82,7 +82,7 @@ export function WeeklyActivityChart({
 
   if (loading) {
     return (
-      <div className="bg-zinc-800 rounded-lg p-4 h-64 animate-pulse" data-testid="activity-loading" />
+      <div className="bg-card rounded-md shadow-sm p-4 h-64 animate-pulse" data-testid="activity-loading" />
     );
   }
 
@@ -96,9 +96,9 @@ export function WeeklyActivityChart({
 
   if (!data || data.activities.length === 0) {
     return (
-      <div className="bg-zinc-800 rounded-lg p-4" data-testid="activity-empty">
-        <h3 className="text-lg font-semibold text-white mb-2">Weekly Activity</h3>
-        <p className="text-zinc-400">No activities recorded yet.</p>
+      <div className="bg-card rounded-md shadow-sm p-4" data-testid="activity-empty">
+        <h3 className="text-lg font-semibold text-foreground mb-2">Weekly Activity</h3>
+        <p className="text-muted-foreground">No activities recorded yet.</p>
       </div>
     );
   }
@@ -114,30 +114,30 @@ export function WeeklyActivityChart({
   };
 
   return (
-    <div className="bg-zinc-800 rounded-lg p-4" data-testid="weekly-activity-chart">
+    <div className="bg-card rounded-md shadow-sm p-4" data-testid="weekly-activity-chart">
       <div className="flex flex-col sm:flex-row justify-between items-start gap-3 mb-4">
         <div className="flex items-center gap-2">
           <div className="p-2 bg-orange-500/20 rounded-lg">
             <Activity className="w-5 h-5 text-orange-400" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-white">Activity Breakdown</h3>
-            <p className="text-sm text-zinc-400">
+            <h3 className="text-lg font-semibold text-foreground">Activity Breakdown</h3>
+            <p className="text-sm text-muted-foreground">
               {data.activities.length} types | {totalTimeStr} total
             </p>
           </div>
         </div>
 
-        <div className="flex bg-zinc-700 rounded-lg p-1">
+        <div className="flex bg-secondary rounded-lg p-1">
           <button
-            className={`p-2 rounded transition-colors ${chartType === 'bar' ? 'bg-orange-500 text-white' : 'text-zinc-400 hover:text-white'}`}
+            className={`p-2 rounded transition-colors ${chartType === 'bar' ? 'bg-orange-500 text-white' : 'text-muted-foreground hover:text-foreground'}`}
             onClick={() => setChartType('bar')}
             aria-label="Bar chart"
           >
             <LayoutGrid className="w-4 h-4" />
           </button>
           <button
-            className={`p-2 rounded transition-colors ${chartType === 'pie' ? 'bg-orange-500 text-white' : 'text-zinc-400 hover:text-white'}`}
+            className={`p-2 rounded transition-colors ${chartType === 'pie' ? 'bg-orange-500 text-white' : 'text-muted-foreground hover:text-foreground'}`}
             onClick={() => setChartType('pie')}
             aria-label="Pie chart"
           >
@@ -157,10 +157,10 @@ export function WeeklyActivityChart({
               onMouseEnter={() => setHovered(i)}
               onMouseLeave={() => setHovered(null)}
             >
-              <span className="text-xs text-zinc-400 w-20 text-right shrink-0 group-hover:text-white transition-colors">
+              <span className="text-xs text-muted-foreground w-20 text-right shrink-0 group-hover:text-foreground transition-colors">
                 {item.name}
               </span>
-              <div className="flex-1 h-5 bg-zinc-700/50 rounded overflow-hidden relative">
+              <div className="flex-1 h-5 bg-secondary/50 rounded overflow-hidden relative">
                 <div
                   className="h-full rounded transition-all duration-300"
                   style={{
@@ -192,8 +192,8 @@ export function WeeklyActivityChart({
             />
             {hovered !== null && (
               <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                <span className="text-white text-sm font-medium">{items[hovered].name}</span>
-                <span className="text-zinc-400 text-xs">{items[hovered].percentage.toFixed(0)}%</span>
+                <span className="text-foreground text-sm font-medium">{items[hovered].name}</span>
+                <span className="text-muted-foreground text-xs">{items[hovered].percentage.toFixed(0)}%</span>
               </div>
             )}
           </div>
@@ -201,7 +201,7 @@ export function WeeklyActivityChart({
             {items.map((item, i) => (
               <button
                 key={item.type}
-                className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white transition-colors"
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
                 onClick={() => onActivityClick?.(item.type)}
                 onMouseEnter={() => setHovered(i)}
                 onMouseLeave={() => setHovered(null)}
@@ -215,7 +215,7 @@ export function WeeklyActivityChart({
       )}
 
       {chartType === 'bar' && (
-        <div className="flex items-center justify-between mt-3 pt-3 border-t border-zinc-700 text-xs text-zinc-400">
+        <div className="flex items-center justify-between mt-3 pt-3 border-t border-border text-xs text-muted-foreground">
           <span>Click a bar to filter</span>
           <span>
             Avg per session:{' '}

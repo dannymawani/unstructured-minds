@@ -60,7 +60,7 @@ export function ExerciseProgress({
 
   if (loading) {
     return (
-      <div className="bg-zinc-800 rounded-lg p-4 h-64 animate-pulse" data-testid="exercise-loading" />
+      <div className="bg-card rounded-md shadow-sm p-4 h-64 animate-pulse" data-testid="exercise-loading" />
     );
   }
 
@@ -74,9 +74,9 @@ export function ExerciseProgress({
 
   if (!data || data.progress.length === 0) {
     return (
-      <div className="bg-zinc-800 rounded-lg p-4" data-testid="exercise-empty">
-        <h3 className="text-lg font-semibold text-white mb-2">{exercise} Progress</h3>
-        <p className="text-zinc-400">No data for this exercise yet.</p>
+      <div className="bg-card rounded-md shadow-sm p-4" data-testid="exercise-empty">
+        <h3 className="text-lg font-semibold text-foreground mb-2">{exercise} Progress</h3>
+        <p className="text-muted-foreground">No data for this exercise yet.</p>
       </div>
     );
   }
@@ -131,7 +131,7 @@ export function ExerciseProgress({
   }
 
   const TrendIcon = trend === 'up' ? TrendingUp : trend === 'down' ? TrendingDown : Minus;
-  const trendColor = trend === 'up' ? 'text-green-400' : trend === 'down' ? 'text-red-400' : 'text-zinc-400';
+  const trendColor = trend === 'up' ? 'text-green-400' : trend === 'down' ? 'text-red-400' : 'text-muted-foreground';
 
   const periodMax = Math.max(...data.progress.filter((p) => p.max_weight_kg !== null).map((p) => p.max_weight_kg!), 0);
   const isPR = periodMax === data.summary.all_time_max;
@@ -156,26 +156,26 @@ export function ExerciseProgress({
   const hoveredVal = hovered !== null ? values[hovered] : null;
 
   return (
-    <div className="bg-zinc-800 rounded-lg p-4" data-testid="exercise-progress">
+    <div className="bg-card rounded-md shadow-sm p-4" data-testid="exercise-progress">
       <div className="flex flex-col sm:flex-row justify-between items-start gap-3 mb-4">
         <div className="flex items-start gap-3">
           <div className="p-2 bg-purple-500/20 rounded-lg">
             <Dumbbell className="w-5 h-5 text-purple-400" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-white">{data.exercise} Progress</h3>
-            <p className="text-sm text-zinc-400">{data.summary.total_sessions} sessions</p>
+            <h3 className="text-lg font-semibold text-foreground">{data.exercise} Progress</h3>
+            <p className="text-sm text-muted-foreground">{data.summary.total_sessions} sessions</p>
           </div>
         </div>
 
         <div className="flex items-center gap-4">
-          <div className="flex bg-zinc-700 rounded-lg p-1">
+          <div className="flex bg-secondary rounded-lg p-1">
             <button
-              className={`px-2 py-1 text-xs rounded transition-colors ${!showReps ? 'bg-purple-500 text-white' : 'text-zinc-400 hover:text-white'}`}
+              className={`px-2 py-1 text-xs rounded transition-colors ${!showReps ? 'bg-purple-500 text-white' : 'text-muted-foreground hover:text-foreground'}`}
               onClick={() => setShowReps(false)}
             >Weight</button>
             <button
-              className={`px-2 py-1 text-xs rounded transition-colors ${showReps ? 'bg-purple-500 text-white' : 'text-zinc-400 hover:text-white'}`}
+              className={`px-2 py-1 text-xs rounded transition-colors ${showReps ? 'bg-purple-500 text-white' : 'text-muted-foreground hover:text-foreground'}`}
               onClick={() => setShowReps(true)}
             >Reps</button>
           </div>
@@ -183,11 +183,11 @@ export function ExerciseProgress({
           <div className="text-right">
             <div className="flex items-center gap-1">
               <TrendIcon className={`w-4 h-4 ${trendColor}`} />
-              <span className="text-xl font-bold text-white">
+              <span className="text-xl font-bold text-foreground">
                 {data.summary.current_max ?? '-'} kg
               </span>
             </div>
-            <p className="text-xs text-zinc-400">
+            <p className="text-xs text-muted-foreground">
               {trend !== 'flat' && (
                 <span className={trendColor}>{trend === 'up' ? '+' : '-'}{trendPercent.toFixed(1)}%</span>
               )}
@@ -264,28 +264,28 @@ export function ExerciseProgress({
         {/* Tooltip */}
         {hoveredEntry && hovered !== null && hoveredVal !== null && (
           <div
-            className="absolute pointer-events-none bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs shadow-xl z-10"
+            className="absolute pointer-events-none bg-popover text-popover-foreground rounded-md shadow-lg border border-border px-3 py-2 text-xs z-10"
             style={{
               left: `${(sx(hovered) / W) * 100}%`,
               top: `${(sy(hoveredVal) / H) * 100}%`,
               transform: 'translate(-50%, -120%)',
             }}
           >
-            <div className="font-medium text-white mb-1">
+            <div className="font-medium text-foreground mb-1">
               {new Date(hoveredEntry.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
             </div>
             {hoveredEntry.max_weight_kg !== null && (
               <div className="text-purple-400">Max Weight: {hoveredEntry.max_weight_kg} kg</div>
             )}
-            <div className="text-zinc-300">Reps: {hoveredEntry.total_reps} &middot; Sets: {hoveredEntry.total_sets}</div>
+            <div className="text-muted-foreground">Reps: {hoveredEntry.total_reps} &middot; Sets: {hoveredEntry.total_sets}</div>
             {hoveredEntry.max_weight_kg && (
-              <div className="text-zinc-300">Volume: {(hoveredEntry.max_weight_kg * hoveredEntry.total_reps).toLocaleString()} kg</div>
+              <div className="text-muted-foreground">Volume: {(hoveredEntry.max_weight_kg * hoveredEntry.total_reps).toLocaleString()} kg</div>
             )}
           </div>
         )}
       </div>
 
-      <div className="flex items-center justify-between mt-3 pt-3 border-t border-zinc-700 text-xs text-zinc-400">
+      <div className="flex items-center justify-between mt-3 pt-3 border-t border-border text-xs text-muted-foreground">
         <span>
           <Target className="w-3 h-3 inline mr-1" />
           Total Volume: {data.summary.total_volume.toLocaleString()} kg

@@ -12,13 +12,13 @@ interface KanbanColumnProps {
 }
 
 const columnColors: Record<string, string> = {
-  'Not Started': 'border-t-zinc-500',
+  'Not Started': 'border-t-muted-foreground',
   'In Progress': 'border-t-blue-500',
   'Done': 'border-t-green-500',
 }
 
 export function KanbanColumn({ name, status, tasks, onTaskClick, fullWidth = false }: KanbanColumnProps) {
-  const borderColor = columnColors[name] || 'border-t-zinc-500'
+  const borderColor = columnColors[name] || 'border-t-muted-foreground'
   const { setNodeRef, isOver } = useDroppable({ id: status })
 
   return (

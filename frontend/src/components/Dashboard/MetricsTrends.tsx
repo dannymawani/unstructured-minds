@@ -95,7 +95,7 @@ export function MetricsTrends({
 
   if (loading) {
     return (
-      <div className="bg-zinc-800 rounded-lg p-4 h-64 animate-pulse" data-testid="metrics-loading" />
+      <div className="bg-card rounded-md shadow-sm p-4 h-64 animate-pulse" data-testid="metrics-loading" />
     );
   }
 
@@ -109,9 +109,9 @@ export function MetricsTrends({
 
   if (!data || data.metrics.length === 0) {
     return (
-      <div className="bg-zinc-800 rounded-lg p-4" data-testid="metrics-empty">
-        <h3 className="text-lg font-semibold text-white mb-2">Daily Metrics</h3>
-        <p className="text-zinc-400">No metrics recorded yet.</p>
+      <div className="bg-card rounded-md shadow-sm p-4" data-testid="metrics-empty">
+        <h3 className="text-lg font-semibold text-foreground mb-2">Daily Metrics</h3>
+        <p className="text-muted-foreground">No metrics recorded yet.</p>
       </div>
     );
   }
@@ -131,15 +131,15 @@ export function MetricsTrends({
   const hoveredEntry = hovered !== null ? data.metrics[hovered] : null;
 
   return (
-    <div className="bg-zinc-800 rounded-lg p-4" data-testid="metrics-trends">
+    <div className="bg-card rounded-md shadow-sm p-4" data-testid="metrics-trends">
       <div className="flex flex-col sm:flex-row justify-between items-start gap-3 mb-4">
         <div className="flex items-center gap-2">
           <div className="p-2 bg-blue-500/20 rounded-lg">
             <Activity className="w-5 h-5 text-blue-400" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-white">Daily Metrics</h3>
-            <p className="text-sm text-zinc-400">{n} days</p>
+            <h3 className="text-lg font-semibold text-foreground">Daily Metrics</h3>
+            <p className="text-sm text-muted-foreground">{n} days</p>
           </div>
         </div>
 
@@ -150,8 +150,8 @@ export function MetricsTrends({
               onClick={() => toggleMetric(metric.key)}
               className={`flex items-center gap-1.5 px-2 py-1 text-xs rounded-lg transition-colors ${
                 visibleMetrics.has(metric.key)
-                  ? 'bg-zinc-700 text-white'
-                  : 'bg-zinc-800 text-zinc-500 hover:text-zinc-300'
+                  ? 'bg-secondary text-foreground'
+                  : 'bg-muted text-muted-foreground hover:text-foreground'
               }`}
               style={{
                 borderLeft: visibleMetrics.has(metric.key)
@@ -244,14 +244,14 @@ export function MetricsTrends({
         {/* Tooltip */}
         {hoveredEntry && hovered !== null && (
           <div
-            className="absolute pointer-events-none bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs shadow-xl z-10"
+            className="absolute pointer-events-none bg-popover text-popover-foreground rounded-md shadow-lg border border-border px-3 py-2 text-xs z-10"
             style={{
               left: `${(sx(hovered, n) / W) * 100}%`,
               top: 0,
               transform: 'translateX(-50%)',
             }}
           >
-            <div className="font-medium text-white mb-1">
+            <div className="font-medium text-foreground mb-1">
               {new Date(hoveredEntry.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
             </div>
             {METRICS.filter((m) => visibleMetrics.has(m.key)).map((metric) => {
@@ -260,8 +260,8 @@ export function MetricsTrends({
               return (
                 <div key={metric.key} className="flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: metric.color }} />
-                  <span className="text-zinc-300">{metric.label}:</span>
-                  <span className="text-white font-medium">
+                  <span className="text-muted-foreground">{metric.label}:</span>
+                  <span className="text-foreground font-medium">
                     {metric.key === 'sleep' ? `${val.toFixed(1)} hrs` : `${val}/10`}
                   </span>
                 </div>
@@ -272,8 +272,8 @@ export function MetricsTrends({
       </div>
 
       {/* Averages footer */}
-      <div className="flex flex-wrap items-center gap-4 mt-3 pt-3 border-t border-zinc-700 text-xs">
-        <span className="text-zinc-500">Averages:</span>
+      <div className="flex flex-wrap items-center gap-4 mt-3 pt-3 border-t border-border text-xs">
+        <span className="text-muted-foreground">Averages:</span>
         {METRICS.filter((m) => visibleMetrics.has(m.key)).map((metric) => (
           <span key={metric.key} className="flex items-center gap-1" style={{ color: metric.color }}>
             <span className="w-2 h-2 rounded-full" style={{ backgroundColor: metric.color }} />

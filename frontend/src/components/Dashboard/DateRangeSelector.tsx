@@ -43,22 +43,22 @@ export function DateRangeSelector({ value, onChange, className = '' }: DateRange
   return (
     <div className={`relative ${className}`} ref={dropdownRef}>
       <button
-        className="flex items-center gap-2 bg-zinc-700 hover:bg-zinc-600 text-white text-sm px-3 py-2 rounded-lg transition-colors min-h-[40px]"
+        className="flex items-center gap-2 bg-secondary hover:bg-secondary text-foreground text-sm px-3 py-2 rounded-lg transition-colors min-h-[40px]"
         onClick={() => setIsOpen(!isOpen)}
         aria-label="Select date range"
       >
-        <Calendar className="w-4 h-4 text-zinc-400" />
+        <Calendar className="w-4 h-4 text-muted-foreground" />
         <span>{currentOption.label}</span>
         <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-1 w-44 bg-zinc-700 rounded-lg shadow-lg z-20 overflow-hidden">
+        <div className="absolute right-0 mt-1 w-44 bg-secondary rounded-lg shadow-lg z-20 overflow-hidden">
           {DATE_RANGE_OPTIONS.map((option) => (
             <button
               key={option.value}
-              className={`w-full text-left px-3 py-2 text-sm hover:bg-zinc-600 transition-colors ${
-                option.value === value ? 'bg-zinc-600 text-white' : 'text-zinc-300'
+              className={`w-full text-left px-3 py-2 text-sm hover:bg-secondary transition-colors ${
+                option.value === value ? 'bg-secondary text-foreground' : 'text-muted-foreground'
               }`}
               onClick={() => {
                 onChange(option.value);

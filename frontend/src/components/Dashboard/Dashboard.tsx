@@ -45,12 +45,12 @@ export function Dashboard({ apiUrl = 'http://localhost:8000' }: DashboardProps) 
   };
 
   return (
-    <div className="p-3 sm:p-4 space-y-4 sm:space-y-6" data-testid="dashboard">
+    <div className="p-4 sm:p-6 space-y-5 sm:space-y-6" data-testid="dashboard">
       {/* Header with controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 sm:mb-6">
-        <div className="flex items-center gap-2">
-          <LayoutDashboard className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400" />
-          <h1 className="text-xl sm:text-2xl font-bold text-foreground">Dashboard</h1>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-2 sm:mb-4">
+        <div className="flex items-center gap-2.5">
+          <LayoutDashboard className="w-5 h-5 text-accent" />
+          <h1 className="text-lg sm:text-xl font-semibold tracking-tight text-foreground">Dashboard</h1>
         </div>
 
         {/* Controls */}
@@ -74,7 +74,7 @@ export function Dashboard({ apiUrl = 'http://localhost:8000' }: DashboardProps) 
             <select
               value={selectedYear}
               onChange={(e) => setSelectedYear(Number(e.target.value))}
-              className="bg-zinc-700 text-white text-sm rounded px-2 py-1 border-none focus:ring-2 focus:ring-ring"
+              className="bg-secondary text-foreground text-sm rounded px-2 py-1 border-none focus:ring-2 focus:ring-ring"
             >
               {[...Array(3)].map((_, i) => {
                 const year = new Date().getFullYear() - i;
@@ -110,7 +110,7 @@ export function Dashboard({ apiUrl = 'http://localhost:8000' }: DashboardProps) 
 
       {/* Exercise Progress */}
       {isVisible('exerciseProgress') && (
-        <div className="bg-card border rounded-lg p-3 sm:p-4">
+        <div className="bg-card rounded-md shadow-sm p-3 sm:p-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0 mb-3 sm:mb-4">
             <h3 className="text-base sm:text-lg font-semibold text-foreground">Track Exercise</h3>
             <select
