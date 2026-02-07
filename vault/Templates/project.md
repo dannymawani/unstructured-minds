@@ -1,75 +1,64 @@
----
+***
+
 date: {{date}}
-type: project
-description: Project planning template
+type: strength-training
+description: Strength training session log
 tags:
-  - project
-status: planning
----
 
-# {{title}}
+* training
 
-## Overview
+* strength
 
-**Description**: Brief description of the project
-**Business Value**: Why this project matters
+* workout
 
-## Goals & Objectives
+***
 
-### Primary Goals
-1.
-2.
-3.
+# Strength Training - {{date}}
 
-### Success Metrics
-- [ ] Metric 1: Target value
-- [ ] Metric 2: Target value
+## Workout Summary
 
-## Technical Scope
+* **Duration**:
 
-### In Scope
--
--
+* **Focus**:
 
-### Out of Scope
--
--
+* **Energy Level**: /10
 
-### Technologies
-- **Languages**:
-- **Frameworks**:
-- **Infrastructure**:
+* **Notes**:
 
-## Timeline & Milestones
+## Exercises
 
-| Phase | Description | Target Date | Status |
-|-------|-------------|-------------|--------|
-| Planning | Requirements & design | {{date}} | Active |
-| Development | Core implementation | | Pending |
-| Testing | QA & validation | | Pending |
-| Deployment | Production release | | Pending |
+| Exercise | Weight (kg) | Reps   |
+| -------- | ----------- | ------ |
+| <br />   | <br />      | <br /> |
 
-## Tasks
+## Sets Detail
 
-### Current Sprint
-- [ ] Task 1
-- [ ] Task 2
+### Exercise 1:
 
-### Backlog
-- [ ] Future task 1
+* Set 1: kg x reps
 
-## Risks & Blockers
+* Set 2: kg x reps
 
-| Risk | Impact | Mitigation |
-|------|--------|------------|
-| Risk 1 | High | Mitigation plan |
+* Set 3: kg x reps
 
-## Resources & Links
+### Exercise 2:
 
--
+* Set 1: kg x reps
 
-## Notes
+* Set 2: kg x reps
 
+* Set 3: kg x reps
 
----
-*Created: {{date}} at {{time}}*
+## Post-Workout Notes
+
+* How did I feel?
+
+* Any PRs?
+
+* Areas to improve:
+
+* Next session goals:
+
+***
+
+*Created at {{time}}*

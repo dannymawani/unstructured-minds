@@ -5,7 +5,7 @@ import { gfm } from '@milkdown/kit/preset/gfm'
 import { history } from '@milkdown/kit/plugin/history'
 import { listener, listenerCtx } from '@milkdown/kit/plugin/listener'
 import { Milkdown, MilkdownProvider, useEditor } from '@milkdown/react'
-import { slash, useSlashPlugin } from './EditorPlugins'
+import { slash, useSlashPlugin, codeBlockExitPlugin } from './EditorPlugins'
 import { EditorToolbar } from './EditorToolbar'
 
 interface EditorContentProps {
@@ -57,6 +57,7 @@ function EditorContent({
       .use(history)
       .use(listener)
       .use(slash)
+      .use(codeBlockExitPlugin)
       .config((ctx) => {
         ctx.get(listenerCtx).markdownUpdated((_ctx, markdown) => {
           onChangeRef.current(markdown)

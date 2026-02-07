@@ -1,8 +1,7 @@
 # Issues & tasks
-* ~~Clean up the project and remove things that are not relevant anymore for the system to work~~ done
-* ~~the editor experience still sucks - we need to add the format changes to be in the top instead of the right bottom~~ done
-* we need to disable that it auto saves each time a character is added - it stops the editing
-* in the settings - claude api is disabled & data extraction fails (schema load failed)
-* the length of the library files are still bloating the length of the application so everything is super long and not dynamic
-* ~~none of the data from my test data in markdown are processed in the app so nothing is displayed~~ done (imported from obsidian)
-* the kanban board needs to extract tasks, but i would also like for it to be able to make tasks in there
+
+## Deeper integration with claude
+1. when writing the daily note use the same priniples for the daily skill in the  ../obsedian repos under claude skills --> the same goes for everything here actually
+2. when i click on a daily note i should answer in a wizard config format so i always end up on the same structure and it matches closer to the obsedian data i already have
+3. we should aim to make as much as possible code / cli / dropdown based so the input for claude will always be easier to get an less context heavy and easier to sync with the data
+4. in the files folder all files are in one - make it into folders for year and month
