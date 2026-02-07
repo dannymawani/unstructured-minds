@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
-import { X, ChevronLeft, ArrowRight } from 'lucide-react'
+import { X, ChevronLeft, ArrowRight, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 interface DailyNoteWizardProps {
@@ -9,6 +9,7 @@ interface DailyNoteWizardProps {
   onComplete: (content: string) => void
   noteContent: string
   date: string
+  apiBaseUrl?: string
 }
 
 type WorkoutType = 'BJJ' | 'Strength' | 'Cardio' | 'Rest'
@@ -25,7 +26,7 @@ interface WizardAnswers {
 
 const TOTAL_STEPS = 7
 
-export function DailyNoteWizard({ isOpen, onClose, onComplete, noteContent, date }: DailyNoteWizardProps) {
+export function DailyNoteWizard({ isOpen, onClose, onComplete, noteContent, date, apiBaseUrl }: DailyNoteWizardProps) {
   const [step, setStep] = useState(1)
   const [answers, setAnswers] = useState<WizardAnswers>({
     workout: null,
@@ -36,6 +37,7 @@ export function DailyNoteWizard({ isOpen, onClose, onComplete, noteContent, date
     personal: '',
     adhoc: '',
   })
+  const [isPopulating, setIsPopulating] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // Reset when opening
@@ -61,15 +63,46 @@ export function DailyNoteWizard({ isOpen, onClose, onComplete, noteContent, date
     }
   }, [isOpen, step])
 
-  const goNext = useCallback(() => {
+  const goNext = useCallback(async () => {
     if (step < TOTAL_STEPS) {
       setStep(s => s + 1)
     } else {
-      // Final step — populate and complete
+      // Final step — populate via API, fall back to client-side
+      setIsPopulating(true)
+      try {
+        if (apiBaseUrl) {
+          const res = await fetch(`${apiBaseUrl}/calendar/daily-note/populate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              date,
+              template: noteContent,
+              workout: answers.workout,
+              sleep: answers.sleep,
+              energy: answers.energy,
+              mood: answers.mood,
+              work_priorities: answers.workPriorities,
+              personal: answers.personal,
+              adhoc: answers.adhoc,
+            }),
+          })
+          if (res.ok) {
+            const data = await res.json()
+            onComplete(data.content)
+            return
+          }
+        }
+      } catch {
+        // Fall through to client-side fallback
+      } finally {
+        setIsPopulating(false)
+      }
+
+      // Client-side fallback
       const populated = populateNote(noteContent, answers)
       onComplete(populated)
     }
-  }, [step, noteContent, answers, onComplete])
+  }, [step, noteContent, answers, onComplete, apiBaseUrl, date])
 
   const goBack = useCallback(() => {
     if (step > 1) setStep(s => s - 1)
@@ -89,7 +122,7 @@ export function DailyNoteWizard({ isOpen, onClose, onComplete, noteContent, date
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="bg-card rounded-xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden border border-border/50">
+      <div className="bg-card rounded-xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden border border-border/50 relative">
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-5 pb-3">
           <div>
@@ -116,6 +149,14 @@ export function DailyNoteWizard({ isOpen, onClose, onComplete, noteContent, date
           </div>
           <p className="text-xs text-muted-foreground mt-1.5">Step {step} of {TOTAL_STEPS}</p>
         </div>
+
+        {/* Populating overlay */}
+        {isPopulating && (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-card/90 rounded-xl">
+            <Loader2 className="h-8 w-8 animate-spin text-primary mb-3" />
+            <p className="text-sm text-muted-foreground">Formatting your daily note...</p>
+          </div>
+        )}
 
         {/* Step content */}
         <div className="px-6 pb-6 min-h-[200px] flex flex-col">
