@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { cn } from '@/lib/utils'
 import type { KanbanTask } from './KanbanBoard'
@@ -17,7 +18,7 @@ const columnColors: Record<string, string> = {
   'Done': 'border-t-green-500',
 }
 
-export function KanbanColumn({ name, status, tasks, onTaskClick, fullWidth = false }: KanbanColumnProps) {
+export const KanbanColumn = memo(function KanbanColumn({ name, status, tasks, onTaskClick, fullWidth = false }: KanbanColumnProps) {
   const borderColor = columnColors[name] || 'border-t-muted-foreground'
   const { setNodeRef, isOver } = useDroppable({ id: status })
 
@@ -57,4 +58,4 @@ export function KanbanColumn({ name, status, tasks, onTaskClick, fullWidth = fal
       </div>
     </div>
   )
-}
+})

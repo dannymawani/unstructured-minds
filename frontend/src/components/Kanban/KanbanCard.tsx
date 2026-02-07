@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { Clock } from 'lucide-react'
 import { useDraggable } from '@dnd-kit/core'
 import { cn } from '@/lib/utils'
@@ -101,7 +102,7 @@ function CardContent({ task }: { task: KanbanTask }) {
   )
 }
 
-export function KanbanCard({ task, onClick, isDragOverlay }: KanbanCardProps) {
+export const KanbanCard = memo(function KanbanCard({ task, onClick, isDragOverlay }: KanbanCardProps) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: task.id,
   })
@@ -128,4 +129,4 @@ export function KanbanCard({ task, onClick, isDragOverlay }: KanbanCardProps) {
       <CardContent task={task} />
     </div>
   )
-}
+})

@@ -47,13 +47,14 @@ class TestClaudeClientExtraction:
 
     @pytest.fixture
     def mock_anthropic(self):
-        """Create mock Anthropic client."""
-        with patch("src.claude.client.Anthropic") as mock:
+        """Create mock AsyncAnthropic client."""
+        with patch("src.claude.client.AsyncAnthropic") as mock:
+            # Make messages.create an async mock
+            mock.return_value.messages.create = AsyncMock()
             yield mock
 
     async def test_extraction_returns_json(self, mock_anthropic: MagicMock) -> None:
         """Test extraction parses tool use response."""
-        # Set up mock response with tool use
         mock_tool_block = MagicMock()
         mock_tool_block.type = "tool_use"
         mock_tool_block.input = {"exercise_log": [{"name": "squat", "weight_kg": 100}]}
@@ -94,8 +95,9 @@ class TestClaudeClientQuery:
 
     @pytest.fixture
     def mock_anthropic(self):
-        """Create mock Anthropic client."""
-        with patch("src.claude.client.Anthropic") as mock:
+        """Create mock AsyncAnthropic client."""
+        with patch("src.claude.client.AsyncAnthropic") as mock:
+            mock.return_value.messages.create = AsyncMock()
             yield mock
 
     async def test_query_returns_text(self, mock_anthropic: MagicMock) -> None:
@@ -137,8 +139,9 @@ class TestClaudeClientSkillExecution:
 
     @pytest.fixture
     def mock_anthropic(self):
-        """Create mock Anthropic client."""
-        with patch("src.claude.client.Anthropic") as mock:
+        """Create mock AsyncAnthropic client."""
+        with patch("src.claude.client.AsyncAnthropic") as mock:
+            mock.return_value.messages.create = AsyncMock()
             yield mock
 
     async def test_execute_skill_uses_smart_model(self, mock_anthropic: MagicMock) -> None:
@@ -166,8 +169,9 @@ class TestClaudeClientRetry:
 
     @pytest.fixture
     def mock_anthropic(self):
-        """Create mock Anthropic client."""
-        with patch("src.claude.client.Anthropic") as mock:
+        """Create mock AsyncAnthropic client."""
+        with patch("src.claude.client.AsyncAnthropic") as mock:
+            mock.return_value.messages.create = AsyncMock()
             yield mock
 
     async def test_retry_on_rate_limit(self, mock_anthropic: MagicMock) -> None:
@@ -191,7 +195,6 @@ class TestClaudeClientRetry:
 
         client = ClaudeClient(api_key="test-key")
 
-        # Use shorter delays for test by patching asyncio.sleep
         with patch("asyncio.sleep", new_callable=AsyncMock):
             result = await client.query("question", "context")
 

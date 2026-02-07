@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     port: int = 8000
     debug: bool = False
 
+    # CORS
+    cors_origins: str = "http://localhost:3000,http://localhost:5173"
+
     # Claude API (optional)
     anthropic_api_key: Optional[str] = None
 

@@ -31,7 +31,7 @@ Unstructured Minds transforms natural language notes into structured, queryable 
 
 ### Core Flow
 ```
-Markdown Note → Claude Extraction → CSV/DuckDB → Natural Language Query
+Markdown Note → Claude Extraction → DuckDB → Natural Language Query
 ```
 
 ## Tech Stack
@@ -39,9 +39,9 @@ Markdown Note → Claude Extraction → CSV/DuckDB → Natural Language Query
 | Component | Technology |
 |-----------|------------|
 | Frontend | React 19 + Milkdown (pure web app) |
-| Backend | Python 3.14 + FastAPI |
+| Backend | Python >=3.12 + FastAPI |
 | Database | DuckDB 1.4 |
-| AI | Claude API (Haiku for extraction, Sonnet for queries) |
+| AI | Claude API (Haiku 4.5 for extraction, Sonnet 4.5 for queries) |
 | Deployment | Docker Compose |
 
 > **Note:** No Electron - this is a containerized web app for easy deployment and lighter footprint.

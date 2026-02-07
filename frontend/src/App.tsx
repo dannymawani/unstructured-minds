@@ -1,5 +1,5 @@
-import { useState, useCallback, useMemo, useRef, useEffect, lazy, Suspense } from 'react'
-import { Routes, Route, Navigate, useNavigate, useLocation, useSearchParams } from 'react-router'
+import { useCallback, useMemo, lazy, Suspense } from 'react'
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { FileTree } from '@/components/FileTree'
 import { MarkdownEditor } from '@/components/Editor/MarkdownEditor'
@@ -16,7 +16,9 @@ import { MobileNav } from '@/components/MobileNav'
 import { Drawer } from '@/components/Drawer'
 import { useKeyboardShortcuts, type KeyboardShortcut } from '@/hooks/useKeyboardShortcuts'
 import { useTheme } from '@/hooks/useTheme'
-import { useMobile } from '@/hooks/useMobile'
+import { useFileManager } from '@/hooks/useFileManager'
+import { useUIState } from '@/hooks/useUIState'
+import { api } from '@/lib/apiClient'
 import {
   LayoutDashboard,
   FileText,
@@ -42,7 +44,6 @@ const KanbanBoard = lazy(() => import('@/components/Kanban/KanbanBoard').then(m 
 const CalendarView = lazy(() => import('@/components/Calendar/CalendarView').then(m => ({ default: m.CalendarView })))
 const LifeProfile = lazy(() => import('@/components/LifeProfile/LifeProfile').then(m => ({ default: m.LifeProfile })))
 
-// Loading fallback component
 function ViewLoadingFallback() {
   return (
     <div className="flex-1 flex items-center justify-center">
@@ -55,16 +56,12 @@ function ViewLoadingFallback() {
 }
 
 type View = 'editor' | 'dashboard' | 'kanban' | 'calendar' | 'profile'
-type SidebarTab = 'files' | 'tags' | 'links'
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 function App() {
   const navigate = useNavigate()
   const location = useLocation()
-  const [searchParams] = useSearchParams()
+  const { theme, toggleTheme, setTheme } = useTheme()
 
-  // Derive view from URL pathname instead of state
   const view: View = useMemo(() => {
     const path = location.pathname.replace(/^\//, '')
     if (path === 'dashboard') return 'dashboard'
@@ -74,218 +71,23 @@ function App() {
     return 'editor'
   }, [location.pathname])
 
-  const [selectedFile, setSelectedFile] = useState<string | undefined>()
-  const [content, setContent] = useState('')
-  const contentRef = useRef(content)
-  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'extracting' | 'saved'>('idle')
-  const isDirtyRef = useRef(false)
-  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false)
-  const [isSidebarVisible, setIsSidebarVisible] = useState(true)
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-  const [isSearchOpen, setIsSearchOpen] = useState(false)
-  const [isTemplatePickerOpen, setIsTemplatePickerOpen] = useState(false)
-  const [isQuickCaptureOpen, setIsQuickCaptureOpen] = useState(false)
-  const [sidebarTab, setSidebarTab] = useState<SidebarTab>('files')
-  const { theme, toggleTheme, setTheme } = useTheme()
+  const file = useFileManager()
+  const ui = useUIState()
 
-  // Mobile state
-  const { isMobile, isTablet } = useMobile()
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
-  const [isMobileChatOpen, setIsMobileChatOpen] = useState(false)
-  const [isChatExpanded, setIsChatExpanded] = useState(false)
-  const [chatInitialMessage, setChatInitialMessage] = useState<string | undefined>()
-  const [isWizardOpen, setIsWizardOpen] = useState(false)
-  const [wizardDate, setWizardDate] = useState('')
-  const [wizardNoteContent, setWizardNoteContent] = useState('')
-  const [wizardNotePath, setWizardNotePath] = useState('')
-
-  const fetchFileContent = useCallback(async (path: string) => {
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/vault/file?path=${encodeURIComponent(path)}`
-      )
-      if (!response.ok) {
-        throw new Error('Failed to fetch file')
-      }
-      const data = await response.json()
-      return data.content as string
-    } catch (err) {
-      console.error('Error loading file:', err)
-      return ''
-    }
-  }, [])
-
-  const handleFileSelect = useCallback(
-    async (path: string) => {
-      // Fetch content FIRST, then update selectedFile so the editor
-      // remounts (via key={selectedFile}) with the correct content
-      const fileContent = await fetchFileContent(path)
-      setContent(fileContent)
-      setSelectedFile(path)
-      navigate(`/editor?file=${encodeURIComponent(path)}`)
-      // Close mobile sidebar after selection
-      if (isMobile || isTablet) {
-        setIsMobileSidebarOpen(false)
-      }
-    },
-    [fetchFileContent, isMobile, isTablet, navigate]
-  )
-
-  const handleContentChange = useCallback((markdown: string) => {
-    setContent(markdown)
-    contentRef.current = markdown
-    isDirtyRef.current = true
-  }, [])
-
-  // Called by ChatPanel when note-assist returns updated content
-  const handleNoteContentUpdate = useCallback((newContent: string) => {
-    setContent(newContent)
-    contentRef.current = newContent
-    isDirtyRef.current = true
-
-    // Save to disk immediately so content isn't lost on refresh
-    if (selectedFile) {
-      fetch(`${API_BASE_URL}/vault/file?extract=false`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: selectedFile, content: newContent }),
-      }).then(() => {
-        isDirtyRef.current = false
-      }).catch((err) => console.error('Error saving note-assist update:', err))
-    }
-  }, [selectedFile])
-
-  // Autosave: disk only, no extraction (called by 60s interval)
-  const handleAutosave = useCallback(async () => {
-    if (!selectedFile) return
-
-    setSaveState('saving')
-    try {
-      const response = await fetch(`${API_BASE_URL}/vault/file?extract=false`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: selectedFile, content: contentRef.current }),
-      })
-      if (!response.ok) {
-        throw new Error('Failed to save file')
-      }
-      isDirtyRef.current = false
-      setSaveState('saved')
-      setTimeout(() => setSaveState('idle'), 2000)
-    } catch (err) {
-      console.error('Error saving file:', err)
-      setSaveState('idle')
-    }
-  }, [selectedFile])
-
-  // Explicit save: disk + extraction (Cmd+S)
-  const handleSave = useCallback(async () => {
-    if (!selectedFile) return
-
-    setSaveState('extracting')
-    try {
-      const response = await fetch(`${API_BASE_URL}/vault/file?extract=true`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: selectedFile, content: contentRef.current }),
-      })
-      if (!response.ok) {
-        throw new Error('Failed to save file')
-      }
-      isDirtyRef.current = false
-      setSaveState('saved')
-      setTimeout(() => setSaveState('idle'), 2000)
-    } catch (err) {
-      console.error('Error saving file:', err)
-      setSaveState('idle')
-    }
-  }, [selectedFile])
-
-  // Extract on file switch if content is dirty
-  const prevFileRef = useRef<string | undefined>(selectedFile)
-  useEffect(() => {
-    if (prevFileRef.current && prevFileRef.current !== selectedFile && isDirtyRef.current) {
-      // Fire save+extract for the file we're leaving
-      const prevFile = prevFileRef.current
-      fetch(`${API_BASE_URL}/vault/file?extract=true`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: prevFile, content: contentRef.current }),
-      }).catch((err) => console.error('Error saving on file switch:', err))
-      isDirtyRef.current = false
-    }
-    prevFileRef.current = selectedFile
-  }, [selectedFile])
-
-  // Deep link: load file from ?file= query param (supports browser back/forward)
-  const fileParam = searchParams.get('file')
-  useEffect(() => {
-    if (fileParam && fileParam !== selectedFile) {
-      fetchFileContent(fileParam).then((fileContent) => {
-        setContent(fileContent)
-        contentRef.current = fileContent
-        isDirtyRef.current = false
-        setSelectedFile(fileParam)
-      })
-    }
-  }, [fileParam, selectedFile, fetchFileContent])
-
-  // Handle file deletion — clear editor if deleted file was open
-  const handleDeleteFile = useCallback(
-    (path: string) => {
-      if (selectedFile === path) {
-        setSelectedFile(undefined)
-        setContent('')
-        contentRef.current = ''
-        isDirtyRef.current = false
-        navigate('/editor')
-      }
-    },
-    [selectedFile, navigate]
-  )
-
-  // Handle file rename — update editor if renamed file was open
-  const handleRenameFile = useCallback(
-    (oldPath: string, newPath: string) => {
-      if (selectedFile === oldPath) {
-        setSelectedFile(newPath)
-        navigate(`/editor?file=${encodeURIComponent(newPath)}`)
-      }
-    },
-    [selectedFile, navigate]
-  )
-
-  // Toggle sidebar visibility
-  const toggleSidebar = useCallback(() => {
-    if (isMobile || isTablet) {
-      setIsMobileSidebarOpen((prev) => !prev)
-    } else {
-      setIsSidebarVisible((prev) => !prev)
-    }
-  }, [isMobile, isTablet])
-
-  // Handle wizard completion — populate note, save with extraction
   const handleWizardComplete = useCallback(async (populatedContent: string) => {
-    setIsWizardOpen(false)
-    setContent(populatedContent)
-    contentRef.current = populatedContent
-    setSelectedFile(wizardNotePath)
-    navigate(`/editor?file=${encodeURIComponent(wizardNotePath)}`)
-
-    // Save with extraction
+    ui.setIsWizardOpen(false)
+    file.setContent(populatedContent)
+    file.contentRef.current = populatedContent
+    file.setSelectedFile(ui.wizardNotePath)
+    navigate(`/editor?file=${encodeURIComponent(ui.wizardNotePath)}`)
     try {
-      await fetch(`${API_BASE_URL}/vault/file?extract=true`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: wizardNotePath, content: populatedContent }),
-      })
-      isDirtyRef.current = false
+      await api.post(`/vault/file?extract=true`, { path: ui.wizardNotePath, content: populatedContent })
+      file.isDirtyRef.current = false
     } catch (err) {
       console.error('Error saving wizard-populated note:', err)
     }
-  }, [wizardNotePath, navigate])
+  }, [ui.wizardNotePath, navigate, file, ui])
 
-  // Create or open today's daily note
   const createDailyNote = useCallback(async () => {
     const today = new Date()
     const year = today.getFullYear()
@@ -296,576 +98,218 @@ function App() {
 
     let isNewNote = false
     try {
-      const res = await fetch(`${API_BASE_URL}/calendar/daily-note`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: dateStr }),
-      })
-      if (res.ok) {
-        const data = await res.json()
-        isNewNote = data.created
-      }
+      const data = await api.post<{ created: boolean }>(`/calendar/daily-note`, { date: dateStr })
+      isNewNote = data.created
     } catch (err) {
       console.error('Error creating daily note:', err)
     }
 
-    // Fetch content
-    const fileContent = await fetchFileContent(dailyNotePath)
-
+    const fileContent = await file.fetchFileContent(dailyNotePath)
     if (isNewNote) {
-      // Open wizard for new notes
-      setWizardDate(dateStr)
-      setWizardNoteContent(fileContent)
-      setWizardNotePath(dailyNotePath)
-      setIsWizardOpen(true)
+      ui.setWizardDate(dateStr)
+      ui.setWizardNoteContent(fileContent)
+      ui.setWizardNotePath(dailyNotePath)
+      ui.setIsWizardOpen(true)
     } else {
-      // Existing note — open directly
-      setContent(fileContent)
+      file.setContent(fileContent)
       navigate(`/editor?file=${encodeURIComponent(dailyNotePath)}`)
-      setSelectedFile(dailyNotePath)
+      file.setSelectedFile(dailyNotePath)
     }
-  }, [fetchFileContent, navigate])
+  }, [file, navigate, ui])
 
-  // Open command palette
-  const openCommandPalette = useCallback(() => {
-    setIsCommandPaletteOpen(true)
-  }, [])
+  const handleFileSelect = useCallback(async (path: string) => {
+    await file.handleFileSelect(path)
+    if (ui.isMobile || ui.isTablet) ui.setIsMobileSidebarOpen(false)
+  }, [file, ui])
 
-  // Open search modal
-  const openSearch = useCallback(() => {
-    setIsSearchOpen(true)
-  }, [])
+  const handleSearchSelect = useCallback(async (path: string) => {
+    const fileContent = await file.fetchFileContent(path)
+    file.setContent(fileContent)
+    file.setSelectedFile(path)
+    navigate(`/editor?file=${encodeURIComponent(path)}`)
+  }, [file, navigate])
 
-  // Open template picker
-  const openTemplatePicker = useCallback(() => {
-    setIsTemplatePickerOpen(true)
-  }, [])
+  const handleCalendarDaySelect = useCallback(async (date: string, hasNote: boolean) => {
+    const [year, month] = date.split('-')
+    const dailyNotePath = `Daily-Notes/${year}-${month}/${date}.md`
+    if (!hasNote) {
+      try { await api.post(`/calendar/daily-note`, { date }) } catch (err) { console.error('Error creating daily note:', err) }
+    }
+    const fileContent = await file.fetchFileContent(dailyNotePath)
+    if (!hasNote) {
+      ui.setWizardDate(date)
+      ui.setWizardNoteContent(fileContent)
+      ui.setWizardNotePath(dailyNotePath)
+      ui.setIsWizardOpen(true)
+    } else {
+      file.setContent(fileContent)
+      file.setSelectedFile(dailyNotePath)
+      navigate(`/editor?file=${encodeURIComponent(dailyNotePath)}`)
+    }
+  }, [file, navigate, ui])
 
-  // Open quick capture
-  const openQuickCapture = useCallback(() => {
-    setIsQuickCaptureOpen(true)
-  }, [])
+  const commands = useMemo(() => createDefaultCommands({
+    onSave: file.handleSave, onToggleSidebar: ui.toggleSidebar, onCreateDailyNote: createDailyNote,
+    onOpenCommandPalette: ui.openCommandPalette, onSwitchToEditor: () => navigate('/editor'),
+    onSwitchToDashboard: () => navigate('/dashboard'), onSwitchToKanban: () => navigate('/kanban'),
+    onSwitchToCalendar: () => navigate('/calendar'), onSwitchToProfile: () => navigate('/profile'),
+    onSearch: ui.openSearch, onNewFromTemplate: ui.openTemplatePicker, onQuickCapture: ui.openQuickCapture,
+  }), [file.handleSave, ui, createDailyNote, navigate])
 
-  // Handle search result selection
-  const handleSearchSelect = useCallback(
-    async (path: string) => {
-      const fileContent = await fetchFileContent(path)
-      setContent(fileContent)
-      setSelectedFile(path)
-      navigate(`/editor?file=${encodeURIComponent(path)}`)
-    },
-    [fetchFileContent, navigate]
-  )
+  const shortcuts: KeyboardShortcut[] = useMemo(() => [
+    { key: 's', meta: true, action: file.handleSave, description: 'Save current file' },
+    { key: 'k', meta: true, action: ui.openCommandPalette, description: 'Open command palette' },
+    { key: 'b', meta: true, action: ui.toggleSidebar, description: 'Toggle sidebar' },
+    { key: 'd', meta: true, action: createDailyNote, description: 'Create/open daily note' },
+    { key: 'f', meta: true, shift: true, action: ui.openSearch, description: 'Search notes' },
+    { key: 'n', meta: true, shift: true, action: ui.openQuickCapture, description: 'Quick capture' },
+    { key: 't', meta: true, action: ui.openTemplatePicker, description: 'New note from template' },
+  ], [file.handleSave, ui, createDailyNote])
 
-  // Handle template creation result
-  const handleTemplateSelect = useCallback(
-    async (path: string) => {
-      const fileContent = await fetchFileContent(path)
-      setContent(fileContent)
-      setSelectedFile(path)
-      navigate(`/editor?file=${encodeURIComponent(path)}`)
-    },
-    [fetchFileContent, navigate]
-  )
-
-  // Handle calendar day selection
-  const handleCalendarDaySelect = useCallback(
-    async (date: string, hasNote: boolean) => {
-      const [year, month] = date.split('-')
-      const dailyNotePath = `Daily-Notes/${year}-${month}/${date}.md`
-
-      if (!hasNote) {
-        // Create new note via API first
-        try {
-          await fetch(`${API_BASE_URL}/calendar/daily-note`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ date }),
-          })
-        } catch (err) {
-          console.error('Error creating daily note:', err)
-        }
-      }
-
-      // Fetch content
-      const fileContent = await fetchFileContent(dailyNotePath)
-
-      if (!hasNote) {
-        // Open wizard for new notes
-        setWizardDate(date)
-        setWizardNoteContent(fileContent)
-        setWizardNotePath(dailyNotePath)
-        setIsWizardOpen(true)
-      } else {
-        // Existing note — open directly
-        setContent(fileContent)
-        setSelectedFile(dailyNotePath)
-        navigate(`/editor?file=${encodeURIComponent(dailyNotePath)}`)
-      }
-    },
-    [fetchFileContent, navigate]
-  )
-
-  // Command palette commands
-  const commands = useMemo(
-    () =>
-      createDefaultCommands({
-        onSave: handleSave,
-        onToggleSidebar: toggleSidebar,
-        onCreateDailyNote: createDailyNote,
-        onOpenCommandPalette: openCommandPalette,
-        onSwitchToEditor: () => navigate('/editor'),
-        onSwitchToDashboard: () => navigate('/dashboard'),
-        onSwitchToKanban: () => navigate('/kanban'),
-        onSwitchToCalendar: () => navigate('/calendar'),
-        onSwitchToProfile: () => navigate('/profile'),
-        onSearch: openSearch,
-        onNewFromTemplate: openTemplatePicker,
-        onQuickCapture: openQuickCapture,
-      }),
-    [handleSave, toggleSidebar, createDailyNote, openCommandPalette, navigate, openSearch, openTemplatePicker, openQuickCapture]
-  )
-
-  // Keyboard shortcuts
-  const shortcuts: KeyboardShortcut[] = useMemo(
-    () => [
-      {
-        key: 's',
-        meta: true,
-        action: handleSave,
-        description: 'Save current file',
-      },
-      {
-        key: 'k',
-        meta: true,
-        action: openCommandPalette,
-        description: 'Open command palette',
-      },
-      {
-        key: 'b',
-        meta: true,
-        action: toggleSidebar,
-        description: 'Toggle sidebar',
-      },
-      {
-        key: 'd',
-        meta: true,
-        action: createDailyNote,
-        description: 'Create/open daily note',
-      },
-      {
-        key: 'f',
-        meta: true,
-        shift: true,
-        action: openSearch,
-        description: 'Search notes',
-      },
-      {
-        key: 'n',
-        meta: true,
-        shift: true,
-        action: openQuickCapture,
-        description: 'Quick capture',
-      },
-      {
-        key: 't',
-        meta: true,
-        action: openTemplatePicker,
-        description: 'New note from template',
-      },
-    ],
-    [handleSave, openCommandPalette, toggleSidebar, createDailyNote, openSearch, openQuickCapture, openTemplatePicker]
-  )
-
-  // Register keyboard shortcuts
   useKeyboardShortcuts(shortcuts)
 
-  // Sidebar content (shared between desktop and mobile drawer)
   const sidebarContent = (
     <div className="flex flex-col h-full">
-      {/* Sidebar tab buttons */}
       <div className="flex border-b border-border/50">
-        <button
-          className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 sm:py-1 text-xs font-medium transition-colors min-h-[44px] sm:min-h-0 ${
-            sidebarTab === 'files'
-              ? 'bg-accent text-accent-foreground border-b-2 border-primary'
-              : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
-          }`}
-          onClick={() => setSidebarTab('files')}
-          title="Files"
-        >
-          <FileText className="h-4 w-4" />
-          Files
-        </button>
-        <button
-          className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 sm:py-1 text-xs font-medium transition-colors min-h-[44px] sm:min-h-0 ${
-            sidebarTab === 'tags'
-              ? 'bg-accent text-accent-foreground border-b-2 border-primary'
-              : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
-          }`}
-          onClick={() => setSidebarTab('tags')}
-          title="Tags"
-        >
-          <Hash className="h-4 w-4" />
-          Tags
-        </button>
-        <button
-          className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 sm:py-1 text-xs font-medium transition-colors min-h-[44px] sm:min-h-0 ${
-            sidebarTab === 'links'
-              ? 'bg-accent text-accent-foreground border-b-2 border-primary'
-              : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
-          }`}
-          onClick={() => setSidebarTab('links')}
-          title="Links"
-        >
-          <Link2 className="h-4 w-4" />
-          Links
-        </button>
+        {(['files', 'tags', 'links'] as const).map((tab) => (
+          <button
+            key={tab}
+            className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 sm:py-1 text-xs font-medium transition-colors min-h-[44px] sm:min-h-0 ${
+              ui.sidebarTab === tab
+                ? 'bg-accent text-accent-foreground border-b-2 border-primary'
+                : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+            }`}
+            onClick={() => ui.setSidebarTab(tab)}
+            title={tab.charAt(0).toUpperCase() + tab.slice(1)}
+          >
+            {tab === 'files' && <FileText className="h-4 w-4" />}
+            {tab === 'tags' && <Hash className="h-4 w-4" />}
+            {tab === 'links' && <Link2 className="h-4 w-4" />}
+            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+          </button>
+        ))}
       </div>
-
-      {/* Sidebar content */}
       <div className="flex-1 overflow-hidden">
-        {sidebarTab === 'files' && (
-          <FileTree
-            onFileSelect={handleFileSelect}
-            selectedFile={selectedFile}
-            apiBaseUrl={API_BASE_URL}
-            onCreateDailyNote={createDailyNote}
-            onOpenTemplatePicker={openTemplatePicker}
-            onDeleteFile={handleDeleteFile}
-            onRenameFile={handleRenameFile}
-          />
+        {ui.sidebarTab === 'files' && (
+          <FileTree onFileSelect={handleFileSelect} selectedFile={file.selectedFile} apiBaseUrl={api.baseUrl}
+            onCreateDailyNote={createDailyNote} onOpenTemplatePicker={ui.openTemplatePicker}
+            onDeleteFile={file.handleDeleteFile} onRenameFile={file.handleRenameFile} />
         )}
-        {sidebarTab === 'tags' && (
-          <TagsPanel
-            onFileSelect={handleFileSelect}
-            apiBaseUrl={API_BASE_URL}
-          />
-        )}
-        {sidebarTab === 'links' && (
-          <BacklinksPanel
-            currentFile={selectedFile}
-            onFileSelect={handleFileSelect}
-            apiBaseUrl={API_BASE_URL}
-          />
-        )}
+        {ui.sidebarTab === 'tags' && <TagsPanel onFileSelect={handleFileSelect} apiBaseUrl={api.baseUrl} />}
+        {ui.sidebarTab === 'links' && <BacklinksPanel currentFile={file.selectedFile} onFileSelect={handleFileSelect} apiBaseUrl={api.baseUrl} />}
       </div>
     </div>
   )
 
-  // Editor view element (used by both / and /editor routes)
   const editorElement = (
     <>
-      {/* Desktop Sidebar */}
-      {!isMobile && !isTablet && isSidebarVisible && (
-        <aside className="w-64 bg-card border-r border-border/50 flex flex-col overflow-hidden">
-          {sidebarContent}
-        </aside>
+      {!ui.isMobile && !ui.isTablet && ui.isSidebarVisible && (
+        <aside className="w-64 bg-card border-r border-border/50 flex flex-col overflow-hidden">{sidebarContent}</aside>
+      )}
+      {(ui.isMobile || ui.isTablet) && (
+        <Drawer isOpen={ui.isMobileSidebarOpen} onClose={() => ui.setIsMobileSidebarOpen(false)} position="left" title="Files">{sidebarContent}</Drawer>
       )}
 
-      {/* Mobile/Tablet Sidebar Drawer */}
-      {(isMobile || isTablet) && (
-        <Drawer
-          isOpen={isMobileSidebarOpen}
-          onClose={() => setIsMobileSidebarOpen(false)}
-          position="left"
-          title="Files"
-        >
-          {sidebarContent}
-        </Drawer>
-      )}
-
-      {/* Editor + Chat below */}
       <section className="flex-1 flex flex-col min-h-0 overflow-hidden">
-        {selectedFile ? (
+        {file.selectedFile ? (
           <div className="flex-1 overflow-auto p-3 sm:p-6">
-            <MarkdownEditor
-              key={selectedFile}
-              content={content}
-              onChange={handleContentChange}
-              onAutosave={handleAutosave}
-            />
+            <MarkdownEditor key={file.selectedFile} content={file.content} onChange={file.handleContentChange} onAutosave={file.handleAutosave} />
           </div>
         ) : (
           <div className="flex items-center justify-center h-full text-muted-foreground p-4 text-center">
-            <p>
-              {isMobile || isTablet
-                ? 'Tap the menu to select a file'
-                : 'Select a file to start editing'}
-            </p>
+            <p>{ui.isMobile || ui.isTablet ? 'Tap the menu to select a file' : 'Select a file to start editing'}</p>
           </div>
         )}
 
-        {/* Desktop Chat panel — below editor, collapsible */}
-        {!isMobile && !isTablet && (
+        {!ui.isMobile && !ui.isTablet && (
           <>
-            <button
-              onClick={() => setIsChatExpanded(prev => !prev)}
-              className="flex items-center justify-center gap-2 px-3 py-2 border-t border-border/50 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-            >
+            <button onClick={() => ui.setIsChatExpanded(prev => !prev)}
+              className="flex items-center justify-center gap-2 px-3 py-2 border-t border-border/50 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors">
               <MessageSquare className="h-3.5 w-3.5" />
-              <span>{isChatExpanded ? 'Hide Chat' : 'Chat'}</span>
-              {isChatExpanded
-                ? <ChevronDown className="h-3.5 w-3.5" />
-                : <ChevronUp className="h-3.5 w-3.5" />
-              }
+              <span>{ui.isChatExpanded ? 'Hide Chat' : 'Chat'}</span>
+              {ui.isChatExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
             </button>
-            {isChatExpanded && (
+            {ui.isChatExpanded && (
               <div className="h-96 border-t border-border/50 flex flex-col overflow-hidden">
-                <ChatPanel
-                  apiBaseUrl={API_BASE_URL}
-                  currentFile={selectedFile}
-                  currentContent={content}
-                  onContentUpdate={handleNoteContentUpdate}
-                  initialMessage={chatInitialMessage}
-                />
+                <ChatPanel apiBaseUrl={api.baseUrl} currentFile={file.selectedFile} currentContent={file.content}
+                  onContentUpdate={file.handleNoteContentUpdate} initialMessage={ui.chatInitialMessage} />
               </div>
             )}
           </>
         )}
       </section>
 
-      {/* Mobile/Tablet Chat Drawer */}
-      {(isMobile || isTablet) && (
-        <Drawer
-          isOpen={isMobileChatOpen}
-          onClose={() => setIsMobileChatOpen(false)}
-          position={isMobile ? 'bottom' : 'right'}
-          title="Chat"
-        >
-          <ChatPanel
-            apiBaseUrl={API_BASE_URL}
-            currentFile={selectedFile}
-            currentContent={content}
-            onContentUpdate={handleNoteContentUpdate}
-            initialMessage={chatInitialMessage}
-          />
+      {(ui.isMobile || ui.isTablet) && (
+        <Drawer isOpen={ui.isMobileChatOpen} onClose={() => ui.setIsMobileChatOpen(false)} position={ui.isMobile ? 'bottom' : 'right'} title="Chat">
+          <ChatPanel apiBaseUrl={api.baseUrl} currentFile={file.selectedFile} currentContent={file.content}
+            onContentUpdate={file.handleNoteContentUpdate} initialMessage={ui.chatInitialMessage} />
         </Drawer>
       )}
     </>
   )
 
   return (
-    <div className={`h-screen flex flex-col overflow-hidden ${isMobile ? 'pb-16' : ''}`}>
-      {/* Header */}
+    <div className={`h-screen flex flex-col overflow-hidden ${ui.isMobile ? 'pb-16' : ''}`}>
       <header className="bg-card border-b border-border/50 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-2 sm:gap-4">
-          {/* Mobile menu button */}
-          {(isMobile || isTablet) && view === 'editor' && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsMobileSidebarOpen(true)}
-              className="min-w-[44px] min-h-[44px] p-0"
-              aria-label="Open sidebar"
-            >
+          {(ui.isMobile || ui.isTablet) && view === 'editor' && (
+            <Button variant="ghost" size="sm" onClick={() => ui.setIsMobileSidebarOpen(true)} className="min-w-[44px] min-h-[44px] p-0" aria-label="Open sidebar">
               <Menu className="w-5 h-5" />
             </Button>
           )}
-
-          <h1 className="text-sm sm:text-base font-semibold tracking-tight truncate">
-            {isMobile ? 'UM' : 'Unstructured Minds'}
-          </h1>
-
-          {/* Desktop navigation tabs */}
-          {!isMobile && (
+          <h1 className="text-sm sm:text-base font-semibold tracking-tight truncate">{ui.isMobile ? 'UM' : 'Unstructured Minds'}</h1>
+          {!ui.isMobile && (
             <div className="hidden sm:flex items-center gap-1 bg-muted rounded-lg p-1">
-              <Button
-                variant={view === 'editor' ? 'secondary' : 'ghost'}
-                size="sm"
-                onClick={() => navigate('/editor')}
-                className="gap-1"
-              >
-                <FileText className="w-4 h-4" />
-                <span className="hidden lg:inline">Editor</span>
-              </Button>
-              <Button
-                variant={view === 'dashboard' ? 'secondary' : 'ghost'}
-                size="sm"
-                onClick={() => navigate('/dashboard')}
-                className="gap-1"
-              >
-                <LayoutDashboard className="w-4 h-4" />
-                <span className="hidden lg:inline">Dashboard</span>
-              </Button>
-              <Button
-                variant={view === 'kanban' ? 'secondary' : 'ghost'}
-                size="sm"
-                onClick={() => navigate('/kanban')}
-                className="gap-1"
-              >
-                <Kanban className="w-4 h-4" />
-                <span className="hidden lg:inline">Kanban</span>
-              </Button>
-              <Button
-                variant={view === 'calendar' ? 'secondary' : 'ghost'}
-                size="sm"
-                onClick={() => navigate('/calendar')}
-                className="gap-1"
-              >
-                <Calendar className="w-4 h-4" />
-                <span className="hidden lg:inline">Calendar</span>
-              </Button>
-              <Button
-                variant={view === 'profile' ? 'secondary' : 'ghost'}
-                size="sm"
-                onClick={() => navigate('/profile')}
-                className="gap-1"
-              >
-                <User className="w-4 h-4" />
-                <span className="hidden lg:inline">Profile</span>
-              </Button>
+              {([['editor', FileText, 'Editor'], ['dashboard', LayoutDashboard, 'Dashboard'], ['kanban', Kanban, 'Kanban'], ['calendar', Calendar, 'Calendar'], ['profile', User, 'Profile']] as const).map(([v, Icon, label]) => (
+                <Button key={v} variant={view === v ? 'secondary' : 'ghost'} size="sm" onClick={() => navigate(v === 'editor' ? '/editor' : `/${v}`)} className="gap-1">
+                  <Icon className="w-4 h-4" /><span className="hidden lg:inline">{label}</span>
+                </Button>
+              ))}
             </div>
           )}
         </div>
-
         <div className="flex items-center gap-1 sm:gap-2">
-          {saveState !== 'idle' && (
+          {file.saveState !== 'idle' && (
             <span className="text-xs sm:text-sm text-muted-foreground hidden sm:inline">
-              {saveState === 'saving' && 'Saving...'}
-              {saveState === 'extracting' && 'Saving & extracting...'}
-              {saveState === 'saved' && 'Saved'}
+              {file.saveState === 'saving' && 'Saving...'}{file.saveState === 'extracting' && 'Saving & extracting...'}{file.saveState === 'saved' && 'Saved'}
             </span>
           )}
-
-          {/* Mobile chat toggle (only in editor view) */}
-          {(isMobile || isTablet) && view === 'editor' && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsMobileChatOpen(true)}
-              className="min-w-[44px] min-h-[44px] p-0"
-              aria-label="Open chat"
-            >
+          {(ui.isMobile || ui.isTablet) && view === 'editor' && (
+            <Button variant="ghost" size="sm" onClick={() => ui.setIsMobileChatOpen(true)} className="min-w-[44px] min-h-[44px] p-0" aria-label="Open chat">
               <MessageSquare className="w-5 h-5" />
             </Button>
           )}
-
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={openSearch}
-            aria-label="Search notes"
-            title="Search notes (Cmd+Shift+F)"
-            className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 p-0 sm:p-2"
-          >
-            <Search className="w-4 h-4 sm:w-4 sm:h-4" />
+          <Button variant="ghost" size="sm" onClick={ui.openSearch} aria-label="Search notes" title="Search notes (Cmd+Shift+F)" className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 p-0 sm:p-2">
+            <Search className="w-4 h-4" />
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={toggleTheme}
-            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-            className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 p-0 sm:p-2"
-          >
-            {theme === 'dark' ? (
-              <Sun className="w-4 h-4" />
-            ) : (
-              <Moon className="w-4 h-4" />
-            )}
+          <Button variant="ghost" size="sm" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`} className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 p-0 sm:p-2">
+            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsSettingsOpen(true)}
-            className="gap-1 min-h-[44px] sm:min-h-0 sm:h-8"
-          >
-            <Settings className="w-4 h-4" />
-            <span className="hidden sm:inline">Settings</span>
+          <Button variant="outline" size="sm" onClick={() => ui.setIsSettingsOpen(true)} className="gap-1 min-h-[44px] sm:min-h-0 sm:h-8">
+            <Settings className="w-4 h-4" /><span className="hidden sm:inline">Settings</span>
           </Button>
         </div>
       </header>
 
-      {/* Main content */}
       <main className="flex-1 flex overflow-hidden">
         <Routes>
-          <Route path="/dashboard" element={
-            <Suspense fallback={<ViewLoadingFallback />}>
-              <section className="flex-1 overflow-auto bg-background">
-                <Dashboard apiUrl={API_BASE_URL} />
-              </section>
-            </Suspense>
-          } />
-          <Route path="/kanban" element={
-            <Suspense fallback={<ViewLoadingFallback />}>
-              <section className="flex-1 overflow-auto bg-background">
-                <KanbanBoard apiUrl={API_BASE_URL} onFileSelect={handleFileSelect} />
-              </section>
-            </Suspense>
-          } />
-          <Route path="/calendar" element={
-            <Suspense fallback={<ViewLoadingFallback />}>
-              <section className="flex-1 overflow-auto bg-background">
-                <CalendarView
-                  apiUrl={API_BASE_URL}
-                  onDaySelect={handleCalendarDaySelect}
-                />
-              </section>
-            </Suspense>
-          } />
-          <Route path="/profile" element={
-            <Suspense fallback={<ViewLoadingFallback />}>
-              <section className="flex-1 overflow-auto bg-background">
-                <LifeProfile apiUrl={API_BASE_URL} />
-              </section>
-            </Suspense>
-          } />
+          <Route path="/dashboard" element={<Suspense fallback={<ViewLoadingFallback />}><section className="flex-1 overflow-auto bg-background"><Dashboard apiUrl={api.baseUrl} /></section></Suspense>} />
+          <Route path="/kanban" element={<Suspense fallback={<ViewLoadingFallback />}><section className="flex-1 overflow-auto bg-background"><KanbanBoard apiUrl={api.baseUrl} onFileSelect={handleFileSelect} /></section></Suspense>} />
+          <Route path="/calendar" element={<Suspense fallback={<ViewLoadingFallback />}><section className="flex-1 overflow-auto bg-background"><CalendarView apiUrl={api.baseUrl} onDaySelect={handleCalendarDaySelect} /></section></Suspense>} />
+          <Route path="/profile" element={<Suspense fallback={<ViewLoadingFallback />}><section className="flex-1 overflow-auto bg-background"><LifeProfile apiUrl={api.baseUrl} /></section></Suspense>} />
           <Route path="/editor" element={editorElement} />
           <Route path="/" element={editorElement} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
 
-      {/* Mobile bottom navigation */}
-      {isMobile && <MobileNav currentView={view} onViewChange={(v) => navigate(v === 'editor' ? '/editor' : `/${v}`)} />}
-
-      {/* Command Palette */}
-      <CommandPalette
-        isOpen={isCommandPaletteOpen}
-        onClose={() => setIsCommandPaletteOpen(false)}
-        commands={commands}
-      />
-
-      {/* Settings Panel */}
-      <SettingsPanel
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        apiBaseUrl={API_BASE_URL}
-        onThemeChange={setTheme}
-      />
-
-      {/* Search Modal */}
-      <SearchModal
-        isOpen={isSearchOpen}
-        onClose={() => setIsSearchOpen(false)}
-        onSelect={handleSearchSelect}
-        apiBaseUrl={API_BASE_URL}
-      />
-
-      {/* Template Picker */}
-      <TemplatePicker
-        isOpen={isTemplatePickerOpen}
-        onClose={() => setIsTemplatePickerOpen(false)}
-        onSelect={handleTemplateSelect}
-        apiBaseUrl={API_BASE_URL}
-      />
-
-      {/* Quick Capture */}
-      <QuickCapture
-        isOpen={isQuickCaptureOpen}
-        onClose={() => setIsQuickCaptureOpen(false)}
-        apiBaseUrl={API_BASE_URL}
-      />
-
-      {/* Daily Note Wizard */}
-      <DailyNoteWizard
-        isOpen={isWizardOpen}
-        onClose={() => setIsWizardOpen(false)}
-        onComplete={handleWizardComplete}
-        noteContent={wizardNoteContent}
-        date={wizardDate}
-        apiBaseUrl={API_BASE_URL}
-      />
+      {ui.isMobile && <MobileNav currentView={view} onViewChange={(v) => navigate(v === 'editor' ? '/editor' : `/${v}`)} />}
+      <CommandPalette isOpen={ui.isCommandPaletteOpen} onClose={() => ui.setIsCommandPaletteOpen(false)} commands={commands} />
+      <SettingsPanel isOpen={ui.isSettingsOpen} onClose={() => ui.setIsSettingsOpen(false)} apiBaseUrl={api.baseUrl} onThemeChange={setTheme} />
+      <SearchModal isOpen={ui.isSearchOpen} onClose={() => ui.setIsSearchOpen(false)} onSelect={handleSearchSelect} apiBaseUrl={api.baseUrl} />
+      <TemplatePicker isOpen={ui.isTemplatePickerOpen} onClose={() => ui.setIsTemplatePickerOpen(false)} onSelect={handleSearchSelect} apiBaseUrl={api.baseUrl} />
+      <QuickCapture isOpen={ui.isQuickCaptureOpen} onClose={() => ui.setIsQuickCaptureOpen(false)} apiBaseUrl={api.baseUrl} />
+      <DailyNoteWizard isOpen={ui.isWizardOpen} onClose={() => ui.setIsWizardOpen(false)} onComplete={handleWizardComplete} noteContent={ui.wizardNoteContent} date={ui.wizardDate} />
     </div>
   )
 }
