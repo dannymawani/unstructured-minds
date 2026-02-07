@@ -119,6 +119,11 @@ def init_database(db_path: Path | str) -> duckdb.DuckDBPyConnection:
     except duckdb.BinderException:
         conn.execute("ALTER TABLE kanban_tasks ADD COLUMN deadline DATE")
 
+    # Migration: normalize task statuses from extraction values to API-standard values
+    conn.execute("UPDATE tasks SET status = 'pending' WHERE status = 'todo'")
+    conn.execute("UPDATE tasks SET status = 'completed' WHERE status = 'done'")
+    conn.execute("UPDATE tasks SET status = 'pending' WHERE status = 'in_progress'")
+
     # Kanban task updates / notes timeline
     conn.execute("""
         CREATE TABLE IF NOT EXISTS kanban_task_updates (
