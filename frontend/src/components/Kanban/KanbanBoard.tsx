@@ -14,6 +14,7 @@ export interface KanbanTask {
   depends_on: string | null
   description: string | null
   content: string | null
+  deadline: string | null
   completed_at: string | null
 }
 
@@ -37,6 +38,7 @@ export function KanbanBoard({ apiUrl }: KanbanBoardProps) {
   const [newTitle, setNewTitle] = useState('')
   const [newDescription, setNewDescription] = useState('')
   const [newPriority, setNewPriority] = useState('')
+  const [newDeadline, setNewDeadline] = useState('')
   const [creating, setCreating] = useState(false)
 
   const fetchBoard = useCallback(async () => {
@@ -92,6 +94,7 @@ export function KanbanBoard({ apiUrl }: KanbanBoardProps) {
           title: newTitle.trim(),
           description: newDescription.trim() || null,
           priority: newPriority || null,
+          deadline: newDeadline.trim() || null,
         }),
       })
       if (!response.ok) {
@@ -101,6 +104,7 @@ export function KanbanBoard({ apiUrl }: KanbanBoardProps) {
       setNewTitle('')
       setNewDescription('')
       setNewPriority('')
+      setNewDeadline('')
       setShowNewForm(false)
       await fetchBoard()
     } catch (err) {
@@ -185,7 +189,7 @@ export function KanbanBoard({ apiUrl }: KanbanBoardProps) {
               placeholder="Description (optional)"
               className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
-            <div className="flex gap-2 items-center">
+            <div className="flex gap-2 items-center flex-wrap">
               <select
                 value={newPriority}
                 onChange={(e) => setNewPriority(e.target.value)}
@@ -196,6 +200,13 @@ export function KanbanBoard({ apiUrl }: KanbanBoardProps) {
                 <option value="medium">Medium</option>
                 <option value="low">Low</option>
               </select>
+              <input
+                type="text"
+                value={newDeadline}
+                onChange={(e) => setNewDeadline(e.target.value)}
+                placeholder="Deadline (e.g. Friday, Feb 14)"
+                className="flex-1 min-w-[180px] rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              />
               <Button type="submit" size="sm" disabled={!newTitle.trim() || creating}>
                 {creating ? 'Creating...' : 'Add Task'}
               </Button>
