@@ -63,6 +63,17 @@ class KanbanTaskUpdate(BaseModel):
     deadline: Optional[date] = Field(None, description="Deadline date (YYYY-MM-DD)")
 
 
+class TaskNote(BaseModel):
+    id: int
+    task_id: str
+    note: str
+    created_at: str
+
+
+class TaskNoteCreate(BaseModel):
+    note: str = Field(..., min_length=1, max_length=2000)
+
+
 # =============================================================================
 # Helpers
 # =============================================================================
@@ -246,4 +257,50 @@ async def delete_task(
         raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
 
     db.execute("DELETE FROM kanban_tasks WHERE id = ?", [task_id])
+    db.execute("DELETE FROM kanban_task_updates WHERE task_id = ?", [task_id])
     return {"success": True, "task_id": task_id}
+
+
+@router.get("/task/{task_id}/updates", response_model=list[TaskNote])
+async def list_task_updates(
+    task_id: str,
+    db: DatabaseManager = Depends(get_db),
+) -> list[TaskNote]:
+    """List all status updates / notes for a task, newest first."""
+    result = db.execute(
+        "SELECT id, task_id, note, created_at FROM kanban_task_updates WHERE task_id = ? ORDER BY created_at DESC",
+        [task_id],
+    )
+    return [
+        TaskNote(id=row[0], task_id=row[1], note=row[2], created_at=str(row[3]))
+        for row in result.fetchall()
+    ]
+
+
+@router.post("/task/{task_id}/updates", response_model=TaskNote, status_code=201)
+async def add_task_update(
+    task_id: str,
+    request: TaskNoteCreate,
+    db: DatabaseManager = Depends(get_db),
+) -> TaskNote:
+    """Add a status update / note to a task."""
+    # Verify task exists
+    check = db.execute("SELECT id FROM kanban_tasks WHERE id = ?", [task_id])
+    if not check.fetchone():
+        raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+
+    # Get next ID
+    max_id = db.execute("SELECT COALESCE(MAX(id), 0) FROM kanban_task_updates").fetchone()[0]
+    new_id = max_id + 1
+
+    db.execute(
+        "INSERT INTO kanban_task_updates (id, task_id, note) VALUES (?, ?, ?)",
+        [new_id, task_id, request.note],
+    )
+
+    result = db.execute(
+        "SELECT id, task_id, note, created_at FROM kanban_task_updates WHERE id = ?",
+        [new_id],
+    )
+    row = result.fetchone()
+    return TaskNote(id=row[0], task_id=row[1], note=row[2], created_at=str(row[3]))
