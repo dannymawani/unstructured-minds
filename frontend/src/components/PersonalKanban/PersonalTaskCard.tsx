@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { FileText } from 'lucide-react'
+import { Clock, FileText } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export interface Task {
@@ -13,11 +13,12 @@ export interface Task {
   category: string | null
   priority: number | null
   source_file: string | null
+  deadline: string | null
 }
 
 interface PersonalTaskCardProps {
   task: Task
-  onFileSelect?: (path: string) => void
+  onTaskClick?: (task: Task) => void
 }
 
 const priorityConfig: Record<number, { label: string; className: string }> = {
@@ -39,7 +40,7 @@ function getFilename(path: string): string {
   return parts[parts.length - 1] || path
 }
 
-export function PersonalTaskCard({ task, onFileSelect }: PersonalTaskCardProps) {
+export function PersonalTaskCard({ task, onTaskClick }: PersonalTaskCardProps) {
   const mouseStart = useRef<{ x: number; y: number } | null>(null)
 
   const {
@@ -73,9 +74,7 @@ export function PersonalTaskCard({ task, onFileSelect }: PersonalTaskCardProps) 
     const dy = e.clientY - mouseStart.current.y
     mouseStart.current = null
     if (Math.abs(dx) < 5 && Math.abs(dy) < 5) {
-      if (task.source_file && onFileSelect) {
-        onFileSelect(task.source_file)
-      }
+      onTaskClick?.(task)
     }
   }
 
@@ -112,6 +111,12 @@ export function PersonalTaskCard({ task, onFileSelect }: PersonalTaskCardProps) 
             )}
           >
             {priority.label}
+          </span>
+        )}
+        {task.deadline && (
+          <span className="flex items-center gap-1 text-xs bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded">
+            <Clock className="w-3 h-3" />
+            {new Date(task.deadline + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
           </span>
         )}
       </div>

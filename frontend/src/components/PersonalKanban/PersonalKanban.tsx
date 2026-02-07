@@ -17,6 +17,7 @@ import { Plus, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { PersonalTaskCard, type Task } from './PersonalTaskCard'
+import { PersonalTaskModal } from './PersonalTaskModal'
 
 interface PersonalKanbanProps {
   apiUrl: string
@@ -47,23 +48,25 @@ interface NewTaskForm {
   description: string
   category: string
   priority: string
+  deadline: string
 }
 
 const INITIAL_FORM: NewTaskForm = {
   description: '',
   category: '',
   priority: '',
+  deadline: '',
 }
 
 function DroppableColumn({
   column,
   tasks,
-  onFileSelect,
+  onTaskClick,
   children,
 }: {
   column: ColumnDef
   tasks: Task[]
-  onFileSelect?: (path: string) => void
+  onTaskClick?: (task: Task) => void
   children?: React.ReactNode
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id })
@@ -97,7 +100,7 @@ function DroppableColumn({
               <PersonalTaskCard
                 key={task.id}
                 task={task}
-                onFileSelect={onFileSelect}
+                onTaskClick={onTaskClick}
               />
             ))}
             {tasks.length === 0 && (
@@ -117,6 +120,7 @@ export function PersonalKanban({ apiUrl, onFileSelect }: PersonalKanbanProps) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeTask, setActiveTask] = useState<Task | null>(null)
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [showNewForm, setShowNewForm] = useState(false)
   const [newTask, setNewTask] = useState<NewTaskForm>(INITIAL_FORM)
   const [submitting, setSubmitting] = useState(false)
@@ -252,6 +256,7 @@ export function PersonalKanban({ apiUrl, onFileSelect }: PersonalKanbanProps) {
         }
         if (newTask.category.trim()) body.category = newTask.category.trim()
         if (newTask.priority) body.priority = Number(newTask.priority)
+        if (newTask.deadline) body.deadline = newTask.deadline
 
         const response = await fetch(`${apiUrl}/tasks`, {
           method: 'POST',
@@ -320,7 +325,7 @@ export function PersonalKanban({ apiUrl, onFileSelect }: PersonalKanbanProps) {
               className="w-full bg-background border border-border rounded px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground"
               autoFocus
             />
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <input
                 type="text"
                 placeholder="Category (optional)"
@@ -328,7 +333,7 @@ export function PersonalKanban({ apiUrl, onFileSelect }: PersonalKanbanProps) {
                 onChange={(e) =>
                   setNewTask((prev) => ({ ...prev, category: e.target.value }))
                 }
-                className="flex-1 bg-background border border-border rounded px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground"
+                className="flex-1 min-w-[120px] bg-background border border-border rounded px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground"
               />
               <select
                 value={newTask.priority}
@@ -342,6 +347,15 @@ export function PersonalKanban({ apiUrl, onFileSelect }: PersonalKanbanProps) {
                 <option value="2">Medium</option>
                 <option value="3">Low</option>
               </select>
+              <input
+                type="date"
+                value={newTask.deadline}
+                onChange={(e) =>
+                  setNewTask((prev) => ({ ...prev, deadline: e.target.value }))
+                }
+                className="bg-background border border-border rounded px-3 py-1.5 text-sm text-foreground"
+                title="Deadline (optional)"
+              />
             </div>
             <div className="flex justify-end gap-2">
               <Button
@@ -391,7 +405,7 @@ export function PersonalKanban({ apiUrl, onFileSelect }: PersonalKanbanProps) {
                 key={column.id}
                 column={column}
                 tasks={getColumnTasks(column.id)}
-                onFileSelect={onFileSelect}
+                onTaskClick={(task) => setSelectedTask(task)}
               />
             ))}
           </div>
@@ -400,11 +414,31 @@ export function PersonalKanban({ apiUrl, onFileSelect }: PersonalKanbanProps) {
         <DragOverlay>
           {activeTask ? (
             <div className="w-72 sm:w-80 opacity-90">
-              <PersonalTaskCard task={activeTask} onFileSelect={onFileSelect} />
+              <PersonalTaskCard task={activeTask} />
             </div>
           ) : null}
         </DragOverlay>
       </DndContext>
+
+      {selectedTask && (
+        <PersonalTaskModal
+          task={selectedTask}
+          apiUrl={apiUrl}
+          onClose={() => setSelectedTask(null)}
+          onMove={(taskId, newStatus) => {
+            updateTaskStatus(taskId, newStatus)
+            setSelectedTask(null)
+          }}
+          onOpenNote={(path) => {
+            setSelectedTask(null)
+            onFileSelect?.(path)
+          }}
+          onTaskUpdated={(updated) => {
+            setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)))
+            setSelectedTask(updated)
+          }}
+        />
+      )}
     </div>
   )
 }
