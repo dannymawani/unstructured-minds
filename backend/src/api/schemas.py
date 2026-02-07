@@ -1,11 +1,14 @@
 """Schema management API endpoints."""
 
 import json
+import logging
 from pathlib import Path
 from typing import Any, Optional
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
+
+logger = logging.getLogger(__name__)
 
 from ..config import settings
 from ..extraction.schemas import EXTRACTION_SCHEMAS
@@ -160,8 +163,8 @@ def _load_custom_schema(name: str) -> Optional[dict[str, Any]]:
         try:
             with open(path) as f:
                 return json.load(f)
-        except (json.JSONDecodeError, IOError):
-            pass
+        except (json.JSONDecodeError, IOError) as e:
+            logger.warning("Failed to load custom schema '%s': %s", name, e)
     return None
 
 

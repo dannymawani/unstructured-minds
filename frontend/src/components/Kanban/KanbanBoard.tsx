@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { KanbanColumn } from './KanbanColumn'
 import { TaskModal } from './TaskModal'
@@ -33,6 +33,11 @@ export function KanbanBoard({ apiUrl }: KanbanBoardProps) {
   const [error, setError] = useState<string | null>(null)
   const [selectedTask, setSelectedTask] = useState<KanbanTask | null>(null)
   const [mobileColumnIndex, setMobileColumnIndex] = useState(0)
+  const [showNewForm, setShowNewForm] = useState(false)
+  const [newTitle, setNewTitle] = useState('')
+  const [newDescription, setNewDescription] = useState('')
+  const [newPriority, setNewPriority] = useState('')
+  const [creating, setCreating] = useState(false)
 
   const fetchBoard = useCallback(async () => {
     try {
@@ -74,6 +79,51 @@ export function KanbanBoard({ apiUrl }: KanbanBoardProps) {
     }
   }
 
+  const handleCreateTask = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newTitle.trim()) return
+
+    setCreating(true)
+    try {
+      const response = await fetch(`${apiUrl}/kanban/task`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: newTitle.trim(),
+          description: newDescription.trim() || null,
+          priority: newPriority || null,
+        }),
+      })
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}))
+        throw new Error(err.detail || 'Failed to create task')
+      }
+      setNewTitle('')
+      setNewDescription('')
+      setNewPriority('')
+      setShowNewForm(false)
+      await fetchBoard()
+    } catch (err) {
+      console.error('Error creating task:', err)
+      setError(err instanceof Error ? err.message : 'Failed to create task')
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const handleDeleteTask = async (taskId: string) => {
+    try {
+      const response = await fetch(`${apiUrl}/kanban/task/${taskId}`, {
+        method: 'DELETE',
+      })
+      if (!response.ok) throw new Error('Failed to delete task')
+      await fetchBoard()
+      setSelectedTask(null)
+    } catch (err) {
+      console.error('Error deleting task:', err)
+    }
+  }
+
   const goToPrevColumn = () => {
     setMobileColumnIndex((prev) => Math.max(0, prev - 1))
   }
@@ -101,10 +151,57 @@ export function KanbanBoard({ apiUrl }: KanbanBoardProps) {
   return (
     <div className="h-full flex flex-col">
       <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-border">
-        <h2 className="text-lg sm:text-xl font-semibold text-foreground">Implementation Kanban</h2>
-        <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-          {columns.reduce((sum, col) => sum + col.tasks.length, 0)} tasks total
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg sm:text-xl font-semibold text-foreground">Implementation Kanban</h2>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+              {columns.reduce((sum, col) => sum + col.tasks.length, 0)} tasks total
+            </p>
+          </div>
+          <Button
+            size="sm"
+            onClick={() => setShowNewForm((prev) => !prev)}
+            className="gap-1"
+          >
+            {showNewForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+            {showNewForm ? 'Cancel' : 'New Task'}
+          </Button>
+        </div>
+
+        {showNewForm && (
+          <form onSubmit={handleCreateTask} className="mt-3 flex flex-col gap-2">
+            <input
+              type="text"
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              placeholder="Task title..."
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              autoFocus
+            />
+            <input
+              type="text"
+              value={newDescription}
+              onChange={(e) => setNewDescription(e.target.value)}
+              placeholder="Description (optional)"
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+            <div className="flex gap-2 items-center">
+              <select
+                value={newPriority}
+                onChange={(e) => setNewPriority(e.target.value)}
+                className="rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="">Priority</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+              <Button type="submit" size="sm" disabled={!newTitle.trim() || creating}>
+                {creating ? 'Creating...' : 'Add Task'}
+              </Button>
+            </div>
+          </form>
+        )}
       </div>
 
       {/* Mobile column navigation */}
@@ -172,6 +269,7 @@ export function KanbanBoard({ apiUrl }: KanbanBoardProps) {
           task={selectedTask}
           onClose={handleCloseModal}
           onMove={handleMoveTask}
+          onDelete={handleDeleteTask}
         />
       )}
     </div>
