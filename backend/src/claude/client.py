@@ -14,6 +14,38 @@ You have access to their notes, exercise logs, daily metrics, and tasks.
 Answer concisely and accurately based on the context provided."""
 
 
+DAILY_NOTE_POPULATE_SYSTEM_PROMPT = """You populate a daily note template with the user's answers from a wizard.
+
+Rules:
+- Return ONLY the complete markdown document. No explanations, no code fences.
+- Preserve all frontmatter, headers, and structure exactly as-is.
+- Fill in sections based on the provided answers.
+
+Workout section (### Workout):
+- If workout is "Rest": replace the Type/Focus lines with just `- Rest day`
+- Otherwise: set `- **Type**: {workout}` and `- **Focus**: {workout}`
+
+Energy & Recovery section (### Energy & Recovery):
+- Set `- Sleep: {sleep}/10`, `- Energy Level: {energy}/10`, `- Mood: {mood}/10`
+- Leave `- Nutrition:` empty (user fills later)
+
+Work section (## 💼 Work):
+- Parse the work priorities text (comma or newline separated) into `- [ ]` checkbox items
+- If any item looks like a Jira ticket (e.g. PROJ-123, ABC-45), add a `### Jira` sub-header grouping those items
+
+Personal section (## 🤷🏽 Personal):
+- Parse personal items into `- [ ]` checkbox items
+
+Today's Focus section (## 🎯 Today's Focus):
+- Pick the top 3-4 items from work + personal combined as `- [ ]` checkboxes
+
+Adhoc Notes section (## 📝 Adhoc Notes):
+- Parse adhoc text into `- item` bullet points (no checkboxes)
+- If empty, leave as `- `
+
+Keep the Previous/Next navigation footer intact."""
+
+
 NOTE_ASSIST_SYSTEM_PROMPT = """You are a note assistant that helps the user edit and update their markdown notes.
 You can see the current note content and help the user add, modify, or reorganize information.
 
@@ -181,6 +213,51 @@ class ClaudeClient:
             return {"reply": reply, "updated_content": updated_content}
 
         return {"reply": response_text, "updated_content": None}
+
+    async def populate_daily_note(
+        self,
+        template: str,
+        answers: dict[str, Any],
+        date: str,
+    ) -> str:
+        """Populate a daily note template with wizard answers using AI.
+
+        Args:
+            template: The raw daily note template markdown
+            answers: Dict with keys: workout, sleep, energy, mood,
+                     work_priorities, personal, adhoc
+            date: Date string (YYYY-MM-DD)
+
+        Returns:
+            Fully populated markdown string
+        """
+        user_prompt = f"""Date: {date}
+
+Template:
+```markdown
+{template}
+```
+
+Wizard answers:
+- Workout: {answers.get('workout', 'Rest')}
+- Sleep: {answers.get('sleep', '')}/10
+- Energy: {answers.get('energy', '')}/10
+- Mood: {answers.get('mood', '')}/10
+- Work priorities: {answers.get('work_priorities', '')}
+- Personal items: {answers.get('personal', '')}
+- Adhoc notes: {answers.get('adhoc', '')}
+
+Populate the template with these answers and return only the complete markdown."""
+
+        response = await self._call_with_retry(
+            self._create_message,
+            model=self.model_fast,
+            max_tokens=4096,
+            system=DAILY_NOTE_POPULATE_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": user_prompt}],
+        )
+
+        return response.content[0].text
 
     async def execute_skill(
         self, system_prompt: str, user_prompt: str

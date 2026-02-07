@@ -440,6 +440,10 @@ export function PersonalKanban({ apiUrl, onFileSelect }: PersonalKanbanProps) {
             setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)))
             setSelectedTask(updated)
           }}
+          onTaskDeleted={(taskId) => {
+            setTasks((prev) => prev.filter((t) => t.id !== taskId))
+            setSelectedTask(null)
+          }}
         />
       )}
     </div>
