@@ -40,7 +40,7 @@ function getFilename(path: string): string {
 }
 
 export function PersonalTaskCard({ task, onFileSelect }: PersonalTaskCardProps) {
-  const pointerStart = useRef<{ x: number; y: number } | null>(null)
+  const mouseStart = useRef<{ x: number; y: number } | null>(null)
 
   const {
     attributes,
@@ -61,22 +61,17 @@ export function PersonalTaskCard({ task, onFileSelect }: PersonalTaskCardProps) 
     ? categoryColors[task.category.toLowerCase()] || 'bg-zinc-500/20 text-zinc-400'
     : null
 
-  // Merge our pointerDown tracker with dnd-kit's listener
-  const mergedListeners = {
-    ...listeners,
-    onPointerDown: (e: React.PointerEvent) => {
-      pointerStart.current = { x: e.clientX, y: e.clientY }
-      // Call dnd-kit's original handler
-      ;(listeners as Record<string, (e: React.PointerEvent) => void>)?.onPointerDown?.(e)
-    },
+  // Use mouse events for click detection — completely independent of
+  // dnd-kit's pointer event system, so no interference.
+  const handleMouseDown = (e: React.MouseEvent) => {
+    mouseStart.current = { x: e.clientX, y: e.clientY }
   }
 
-  const handlePointerUp = (e: React.PointerEvent) => {
-    if (!pointerStart.current) return
-    const dx = e.clientX - pointerStart.current.x
-    const dy = e.clientY - pointerStart.current.y
-    pointerStart.current = null
-    // If pointer barely moved, treat as click
+  const handleMouseUp = (e: React.MouseEvent) => {
+    if (!mouseStart.current) return
+    const dx = e.clientX - mouseStart.current.x
+    const dy = e.clientY - mouseStart.current.y
+    mouseStart.current = null
     if (Math.abs(dx) < 5 && Math.abs(dy) < 5) {
       if (task.source_file && onFileSelect) {
         onFileSelect(task.source_file)
@@ -89,8 +84,9 @@ export function PersonalTaskCard({ task, onFileSelect }: PersonalTaskCardProps) 
       ref={setNodeRef}
       style={style}
       {...attributes}
-      {...mergedListeners}
-      onPointerUp={handlePointerUp}
+      {...listeners}
+      onMouseDown={handleMouseDown}
+      onMouseUp={handleMouseUp}
       className={cn(
         'bg-zinc-900 border border-zinc-700 rounded-lg p-3 cursor-grab',
         'hover:border-zinc-500 transition-colors text-zinc-100',
