@@ -10,7 +10,6 @@ from slowapi.errors import RateLimitExceeded
 from .config import settings
 from .logging_config import configure_logging, get_logger
 from .api.routes import router
-from .api.chat import router as chat_router
 from .api.skills import router as skills_router
 from .api.extraction import router as extraction_router
 from .api.dashboard import router as dashboard_router
@@ -28,6 +27,7 @@ from .api.health import router as health_router, set_start_time
 from .api.metrics import router as metrics_router
 from .api.insights import router as insights_router
 from .api.note_assist import router as note_assist_router
+from .api.profile import router as profile_router
 from .claude import ClaudeClient
 from .db import DatabaseManager
 from .middleware import limiter, SecurityHeadersMiddleware, RequestLoggingMiddleware
@@ -119,7 +119,6 @@ app.add_middleware(
 app.include_router(router)
 app.include_router(health_router)  # Enhanced health checks
 app.include_router(metrics_router)  # Request metrics
-app.include_router(chat_router)
 app.include_router(skills_router)
 app.include_router(extraction_router)
 app.include_router(dashboard_router)
@@ -136,6 +135,7 @@ app.include_router(tags_router)
 app.include_router(tasks_router)
 app.include_router(insights_router)
 app.include_router(note_assist_router)
+app.include_router(profile_router)
 
 
 if __name__ == "__main__":
