@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useInstance } from '@milkdown/react'
 import { SlashProvider, slashFactory } from '@milkdown/kit/plugin/slash'
-import { callCommand } from '@milkdown/utils'
+import { callCommand, $prose } from '@milkdown/utils'
 import {
   wrapInHeadingCommand,
   wrapInBulletListCommand,
@@ -10,8 +10,67 @@ import {
   createCodeBlockCommand,
   insertHrCommand,
 } from '@milkdown/kit/preset/commonmark'
+import { keymap } from '@milkdown/prose/keymap'
+import { TextSelection } from '@milkdown/prose/state'
 import type { EditorView } from '@milkdown/prose/view'
 import type { EditorState } from '@milkdown/prose/state'
+
+// ============================================================
+// Code Block Exit Plugin
+// ============================================================
+// Pressing Enter on an empty line at the end of a code block exits it.
+// Pressing Mod-Enter anywhere in a code block exits it.
+
+export const codeBlockExitPlugin = $prose(() => {
+  return keymap({
+    'Enter': (state, dispatch) => {
+      const { $head, empty } = state.selection
+      if (!empty) return false
+      if ($head.parent.type.name !== 'code_block') return false
+
+      const cursorPos = $head.parentOffset
+      const text = $head.parent.textContent
+
+      // Only exit if cursor is at the end and the last line is empty
+      if (cursorPos !== text.length || !text.endsWith('\n')) return false
+
+      if (dispatch) {
+        const posAfterCodeBlock = $head.after()
+        const tr = state.tr
+
+        // Remove the trailing empty line
+        tr.delete($head.pos - 1, $head.pos)
+
+        // Create a new paragraph after the code block
+        const mappedPos = tr.mapping.map(posAfterCodeBlock)
+        const paragraph = state.schema.nodes.paragraph.createAndFill()!
+        tr.insert(mappedPos, paragraph)
+
+        // Move cursor into the new paragraph
+        tr.setSelection(TextSelection.near(tr.doc.resolve(mappedPos + 1)))
+        dispatch(tr.scrollIntoView())
+      }
+      return true
+    },
+
+    'Mod-Enter': (state, dispatch) => {
+      const { $head, empty } = state.selection
+      if (!empty) return false
+      if ($head.parent.type.name !== 'code_block') return false
+
+      if (dispatch) {
+        const posAfterCodeBlock = $head.after()
+        const tr = state.tr
+
+        const paragraph = state.schema.nodes.paragraph.createAndFill()!
+        tr.insert(posAfterCodeBlock, paragraph)
+        tr.setSelection(TextSelection.near(tr.doc.resolve(posAfterCodeBlock + 1)))
+        dispatch(tr.scrollIntoView())
+      }
+      return true
+    },
+  })
+})
 
 // ============================================================
 // Slash Menu Plugin
@@ -21,6 +80,7 @@ function createSlashMenuElement(getEditor: () => any, hide: () => void): HTMLEle
   const el = document.createElement('div')
   el.className = 'slash-menu rounded-md border bg-popover shadow-md p-1 w-56'
   el.style.zIndex = '50'
+  el.dataset.show = 'false'
 
   const items: { label: string; icon: string; commandFn: () => (ctx: any) => boolean }[] = [
     { label: 'Heading 1', icon: 'H1', commandFn: () => callCommand(wrapInHeadingCommand.key, 1) },
