@@ -17,13 +17,13 @@ const statusButtons = [
   { status: 'backlog', label: 'Backlog', color: 'text-blue-400' },
   { status: 'in_progress', label: 'In Progress', color: 'text-amber-400' },
   { status: 'done', label: 'Done', color: 'text-green-400' },
-  { status: 'cancelled', label: 'Cancelled', color: 'text-zinc-400' },
+  { status: 'cancelled', label: 'Cancelled', color: 'text-muted-foreground' },
 ]
 
 const priorityConfig: Record<number, { label: string; className: string }> = {
   1: { label: 'High', className: 'bg-red-500/20 text-red-400 border-red-500/30' },
   2: { label: 'Medium', className: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
-  3: { label: 'Low', className: 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30' },
+  3: { label: 'Low', className: 'bg-muted text-muted-foreground border-border' },
 }
 
 const categoryColors: Record<string, string> = {
@@ -92,7 +92,7 @@ export function PersonalTaskModal({
 
   const priority = task.priority != null ? priorityConfig[task.priority] : null
   const categoryClass = task.category
-    ? categoryColors[task.category.toLowerCase()] || 'bg-zinc-500/20 text-zinc-400'
+    ? categoryColors[task.category.toLowerCase()] || 'bg-muted text-muted-foreground'
     : null
 
   const effectiveStatus = task.status || 'backlog'
@@ -100,11 +100,11 @@ export function PersonalTaskModal({
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div
-        className="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-lg overflow-hidden flex flex-col text-zinc-100"
+        className="bg-popover border border-border rounded-lg w-full max-w-lg overflow-hidden flex flex-col text-foreground"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-start justify-between p-4 border-b border-zinc-700">
+        <div className="flex items-start justify-between p-4 border-b border-border">
           <div className="flex-1 pr-4">
             {editing ? (
               <div className="flex gap-2 items-start">
@@ -123,24 +123,24 @@ export function PersonalTaskModal({
                     }
                   }}
                   rows={2}
-                  className="flex-1 bg-zinc-800 border border-zinc-600 rounded px-2 py-1 text-sm text-zinc-100 resize-none focus:outline-none focus:ring-1 focus:ring-teal-500"
+                  className="flex-1 bg-muted border border-input rounded px-2 py-1 text-sm text-foreground resize-none focus:outline-none focus:ring-1 focus:ring-ring"
                 />
                 <button
                   onClick={saveDescription}
                   disabled={saving}
-                  className="p-1 hover:bg-zinc-800 rounded text-teal-400"
+                  className="p-1 hover:bg-muted rounded text-teal-400"
                 >
                   <Check className="w-4 h-4" />
                 </button>
               </div>
             ) : (
               <div className="group flex items-start gap-2">
-                <p className="text-base font-semibold text-zinc-100 leading-snug flex-1">
+                <p className="text-base font-semibold text-foreground leading-snug flex-1">
                   {task.description}
                 </p>
                 <button
                   onClick={() => setEditing(true)}
-                  className="p-1 hover:bg-zinc-800 rounded text-zinc-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="p-1 hover:bg-muted rounded text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
                   title="Edit description"
                 >
                   <Pencil className="w-3.5 h-3.5" />
@@ -158,7 +158,7 @@ export function PersonalTaskModal({
                   {priority.label}
                 </span>
               )}
-              <span className="text-xs bg-zinc-700 text-zinc-300 px-2 py-0.5 rounded">
+              <span className="text-xs bg-secondary text-muted-foreground px-2 py-0.5 rounded">
                 {effectiveStatus.replace('_', ' ')}
               </span>
               {task.deadline && (
@@ -167,18 +167,18 @@ export function PersonalTaskModal({
                   {new Date(task.deadline + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                 </span>
               )}
-              <span className="text-xs text-zinc-500">{task.date}</span>
+              <span className="text-xs text-muted-foreground">{task.date}</span>
             </div>
           </div>
-          <button onClick={onClose} className="p-1 hover:bg-zinc-800 rounded transition-colors">
+          <button onClick={onClose} className="p-1 hover:bg-muted rounded transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Deadline + Category */}
-        <div className="flex items-center gap-4 px-4 py-3 border-b border-zinc-700 flex-wrap">
+        <div className="flex items-center gap-4 px-4 py-3 border-b border-border flex-wrap">
           <div className="flex items-center gap-3">
-            <span className="text-sm text-zinc-400">Deadline:</span>
+            <span className="text-sm text-muted-foreground">Deadline:</span>
             <input
               type="date"
               value={task.deadline || ''}
@@ -198,11 +198,11 @@ export function PersonalTaskModal({
                   console.error('Failed to update deadline:', err)
                 }
               }}
-              className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-sm text-zinc-100 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              className="bg-muted border border-border rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
             />
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-sm text-zinc-400">Category:</span>
+            <span className="text-sm text-muted-foreground">Category:</span>
             <input
               type="text"
               value={categoryDraft}
@@ -228,14 +228,14 @@ export function PersonalTaskModal({
               onKeyDown={(e) => {
                 if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
               }}
-              className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-teal-500 w-36"
+              className="bg-muted border border-border rounded px-2 py-1 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring w-36"
             />
           </div>
         </div>
 
         {/* Move-to buttons */}
-        <div className="flex items-center gap-2 p-4 border-b border-zinc-700 bg-zinc-800/50 flex-wrap">
-          <span className="text-sm text-zinc-400 mr-1">Move to:</span>
+        <div className="flex items-center gap-2 p-4 border-b border-border bg-muted flex-wrap">
+          <span className="text-sm text-muted-foreground mr-1">Move to:</span>
           {statusButtons.map(({ status, label, color }) => (
             <Button
               key={status}
