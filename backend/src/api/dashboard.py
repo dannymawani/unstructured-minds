@@ -376,37 +376,41 @@ def get_dashboard_summary(
     """
     period = get_period(days)
 
+    def fetch_scalar(result, default=0):
+        row = result.fetchone()
+        return row[0] if row and row[0] is not None else default
+
     # Get activity counts
-    activity_count = db.execute(
+    activity_count = fetch_scalar(db.execute(
         """
         SELECT COUNT(*) FROM activities
         WHERE date >= ? AND date <= ?
         """,
         [period.start_date, period.end_date],
-    ).fetchone()[0]
+    ))
 
     # Get exercise counts
-    exercise_count = db.execute(
+    exercise_count = fetch_scalar(db.execute(
         """
         SELECT COUNT(*) FROM exercise_log
         WHERE date >= ? AND date <= ?
         """,
         [period.start_date, period.end_date],
-    ).fetchone()[0]
+    ))
 
     # Get last activity date
-    last_activity = db.execute(
+    last_activity = fetch_scalar(db.execute(
         "SELECT MAX(date) FROM activities"
-    ).fetchone()[0]
+    ), default=None)
 
     # Calculate streak (consecutive days with activities ending today or yesterday)
     streak = 0
     check_date = date.today()
     while True:
-        has_activity = db.execute(
+        has_activity = fetch_scalar(db.execute(
             "SELECT COUNT(*) FROM activities WHERE date = ?",
             [str(check_date)],
-        ).fetchone()[0]
+        ))
 
         if has_activity > 0:
             streak += 1
