@@ -361,10 +361,20 @@ class ExtractionPipeline:
         if not tasks:
             return 0
 
+        # Map extraction statuses to API-standard values
+        STATUS_MAP = {
+            "todo": "pending",
+            "done": "completed",
+            "in_progress": "pending",
+            "cancelled": "cancelled",
+        }
+
         records = 0
         for task in tasks:
             task_id = self._generate_id()
-            completed_at = datetime.now() if task.get("status") == "done" else None
+            raw_status = task.get("status", "todo")
+            status = STATUS_MAP.get(raw_status, raw_status)
+            completed_at = datetime.now() if status == "completed" else None
 
             self.db.execute(
                 """
@@ -376,7 +386,7 @@ class ExtractionPipeline:
                     task_id,
                     date,
                     task.get("description", ""),
-                    task.get("status", "todo"),
+                    status,
                     completed_at,
                     task.get("category"),
                     task.get("priority"),

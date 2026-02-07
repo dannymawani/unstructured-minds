@@ -614,7 +614,7 @@ function App() {
         ) : view === 'kanban' ? (
           <Suspense fallback={<ViewLoadingFallback />}>
             <section className="flex-1 overflow-auto bg-background">
-              <KanbanBoard apiUrl={API_BASE_URL} />
+              <KanbanBoard apiUrl={API_BASE_URL} onFileSelect={handleFileSelect} />
             </section>
           </Suspense>
         ) : (
