@@ -1,9 +1,12 @@
 import { Clock } from 'lucide-react'
+import { useDraggable } from '@dnd-kit/core'
+import { cn } from '@/lib/utils'
 import type { KanbanTask } from './KanbanBoard'
 
 interface KanbanCardProps {
   task: KanbanTask
   onClick: () => void
+  isDragOverlay?: boolean
 }
 
 const priorityColors: Record<string, string> = {
@@ -31,7 +34,6 @@ function getPhaseNumber(phase: string | null): string | null {
   return match ? match[1] : null
 }
 
-/** Deadline is always YYYY-MM-DD from the API. */
 function getDeadlineUrgency(deadline: string | null): 'overdue' | 'urgent' | 'soon' | 'normal' | null {
   if (!deadline) return null
   const parsed = new Date(deadline + 'T23:59:59')
@@ -58,17 +60,14 @@ const urgencyStyles: Record<string, string> = {
   normal: 'text-zinc-400',
 }
 
-export function KanbanCard({ task, onClick }: KanbanCardProps) {
+function CardContent({ task }: { task: KanbanTask }) {
   const priorityClass = task.priority ? priorityColors[task.priority] || priorityColors['Medium'] : ''
   const phaseNum = getPhaseNumber(task.phase)
   const phaseClass = phaseNum ? phaseColors[phaseNum] || '' : 'bg-zinc-500/20 text-zinc-400'
   const deadlineUrgency = getDeadlineUrgency(task.deadline)
 
   return (
-    <div
-      onClick={onClick}
-      className="bg-zinc-900 border border-zinc-700 rounded-lg p-3 cursor-pointer hover:border-zinc-500 transition-colors text-zinc-100"
-    >
+    <>
       <h4 className="font-medium text-sm leading-tight mb-2 text-zinc-100">{task.title}</h4>
 
       {task.description && (
@@ -98,6 +97,35 @@ export function KanbanCard({ task, onClick }: KanbanCardProps) {
           </span>
         )}
       </div>
+    </>
+  )
+}
+
+export function KanbanCard({ task, onClick, isDragOverlay }: KanbanCardProps) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: task.id,
+  })
+
+  if (isDragOverlay) {
+    return (
+      <div className="bg-zinc-900 border border-zinc-500 rounded-lg p-3 text-zinc-100 shadow-xl ring-2 ring-primary/30">
+        <CardContent task={task} />
+      </div>
+    )
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      onClick={onClick}
+      className={cn(
+        'bg-zinc-900 border border-zinc-700 rounded-lg p-3 cursor-grab active:cursor-grabbing hover:border-zinc-500 transition-colors text-zinc-100',
+        isDragging && 'opacity-30'
+      )}
+    >
+      <CardContent task={task} />
     </div>
   )
 }

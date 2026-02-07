@@ -119,6 +119,16 @@ def init_database(db_path: Path | str) -> duckdb.DuckDBPyConnection:
     except duckdb.BinderException:
         conn.execute("ALTER TABLE kanban_tasks ADD COLUMN deadline DATE")
 
+    # Kanban task updates / notes timeline
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS kanban_task_updates (
+            id INTEGER PRIMARY KEY,
+            task_id VARCHAR NOT NULL,
+            note TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
     # File index table for fast file lookups
     conn.execute("""
         CREATE TABLE IF NOT EXISTS file_index (
