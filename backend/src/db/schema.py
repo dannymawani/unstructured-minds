@@ -159,9 +159,10 @@ def init_database(db_path: Path | str) -> duckdb.DuckDBPyConnection:
     """)
 
     # Extraction log table
+    conn.execute("CREATE SEQUENCE IF NOT EXISTS extraction_log_id_seq")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS extraction_log (
-            id INTEGER PRIMARY KEY,
+            id INTEGER PRIMARY KEY DEFAULT nextval('extraction_log_id_seq'),
             file_path VARCHAR NOT NULL,
             file_hash VARCHAR NOT NULL,
             extracted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
