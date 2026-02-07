@@ -9,6 +9,7 @@ import { CommandPalette, createDefaultCommands } from '@/components/CommandPalet
 import { SearchModal } from '@/components/Search'
 import { TemplatePicker } from '@/components/TemplatePicker'
 import { QuickCapture } from '@/components/QuickCapture'
+import { DailyNoteWizard } from '@/components/DailyNoteWizard'
 import { TagsPanel } from '@/components/TagsPanel'
 import { BacklinksPanel } from '@/components/BacklinksPanel'
 import { MobileNav } from '@/components/MobileNav'
@@ -21,6 +22,7 @@ import {
   FileText,
   Kanban,
   Calendar,
+  User,
   Sun,
   Moon,
   Settings,
@@ -38,6 +40,7 @@ import {
 const Dashboard = lazy(() => import('@/components/Dashboard/Dashboard').then(m => ({ default: m.Dashboard })))
 const KanbanBoard = lazy(() => import('@/components/Kanban/KanbanBoard').then(m => ({ default: m.KanbanBoard })))
 const CalendarView = lazy(() => import('@/components/Calendar/CalendarView').then(m => ({ default: m.CalendarView })))
+const LifeProfile = lazy(() => import('@/components/LifeProfile/LifeProfile').then(m => ({ default: m.LifeProfile })))
 
 // Loading fallback component
 function ViewLoadingFallback() {
@@ -51,7 +54,7 @@ function ViewLoadingFallback() {
   )
 }
 
-type View = 'editor' | 'dashboard' | 'kanban' | 'calendar'
+type View = 'editor' | 'dashboard' | 'kanban' | 'calendar' | 'profile'
 type SidebarTab = 'files' | 'tags' | 'links'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
@@ -67,6 +70,7 @@ function App() {
     if (path === 'dashboard') return 'dashboard'
     if (path === 'kanban') return 'kanban'
     if (path === 'calendar') return 'calendar'
+    if (path === 'profile') return 'profile'
     return 'editor'
   }, [location.pathname])
 
@@ -90,6 +94,10 @@ function App() {
   const [isMobileChatOpen, setIsMobileChatOpen] = useState(false)
   const [isChatExpanded, setIsChatExpanded] = useState(false)
   const [chatInitialMessage, setChatInitialMessage] = useState<string | undefined>()
+  const [isWizardOpen, setIsWizardOpen] = useState(false)
+  const [wizardDate, setWizardDate] = useState('')
+  const [wizardNoteContent, setWizardNoteContent] = useState('')
+  const [wizardNotePath, setWizardNotePath] = useState('')
 
   const fetchFileContent = useCallback(async (path: string) => {
     try {
@@ -231,6 +239,27 @@ function App() {
     }
   }, [isMobile, isTablet])
 
+  // Handle wizard completion — populate note, save with extraction
+  const handleWizardComplete = useCallback(async (populatedContent: string) => {
+    setIsWizardOpen(false)
+    setContent(populatedContent)
+    contentRef.current = populatedContent
+    setSelectedFile(wizardNotePath)
+    navigate(`/editor?file=${encodeURIComponent(wizardNotePath)}`)
+
+    // Save with extraction
+    try {
+      await fetch(`${API_BASE_URL}/vault/file?extract=true`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: wizardNotePath, content: populatedContent }),
+      })
+      isDirtyRef.current = false
+    } catch (err) {
+      console.error('Error saving wizard-populated note:', err)
+    }
+  }, [wizardNotePath, navigate])
+
   // Create or open today's daily note
   const createDailyNote = useCallback(async () => {
     const today = new Date()
@@ -254,16 +283,21 @@ function App() {
     } catch (err) {
       console.error('Error creating daily note:', err)
     }
-    // Always open the file - fetch content first, then set selectedFile
-    const fileContent = await fetchFileContent(dailyNotePath)
-    setContent(fileContent)
-    navigate(`/editor?file=${encodeURIComponent(dailyNotePath)}`)
-    setSelectedFile(dailyNotePath)
 
-    // Auto-expand chat with welcome prompt for new notes
+    // Fetch content
+    const fileContent = await fetchFileContent(dailyNotePath)
+
     if (isNewNote) {
-      setIsChatExpanded(true)
-      setChatInitialMessage(`I just created today's daily note. What should I focus on today?`)
+      // Open wizard for new notes
+      setWizardDate(dateStr)
+      setWizardNoteContent(fileContent)
+      setWizardNotePath(dailyNotePath)
+      setIsWizardOpen(true)
+    } else {
+      // Existing note — open directly
+      setContent(fileContent)
+      navigate(`/editor?file=${encodeURIComponent(dailyNotePath)}`)
+      setSelectedFile(dailyNotePath)
     }
   }, [fetchFileContent, navigate])
 
@@ -327,16 +361,21 @@ function App() {
           console.error('Error creating daily note:', err)
         }
       }
-      // Fetch content first, then set selectedFile
-      const fileContent = await fetchFileContent(dailyNotePath)
-      setContent(fileContent)
-      setSelectedFile(dailyNotePath)
-      navigate(`/editor?file=${encodeURIComponent(dailyNotePath)}`)
 
-      // Auto-expand chat with welcome prompt for new notes
+      // Fetch content
+      const fileContent = await fetchFileContent(dailyNotePath)
+
       if (!hasNote) {
-        setIsChatExpanded(true)
-        setChatInitialMessage(`I just created a daily note for ${date}. What should I focus on?`)
+        // Open wizard for new notes
+        setWizardDate(date)
+        setWizardNoteContent(fileContent)
+        setWizardNotePath(dailyNotePath)
+        setIsWizardOpen(true)
+      } else {
+        // Existing note — open directly
+        setContent(fileContent)
+        setSelectedFile(dailyNotePath)
+        navigate(`/editor?file=${encodeURIComponent(dailyNotePath)}`)
       }
     },
     [fetchFileContent, navigate]
@@ -354,6 +393,7 @@ function App() {
         onSwitchToDashboard: () => navigate('/dashboard'),
         onSwitchToKanban: () => navigate('/kanban'),
         onSwitchToCalendar: () => navigate('/calendar'),
+        onSwitchToProfile: () => navigate('/profile'),
         onSearch: openSearch,
         onNewFromTemplate: openTemplatePicker,
         onQuickCapture: openQuickCapture,
@@ -544,7 +584,7 @@ function App() {
               }
             </button>
             {isChatExpanded && (
-              <div className="h-72 border-t border-border/50 flex flex-col overflow-hidden">
+              <div className="h-96 border-t border-border/50 flex flex-col overflow-hidden">
                 <ChatPanel
                   apiBaseUrl={API_BASE_URL}
                   currentFile={selectedFile}
@@ -639,6 +679,15 @@ function App() {
                 <Calendar className="w-4 h-4" />
                 <span className="hidden lg:inline">Calendar</span>
               </Button>
+              <Button
+                variant={view === 'profile' ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={() => navigate('/profile')}
+                className="gap-1"
+              >
+                <User className="w-4 h-4" />
+                <span className="hidden lg:inline">Profile</span>
+              </Button>
             </div>
           )}
         </div>
@@ -727,6 +776,13 @@ function App() {
               </section>
             </Suspense>
           } />
+          <Route path="/profile" element={
+            <Suspense fallback={<ViewLoadingFallback />}>
+              <section className="flex-1 overflow-auto bg-background">
+                <LifeProfile apiUrl={API_BASE_URL} />
+              </section>
+            </Suspense>
+          } />
           <Route path="/editor" element={editorElement} />
           <Route path="/" element={editorElement} />
           <Route path="*" element={<Navigate to="/" replace />} />
@@ -772,6 +828,15 @@ function App() {
         isOpen={isQuickCaptureOpen}
         onClose={() => setIsQuickCaptureOpen(false)}
         apiBaseUrl={API_BASE_URL}
+      />
+
+      {/* Daily Note Wizard */}
+      <DailyNoteWizard
+        isOpen={isWizardOpen}
+        onClose={() => setIsWizardOpen(false)}
+        onComplete={handleWizardComplete}
+        noteContent={wizardNoteContent}
+        date={wizardDate}
       />
     </div>
   )
