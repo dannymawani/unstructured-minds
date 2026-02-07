@@ -1,6 +1,7 @@
+import { useRef } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { FileText, GripVertical } from 'lucide-react'
+import { FileText } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export interface Task {
@@ -39,6 +40,8 @@ function getFilename(path: string): string {
 }
 
 export function PersonalTaskCard({ task, onFileSelect }: PersonalTaskCardProps) {
+  const pointerStart = useRef<{ x: number; y: number } | null>(null)
+
   const {
     attributes,
     listeners,
@@ -58,9 +61,26 @@ export function PersonalTaskCard({ task, onFileSelect }: PersonalTaskCardProps) 
     ? categoryColors[task.category.toLowerCase()] || 'bg-zinc-500/20 text-zinc-400'
     : null
 
-  const handleClick = () => {
-    if (task.source_file && onFileSelect) {
-      onFileSelect(task.source_file)
+  // Merge our pointerDown tracker with dnd-kit's listener
+  const mergedListeners = {
+    ...listeners,
+    onPointerDown: (e: React.PointerEvent) => {
+      pointerStart.current = { x: e.clientX, y: e.clientY }
+      // Call dnd-kit's original handler
+      ;(listeners as Record<string, (e: React.PointerEvent) => void>)?.onPointerDown?.(e)
+    },
+  }
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    if (!pointerStart.current) return
+    const dx = e.clientX - pointerStart.current.x
+    const dy = e.clientY - pointerStart.current.y
+    pointerStart.current = null
+    // If pointer barely moved, treat as click
+    if (Math.abs(dx) < 5 && Math.abs(dy) < 5) {
+      if (task.source_file && onFileSelect) {
+        onFileSelect(task.source_file)
+      }
     }
   }
 
@@ -69,58 +89,47 @@ export function PersonalTaskCard({ task, onFileSelect }: PersonalTaskCardProps) 
       ref={setNodeRef}
       style={style}
       {...attributes}
+      {...mergedListeners}
+      onPointerUp={handlePointerUp}
       className={cn(
-        'bg-zinc-900 border border-zinc-700 rounded-lg p-3 flex gap-2',
+        'bg-zinc-900 border border-zinc-700 rounded-lg p-3 cursor-grab',
         'hover:border-zinc-500 transition-colors text-zinc-100',
+        'active:cursor-grabbing',
         isDragging && 'opacity-50 shadow-lg ring-2 ring-primary/50',
       )}
     >
-      {/* Drag handle */}
-      <div
-        {...listeners}
-        className="flex items-start pt-0.5 cursor-grab active:cursor-grabbing text-zinc-600 hover:text-zinc-400 touch-none"
-      >
-        <GripVertical className="w-4 h-4 flex-shrink-0" />
+      <p className="text-sm leading-tight mb-2 text-zinc-100">
+        {task.description}
+      </p>
+
+      <div className="flex flex-wrap items-center gap-1.5 mb-2">
+        {task.category && categoryClass && (
+          <span className={cn('text-xs px-2 py-0.5 rounded', categoryClass)}>
+            {task.category}
+          </span>
+        )}
+        {priority && (
+          <span
+            className={cn(
+              'text-xs px-2 py-0.5 rounded border',
+              priority.className
+            )}
+          >
+            {priority.label}
+          </span>
+        )}
       </div>
 
-      {/* Clickable content */}
-      <div
-        className={cn('flex-1 min-w-0', task.source_file && onFileSelect && 'cursor-pointer')}
-        onClick={handleClick}
-      >
-        <p className="text-sm leading-tight mb-2 text-zinc-100">
-          {task.description}
-        </p>
-
-        <div className="flex flex-wrap items-center gap-1.5 mb-2">
-          {task.category && categoryClass && (
-            <span className={cn('text-xs px-2 py-0.5 rounded', categoryClass)}>
-              {task.category}
+      <div className="flex items-center justify-between text-xs text-zinc-500">
+        <span>{task.date}</span>
+        {task.source_file && (
+          <span className="flex items-center gap-1 text-zinc-400">
+            <FileText className="w-3 h-3" />
+            <span className="max-w-[120px] truncate">
+              {getFilename(task.source_file)}
             </span>
-          )}
-          {priority && (
-            <span
-              className={cn(
-                'text-xs px-2 py-0.5 rounded border',
-                priority.className
-              )}
-            >
-              {priority.label}
-            </span>
-          )}
-        </div>
-
-        <div className="flex items-center justify-between text-xs text-zinc-500">
-          <span>{task.date}</span>
-          {task.source_file && (
-            <span className="flex items-center gap-1 text-zinc-400">
-              <FileText className="w-3 h-3" />
-              <span className="max-w-[120px] truncate">
-                {getFilename(task.source_file)}
-              </span>
-            </span>
-          )}
-        </div>
+          </span>
+        )}
       </div>
     </div>
   )
