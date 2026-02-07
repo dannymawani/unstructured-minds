@@ -1,6 +1,6 @@
 """Kanban API endpoints backed by DuckDB kanban_tasks table."""
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -26,7 +26,7 @@ class KanbanTask(BaseModel):
     depends_on: Optional[str] = None
     description: Optional[str] = None
     content: Optional[str] = None
-    deadline: Optional[str] = None
+    deadline: Optional[date] = None
     completed_at: Optional[str] = None
 
 
@@ -48,7 +48,7 @@ class KanbanTaskCreate(BaseModel):
     depends_on: Optional[str] = None
     description: Optional[str] = None
     content: Optional[str] = None
-    deadline: Optional[str] = Field(None, max_length=100, description="Deadline (e.g. 'Friday', '2026-02-14', 'end of sprint')")
+    deadline: Optional[date] = Field(None, description="Deadline date (YYYY-MM-DD)")
 
 
 class KanbanTaskUpdate(BaseModel):
@@ -60,7 +60,7 @@ class KanbanTaskUpdate(BaseModel):
     depends_on: Optional[str] = None
     description: Optional[str] = None
     content: Optional[str] = None
-    deadline: Optional[str] = Field(None, max_length=100)
+    deadline: Optional[date] = Field(None, description="Deadline date (YYYY-MM-DD)")
 
 
 # =============================================================================
@@ -90,7 +90,7 @@ def _row_to_task(row: tuple, columns: list[str]) -> KanbanTask:
         depends_on=data.get("depends_on"),
         description=data.get("description"),
         content=data.get("content"),
-        deadline=data.get("deadline"),
+        deadline=data["deadline"] if data.get("deadline") else None,
         completed_at=str(data["completed_at"]) if data.get("completed_at") else None,
     )
 

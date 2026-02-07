@@ -60,7 +60,7 @@ export function TaskModal({ task, onClose, onMove, onDelete }: TaskModalProps) {
               {task.deadline && (
                 <span className="flex items-center gap-1 text-xs bg-amber-500/20 text-amber-400 px-2 py-1 rounded">
                   <Clock className="w-3 h-3" />
-                  {task.deadline}
+                  {new Date(task.deadline + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                 </span>
               )}
             </div>

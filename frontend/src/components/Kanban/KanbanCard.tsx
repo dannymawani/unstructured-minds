@@ -31,34 +31,24 @@ function getPhaseNumber(phase: string | null): string | null {
   return match ? match[1] : null
 }
 
-/**
- * Try to parse a deadline string into a Date.
- * Returns null if the string isn't a recognizable date.
- */
-function parseDeadlineDate(deadline: string): Date | null {
-  // Try ISO format first (YYYY-MM-DD)
-  const isoMatch = deadline.match(/\d{4}-\d{2}-\d{2}/)
-  if (isoMatch) {
-    const d = new Date(isoMatch[0] + 'T23:59:59')
-    return isNaN(d.getTime()) ? null : d
-  }
-  // Try natural date parsing (e.g. "Feb 14", "February 14 2026")
-  const d = new Date(deadline)
-  return isNaN(d.getTime()) ? null : d
-}
-
+/** Deadline is always YYYY-MM-DD from the API. */
 function getDeadlineUrgency(deadline: string | null): 'overdue' | 'urgent' | 'soon' | 'normal' | null {
   if (!deadline) return null
-  const parsed = parseDeadlineDate(deadline)
-  if (!parsed) return 'normal' // Can't parse — just show it plainly
+  const parsed = new Date(deadline + 'T23:59:59')
+  if (isNaN(parsed.getTime())) return 'normal'
   const now = new Date()
   now.setHours(0, 0, 0, 0)
-  const diffMs = parsed.getTime() - now.getTime()
-  const diffDays = diffMs / (1000 * 60 * 60 * 24)
+  const diffDays = (parsed.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
   if (diffDays < 0) return 'overdue'
   if (diffDays <= 1) return 'urgent'
   if (diffDays <= 3) return 'soon'
   return 'normal'
+}
+
+function formatDeadline(deadline: string): string {
+  const d = new Date(deadline + 'T00:00:00')
+  if (isNaN(d.getTime())) return deadline
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 const urgencyStyles: Record<string, string> = {
@@ -90,7 +80,7 @@ export function KanbanCard({ task, onClick }: KanbanCardProps) {
       {task.deadline && (
         <div className={`flex items-center gap-1 text-xs mb-2 ${urgencyStyles[deadlineUrgency || 'normal']}`}>
           <Clock className="w-3 h-3" />
-          <span>{task.deadline}</span>
+          <span>{formatDeadline(task.deadline)}</span>
           {deadlineUrgency === 'overdue' && <span className="font-semibold">(overdue)</span>}
           {deadlineUrgency === 'urgent' && <span className="font-semibold">(today)</span>}
         </div>
