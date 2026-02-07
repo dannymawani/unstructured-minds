@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef } from 'react'
 import { Editor, rootCtx, defaultValueCtx } from '@milkdown/kit/core'
 import { commonmark } from '@milkdown/kit/preset/commonmark'
 import { gfm } from '@milkdown/kit/preset/gfm'
@@ -23,6 +23,10 @@ function EditorContent({
 }: EditorContentProps) {
   const autoSaveIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const isDirtyRef = useRef(false)
+  // Capture initial content so useEditor doesn't re-create on every keystroke
+  const initialContentRef = useRef(content)
+  const onChangeRef = useRef(onChange)
+  onChangeRef.current = onChange
 
   // Start interval-based autosave (disk-only, no extraction)
   useEffect(() => {
@@ -42,19 +46,11 @@ function EditorContent({
     }
   }, [onAutosave, autoSaveDelay])
 
-  const handleChange = useCallback(
-    (markdown: string) => {
-      onChange(markdown)
-      isDirtyRef.current = true
-    },
-    [onChange]
-  )
-
   useEditor((root) => {
     return Editor.make()
       .config((ctx) => {
         ctx.set(rootCtx, root)
-        ctx.set(defaultValueCtx, content)
+        ctx.set(defaultValueCtx, initialContentRef.current)
       })
       .use(commonmark)
       .use(gfm)
@@ -63,10 +59,11 @@ function EditorContent({
       .use(slash)
       .config((ctx) => {
         ctx.get(listenerCtx).markdownUpdated((_ctx, markdown) => {
-          handleChange(markdown)
+          onChangeRef.current(markdown)
+          isDirtyRef.current = true
         })
       })
-  }, [content])
+  }, [])
 
   useSlashPlugin()
 
