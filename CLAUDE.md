@@ -56,12 +56,15 @@ Markdown Note → Claude Extraction → CSV/DuckDB → Natural Language Query
 ### Data Storage Structure
 ```
 data/
-├── unstructured.duckdb       # Main database (all extracted data)
-├── settings.json             # User preferences
-└── schemas/*.json            # Schema definitions for extraction
+├── unstructured.duckdb           # Main database (all extracted data)
+├── settings.json                 # User preferences
+├── schemas/*.json                # Schema definitions for extraction
+├── exercise_definitions.json     # Exercise name aliases and muscle groups
+├── training_config.json          # Athlete profile, recovery targets
+└── injury_config.json            # Active injuries and constraints
 ```
 
-> **Note:** All extracted data lives in DuckDB tables. Schemas drive the extraction pipeline.
+> **Note:** Extracted data lives in DuckDB tables. Config/reference files (exercise definitions, training profile, injuries) stay as JSON for easy hand-editing and git tracking.
 
 ## Development Workflow
 
