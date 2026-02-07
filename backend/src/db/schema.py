@@ -130,10 +130,28 @@ def init_database(db_path: Path | str) -> duckdb.DuckDBPyConnection:
     conn.execute("UPDATE tasks SET status = 'backlog' WHERE status IN ('pending', 'todo')")
     conn.execute("UPDATE tasks SET status = 'done' WHERE status = 'completed'")
     conn.execute("UPDATE tasks SET status = 'in_progress' WHERE status = 'rolled_over'")
-    # Backfill completed_at for done/cancelled tasks using task date
+    # Backfill completed_at for done/cancelled tasks that don't already have one
     conn.execute("""
         UPDATE tasks SET completed_at = CAST(date AS TIMESTAMP)
-        WHERE status IN ('done', 'cancelled')
+        WHERE status IN ('done', 'cancelled') AND completed_at IS NULL
+    """)
+
+    # Migration: deduplicate tasks — keep oldest per (source_file, description),
+    # delete newer duplicates
+    conn.execute("""
+        DELETE FROM tasks
+        WHERE id IN (
+            SELECT id FROM (
+                SELECT id,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY source_file, description
+                           ORDER BY extracted_at ASC, id ASC
+                       ) AS rn
+                FROM tasks
+                WHERE source_file IS NOT NULL
+            ) ranked
+            WHERE rn > 1
+        )
     """)
 
     # Kanban task updates / notes timeline
