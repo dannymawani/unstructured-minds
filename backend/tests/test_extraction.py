@@ -47,6 +47,9 @@ class MockResult:
     def fetchall(self):
         return self._data
 
+    def fetchone(self):
+        return self._data[0] if self._data else None
+
 
 @pytest.fixture
 def mock_db():
