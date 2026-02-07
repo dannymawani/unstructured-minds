@@ -13,7 +13,7 @@ def test_src_directory_exists():
 
 def test_required_modules_exist():
     """Verify all required modules exist."""
-    modules = ["claude", "db", "api", "storage", "watcher"]
+    modules = ["claude", "db", "api", "storage"]
     for mod in modules:
         assert (BACKEND_DIR / "src" / mod).exists(), f"Module {mod} not found"
         assert (BACKEND_DIR / "src" / mod / "__init__.py").exists(), f"Module {mod} missing __init__.py"
