@@ -14,6 +14,24 @@ You have access to their notes, exercise logs, daily metrics, and tasks.
 Answer concisely and accurately based on the context provided."""
 
 
+NOTE_ASSIST_SYSTEM_PROMPT = """You are a note assistant that helps the user edit and update their markdown notes.
+You can see the current note content and help the user add, modify, or reorganize information.
+
+When the user asks you to update the note (add a task, log a meal, record a workout, etc.),
+return the full updated note content wrapped in <note-update>...</note-update> tags.
+Outside the tags, provide a brief conversational reply explaining what you changed.
+
+If the user is just asking a question about the note (not requesting changes), respond normally without the tags.
+
+Rules for note updates:
+- Preserve all existing content and formatting
+- Add new content in the appropriate section
+- Follow the existing markdown style and structure of the note
+- If the note has frontmatter (---), keep it intact
+- For daily notes, add tasks under ## Tasks, meals under ## Meals, workouts under ## Workout, etc.
+- If the relevant section doesn't exist, create it in a logical position"""
+
+
 class ClaudeClient:
     """Client for interacting with Claude API."""
 
@@ -85,6 +103,71 @@ class ClaudeClient:
         )
 
         return response.content[0].text
+
+    async def note_assist(
+        self,
+        message: str,
+        file_path: str | None = None,
+        file_content: str | None = None,
+        images: list[dict[str, str]] | None = None,
+    ) -> dict[str, Any]:
+        """Assist with editing a note, with optional image support.
+
+        Args:
+            message: User's message/instruction
+            file_path: Path of the current note
+            file_content: Current markdown content of the note
+            images: Optional list of {"data": base64, "media_type": "image/png"}
+
+        Returns:
+            Dict with "reply" (str) and optional "updated_content" (str or None)
+        """
+        # Build content array for multimodal support
+        content_parts: list[dict[str, Any]] = []
+
+        # Add images first if present
+        if images:
+            for img in images:
+                content_parts.append({
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": img["media_type"],
+                        "data": img["data"],
+                    },
+                })
+
+        # Build text prompt with note context
+        text_parts = []
+        if file_path:
+            text_parts.append(f"Current file: {file_path}")
+        if file_content:
+            text_parts.append(f"Current note content:\n```markdown\n{file_content}\n```")
+        text_parts.append(f"User request: {message}")
+
+        content_parts.append({"type": "text", "text": "\n\n".join(text_parts)})
+
+        response = await self._call_with_retry(
+            self._create_message,
+            model=self.model_smart,
+            max_tokens=8192,
+            system=NOTE_ASSIST_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": content_parts}],
+        )
+
+        response_text = response.content[0].text
+
+        # Parse <note-update> tags from response
+        import re
+        match = re.search(r"<note-update>(.*?)</note-update>", response_text, re.DOTALL)
+
+        if match:
+            updated_content = match.group(1).strip()
+            # Remove the tags from the reply
+            reply = re.sub(r"<note-update>.*?</note-update>", "", response_text, flags=re.DOTALL).strip()
+            return {"reply": reply, "updated_content": updated_content}
+
+        return {"reply": response_text, "updated_content": None}
 
     async def execute_skill(
         self, system_prompt: str, user_prompt: str
