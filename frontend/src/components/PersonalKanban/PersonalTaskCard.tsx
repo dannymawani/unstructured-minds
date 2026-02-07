@@ -1,6 +1,6 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { FileText } from 'lucide-react'
+import { FileText, GripVertical } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export interface Task {
@@ -69,56 +69,58 @@ export function PersonalTaskCard({ task, onFileSelect }: PersonalTaskCardProps) 
       ref={setNodeRef}
       style={style}
       {...attributes}
-      {...listeners}
-      onClick={handleClick}
       className={cn(
-        'bg-zinc-900 border border-zinc-700 rounded-lg p-3 cursor-grab',
+        'bg-zinc-900 border border-zinc-700 rounded-lg p-3 flex gap-2',
         'hover:border-zinc-500 transition-colors text-zinc-100',
-        'active:cursor-grabbing',
         isDragging && 'opacity-50 shadow-lg ring-2 ring-primary/50',
-        task.source_file && onFileSelect && 'cursor-pointer'
       )}
     >
-      <p className="text-sm leading-tight mb-2 text-zinc-100">
-        {task.description}
-      </p>
-
-      <div className="flex flex-wrap items-center gap-1.5 mb-2">
-        {task.category && categoryClass && (
-          <span className={cn('text-xs px-2 py-0.5 rounded', categoryClass)}>
-            {task.category}
-          </span>
-        )}
-        {priority && (
-          <span
-            className={cn(
-              'text-xs px-2 py-0.5 rounded border',
-              priority.className
-            )}
-          >
-            {priority.label}
-          </span>
-        )}
+      {/* Drag handle */}
+      <div
+        {...listeners}
+        className="flex items-start pt-0.5 cursor-grab active:cursor-grabbing text-zinc-600 hover:text-zinc-400 touch-none"
+      >
+        <GripVertical className="w-4 h-4 flex-shrink-0" />
       </div>
 
-      <div className="flex items-center justify-between text-xs text-zinc-500">
-        <span>{task.date}</span>
-        {task.source_file && onFileSelect && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              onFileSelect(task.source_file!)
-            }}
-            className="flex items-center gap-1 text-zinc-400 hover:text-zinc-200 transition-colors"
-            title={task.source_file}
-          >
-            <FileText className="w-3 h-3" />
-            <span className="max-w-[120px] truncate">
-              {getFilename(task.source_file)}
+      {/* Clickable content */}
+      <div
+        className={cn('flex-1 min-w-0', task.source_file && onFileSelect && 'cursor-pointer')}
+        onClick={handleClick}
+      >
+        <p className="text-sm leading-tight mb-2 text-zinc-100">
+          {task.description}
+        </p>
+
+        <div className="flex flex-wrap items-center gap-1.5 mb-2">
+          {task.category && categoryClass && (
+            <span className={cn('text-xs px-2 py-0.5 rounded', categoryClass)}>
+              {task.category}
             </span>
-          </button>
-        )}
+          )}
+          {priority && (
+            <span
+              className={cn(
+                'text-xs px-2 py-0.5 rounded border',
+                priority.className
+              )}
+            >
+              {priority.label}
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between text-xs text-zinc-500">
+          <span>{task.date}</span>
+          {task.source_file && (
+            <span className="flex items-center gap-1 text-zinc-400">
+              <FileText className="w-3 h-3" />
+              <span className="max-w-[120px] truncate">
+                {getFilename(task.source_file)}
+              </span>
+            </span>
+          )}
+        </div>
       </div>
     </div>
   )
