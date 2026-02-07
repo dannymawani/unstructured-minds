@@ -11,7 +11,7 @@ This repo contains the original working implementation of:
 - Data extraction from markdown notes
 - CSV storage patterns and schemas
 - Daily note workflows
-- Skills and automation scripts
+- Skills and automation
 
 ### Key Reference Paths in Obsidian Repo
 
@@ -19,7 +19,6 @@ This repo contains the original working implementation of:
 |------|------|
 | Data schemas | `/Users/dmh/Code/obsedian/data/schemas/` |
 | CSV data | `/Users/dmh/Code/obsedian/data/` |
-| Python scripts | `/Users/dmh/Code/obsedian/scripts/` |
 | Daily notes | `/Users/dmh/Code/obsedian/secondbrain/Daily-Notes/` |
 | Templates | `/Users/dmh/Code/obsedian/secondbrain/Templates/` |
 | Claude config | `/Users/dmh/Code/obsedian/CLAUDE.md` |
@@ -207,4 +206,4 @@ These skills provide context automatically when relevant:
 
 ---
 
-**Last Updated**: 2026-02-06
+**Last Updated**: 2026-02-07
