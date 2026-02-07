@@ -135,7 +135,6 @@ git checkout -b feature/phase0-init
 | Task | Test | Acceptance Criteria |
 |------|------|---------------------|
 | Compare schemas with obsidian reference repo | `test_schema_alignment.py` | No conflicts |
-| Update demo_examples schemas to match decisions | N/A | Schemas use descriptive names |
 | Create activities.json schema | N/A | Activities table defined |
 | Validate ID generation patterns | N/A | Composite key format documented |
 

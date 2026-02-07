@@ -53,29 +53,15 @@ Markdown Note → Claude Extraction → CSV/DuckDB → Natural Language Query
 - **CSV dates**: `YYYY-MM-DD`
 - **Daily note path**: `Daily-Notes/YYYY-MM/YYYY-MM-DD.md`
 
-### CSV Storage Structure
+### Data Storage Structure
 ```
 data/
-├── exercise_log.csv          # Single file per data type
-├── food_log.csv              # DuckDB handles filtering by date
-├── daily_metrics.csv
-├── daily_tasks.csv
-├── schemas/*.json
-├── exercise_definitions.json  # Exercise name aliases and muscle groups
-├── training_config.json       # Athlete profile, recovery targets
-└── injury_config.json         # Active injuries and constraints
+├── unstructured.duckdb       # Main database (all extracted data)
+├── settings.json             # User preferences
+└── schemas/*.json            # Schema definitions for extraction
 ```
 
-> **Simplified:** No date-partitioned folders. DuckDB queries flat CSVs efficiently at personal data volumes.
-
-## Demo Examples
-
-The `demo_examples/` folder contains reference implementations showing:
-- Input markdown notes
-- Expected extracted CSV data
-- Schema definitions
-
-Use these as the ground truth for how extraction should work.
+> **Note:** All extracted data lives in DuckDB tables. Schemas drive the extraction pipeline.
 
 ## Development Workflow
 

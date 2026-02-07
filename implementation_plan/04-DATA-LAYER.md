@@ -30,12 +30,9 @@ vault/                          # User's markdown notes (volume mount)
 
 data/                           # App data (volume mount)
 ├── unstructured.duckdb         # Main database (single file)
-├── exercise_log.csv            # Flat CSV files
-├── food_log.csv
-├── daily_metrics.csv
-├── daily_tasks.csv
+├── settings.json               # User preferences
 └── schemas/
-    └── *.json
+    └── *.json                  # Schema definitions for extraction
 
 config/                         # Configuration (volume mount)
 ├── settings.json
