@@ -27,6 +27,7 @@ from .api.tasks import router as tasks_router
 from .api.health import router as health_router, set_start_time
 from .api.metrics import router as metrics_router
 from .api.insights import router as insights_router
+from .api.note_assist import router as note_assist_router
 from .claude import ClaudeClient
 from .db import DatabaseManager
 from .middleware import limiter, SecurityHeadersMiddleware, RequestLoggingMiddleware
@@ -134,6 +135,7 @@ app.include_router(templates_router)
 app.include_router(tags_router)
 app.include_router(tasks_router)
 app.include_router(insights_router)
+app.include_router(note_assist_router)
 
 
 if __name__ == "__main__":

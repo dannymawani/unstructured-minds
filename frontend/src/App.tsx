@@ -29,6 +29,8 @@ import {
   Loader2,
   Menu,
   MessageSquare,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react'
 
 // Lazy load heavy view components for code splitting
@@ -73,6 +75,7 @@ function App() {
   const { isMobile, isTablet } = useMobile()
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
   const [isMobileChatOpen, setIsMobileChatOpen] = useState(false)
+  const [isChatExpanded, setIsChatExpanded] = useState(false)
 
   const fetchFileContent = useCallback(async (path: string) => {
     try {
@@ -109,6 +112,13 @@ function App() {
   const handleContentChange = useCallback((markdown: string) => {
     setContent(markdown)
     contentRef.current = markdown
+    isDirtyRef.current = true
+  }, [])
+
+  // Called by ChatPanel when note-assist returns updated content
+  const handleNoteContentUpdate = useCallback((newContent: string) => {
+    setContent(newContent)
+    contentRef.current = newContent
     isDirtyRef.current = true
   }, [])
 
@@ -565,7 +575,7 @@ function App() {
               </Drawer>
             )}
 
-            {/* Editor */}
+            {/* Editor + Chat below */}
             <section className="flex-1 flex flex-col min-h-0 overflow-hidden">
               {selectedFile ? (
                 <div className="flex-1 overflow-auto p-2 sm:p-4">
@@ -585,14 +595,34 @@ function App() {
                   </p>
                 </div>
               )}
-            </section>
 
-            {/* Desktop Chat panel */}
-            {!isMobile && !isTablet && (
-              <aside className="w-80 border-l flex flex-col overflow-hidden">
-                <ChatPanel apiBaseUrl={API_BASE_URL} />
-              </aside>
-            )}
+              {/* Desktop Chat panel — below editor, collapsible */}
+              {!isMobile && !isTablet && (
+                <>
+                  <button
+                    onClick={() => setIsChatExpanded(prev => !prev)}
+                    className="flex items-center justify-center gap-2 px-3 py-1.5 border-t text-xs text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
+                  >
+                    <MessageSquare className="h-3.5 w-3.5" />
+                    <span>{isChatExpanded ? 'Hide Chat' : 'Chat'}</span>
+                    {isChatExpanded
+                      ? <ChevronDown className="h-3.5 w-3.5" />
+                      : <ChevronUp className="h-3.5 w-3.5" />
+                    }
+                  </button>
+                  {isChatExpanded && (
+                    <div className="h-72 border-t flex flex-col overflow-hidden">
+                      <ChatPanel
+                        apiBaseUrl={API_BASE_URL}
+                        currentFile={selectedFile}
+                        currentContent={content}
+                        onContentUpdate={handleNoteContentUpdate}
+                      />
+                    </div>
+                  )}
+                </>
+              )}
+            </section>
 
             {/* Mobile/Tablet Chat Drawer */}
             {(isMobile || isTablet) && (
@@ -602,7 +632,12 @@ function App() {
                 position={isMobile ? 'bottom' : 'right'}
                 title="Chat"
               >
-                <ChatPanel apiBaseUrl={API_BASE_URL} />
+                <ChatPanel
+                  apiBaseUrl={API_BASE_URL}
+                  currentFile={selectedFile}
+                  currentContent={content}
+                  onContentUpdate={handleNoteContentUpdate}
+                />
               </Drawer>
             )}
           </>
