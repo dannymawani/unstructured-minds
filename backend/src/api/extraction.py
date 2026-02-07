@@ -1,9 +1,12 @@
 """Extraction API endpoints."""
 
+import json
+from collections.abc import AsyncGenerator
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
+from sse_starlette.sse import EventSourceResponse
 
 from ..claude import ClaudeClient
 from ..db import DatabaseManager
@@ -37,6 +40,14 @@ class ExtractResponse(BaseModel):
     message: str
     records_inserted: Optional[dict[str, int]] = None
     data: Optional[dict[str, Any]] = None
+
+
+class ExtractAllRequest(BaseModel):
+    """Request to extract all files in the vault."""
+
+    force: bool = True  # Default true — this is for recovery
+    schema_name: Optional[str] = None
+    exclude_prefixes: list[str] = ["Templates/"]
 
 
 class ExtractBatchRequest(BaseModel):
@@ -214,3 +225,92 @@ async def extract_batch(
         failed=failed,
         results=results,
     )
+
+
+@router.post("/extract/all")
+async def extract_all(
+    request: Request,
+    body: ExtractAllRequest,
+    db: DatabaseManager = Depends(get_db),
+    storage: StorageBackend = Depends(get_storage),
+    claude: ClaudeClient = Depends(get_claude),
+) -> EventSourceResponse:
+    """Re-extract all markdown files in the vault via SSE.
+
+    Discovers all .md files, filters out excluded prefixes (e.g. Templates/),
+    and runs each through the extraction pipeline. Streams progress as
+    Server-Sent Events so callers can monitor without timeout.
+
+    Usage:
+        curl -N -X POST http://localhost:8000/extract/all \\
+          -H "Content-Type: application/json" \\
+          -d '{"force": true}'
+    """
+    all_files = await storage.list("")
+    md_files = [
+        f for f in all_files
+        if f.endswith(".md")
+        and not any(f.startswith(prefix) for prefix in body.exclude_prefixes)
+    ]
+    md_files.sort()
+
+    async def event_generator() -> AsyncGenerator[dict[str, str], None]:
+        total = len(md_files)
+        yield {"event": "start", "data": json.dumps({"total": total})}
+
+        pipeline = ExtractionPipeline(db, claude)
+        successful = 0
+        failed = 0
+
+        for i, file_path in enumerate(md_files):
+            try:
+                content_bytes = await storage.read(file_path)
+                content = content_bytes.decode("utf-8")
+                result = await pipeline.extract(
+                    file_path,
+                    content,
+                    force=body.force,
+                    schema_name=body.schema_name,
+                )
+                if result.success:
+                    successful += 1
+                    message = result.error or "Extraction complete"
+                else:
+                    failed += 1
+                    message = result.error or "Extraction failed"
+
+                yield {
+                    "event": "progress",
+                    "data": json.dumps({
+                        "file": file_path,
+                        "success": result.success,
+                        "message": message,
+                        "records_inserted": result.records_inserted,
+                        "index": i + 1,
+                        "total": total,
+                    }),
+                }
+            except Exception as e:
+                failed += 1
+                yield {
+                    "event": "progress",
+                    "data": json.dumps({
+                        "file": file_path,
+                        "success": False,
+                        "message": str(e),
+                        "records_inserted": None,
+                        "index": i + 1,
+                        "total": total,
+                    }),
+                }
+
+        yield {
+            "event": "done",
+            "data": json.dumps({
+                "total": total,
+                "successful": successful,
+                "failed": failed,
+            }),
+        }
+
+    return EventSourceResponse(event_generator())
