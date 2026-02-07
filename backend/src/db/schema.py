@@ -107,7 +107,7 @@ def init_database(db_path: Path | str) -> duckdb.DuckDBPyConnection:
             depends_on VARCHAR,
             description VARCHAR,
             content TEXT,
-            deadline VARCHAR,
+            deadline DATE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             completed_at TIMESTAMP
         )
@@ -117,7 +117,7 @@ def init_database(db_path: Path | str) -> duckdb.DuckDBPyConnection:
     try:
         conn.execute("SELECT deadline FROM kanban_tasks LIMIT 0")
     except duckdb.BinderException:
-        conn.execute("ALTER TABLE kanban_tasks ADD COLUMN deadline VARCHAR")
+        conn.execute("ALTER TABLE kanban_tasks ADD COLUMN deadline DATE")
 
     # File index table for fast file lookups
     conn.execute("""

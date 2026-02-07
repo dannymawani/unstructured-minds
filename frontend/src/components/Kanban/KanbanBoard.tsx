@@ -201,11 +201,10 @@ export function KanbanBoard({ apiUrl }: KanbanBoardProps) {
                 <option value="low">Low</option>
               </select>
               <input
-                type="text"
+                type="date"
                 value={newDeadline}
                 onChange={(e) => setNewDeadline(e.target.value)}
-                placeholder="Deadline (e.g. Friday, Feb 14)"
-                className="flex-1 min-w-[180px] rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                className="flex-1 min-w-[150px] rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               />
               <Button type="submit" size="sm" disabled={!newTitle.trim() || creating}>
                 {creating ? 'Creating...' : 'Add Task'}
