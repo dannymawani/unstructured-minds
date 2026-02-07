@@ -76,6 +76,7 @@ function App() {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
   const [isMobileChatOpen, setIsMobileChatOpen] = useState(false)
   const [isChatExpanded, setIsChatExpanded] = useState(false)
+  const [chatInitialMessage, setChatInitialMessage] = useState<string | undefined>()
 
   const fetchFileContent = useCallback(async (path: string) => {
     try {
@@ -210,14 +211,20 @@ function App() {
     const year = today.getFullYear()
     const month = String(today.getMonth() + 1).padStart(2, '0')
     const day = String(today.getDate()).padStart(2, '0')
-    const dailyNotePath = `Daily-Notes/${year}-${month}/${year}-${month}-${day}.md`
+    const dateStr = `${year}-${month}-${day}`
+    const dailyNotePath = `Daily-Notes/${year}-${month}/${dateStr}.md`
 
+    let isNewNote = false
     try {
-      await fetch(`${API_BASE_URL}/vault/daily-note`, {
+      const res = await fetch(`${API_BASE_URL}/calendar/daily-note`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: `${year}-${month}-${day}` }),
+        body: JSON.stringify({ date: dateStr }),
       })
+      if (res.ok) {
+        const data = await res.json()
+        isNewNote = data.created
+      }
     } catch (err) {
       console.error('Error creating daily note:', err)
     }
@@ -226,6 +233,12 @@ function App() {
     setContent(fileContent)
     setView('editor')
     setSelectedFile(dailyNotePath)
+
+    // Auto-expand chat with welcome prompt for new notes
+    if (isNewNote) {
+      setIsChatExpanded(true)
+      setChatInitialMessage(`I just created today's daily note. What should I focus on today?`)
+    }
   }, [fetchFileContent])
 
   // Open command palette
@@ -293,6 +306,12 @@ function App() {
       setContent(fileContent)
       setView('editor')
       setSelectedFile(dailyNotePath)
+
+      // Auto-expand chat with welcome prompt for new notes
+      if (!hasNote) {
+        setIsChatExpanded(true)
+        setChatInitialMessage(`I just created a daily note for ${date}. What should I focus on?`)
+      }
     },
     [fetchFileContent]
   )
@@ -628,6 +647,7 @@ function App() {
                         currentFile={selectedFile}
                         currentContent={content}
                         onContentUpdate={handleNoteContentUpdate}
+                        initialMessage={chatInitialMessage}
                       />
                     </div>
                   )}
@@ -648,6 +668,7 @@ function App() {
                   currentFile={selectedFile}
                   currentContent={content}
                   onContentUpdate={handleNoteContentUpdate}
+                  initialMessage={chatInitialMessage}
                 />
               </Drawer>
             )}

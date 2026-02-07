@@ -2,13 +2,13 @@
 
 from calendar import monthrange
 from datetime import date
-from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel
 
 from ..db import DatabaseManager
 from ..storage import StorageBackend
+from ..templates.daily_note import render_daily_note
 
 
 router = APIRouter(prefix="/calendar", tags=["calendar"])
@@ -209,22 +209,10 @@ async def create_or_get_daily_note(
         content = content_bytes.decode("utf-8")
         return DailyNoteResponse(path=path, created=False, content=content)
 
-    # Create new note from template
-    weekday = date_obj.strftime("%A")
-    template = f"""# {request.date} - {weekday}
-
-## Morning
-
-## Tasks
-- [ ]
-
-## Notes
-
-## Evening Reflection
-
-"""
+    # Create new note from shared template
+    content = render_daily_note(request.date)
 
     # Write the new note
-    await storage.write(path, template.encode("utf-8"))
+    await storage.write(path, content.encode("utf-8"))
 
-    return DailyNoteResponse(path=path, created=True, content=template)
+    return DailyNoteResponse(path=path, created=True, content=content)

@@ -28,8 +28,21 @@ Rules for note updates:
 - Add new content in the appropriate section
 - Follow the existing markdown style and structure of the note
 - If the note has frontmatter (---), keep it intact
-- For daily notes, add tasks under ## Tasks, meals under ## Meals, workouts under ## Workout, etc.
-- If the relevant section doesn't exist, create it in a logical position"""
+- If the relevant section doesn't exist, create it in a logical position
+
+Daily note section mapping — place content in the correct section:
+- Tasks and to-dos → ## 🎯 Today's Focus (use `- [ ] description` checkbox format)
+- Quick notes, random thoughts, captures → ## 📝 Adhoc Notes (use `- item` format)
+- Work items, meetings, projects → ## 💼 Work
+- Personal items, errands, life admin → ## 🤷🏽 Personal
+- Workouts → ## 🏋️ Training & Health > ### Workout (use structured format: **Type**, **Focus**, then sets/reps)
+- Sleep, energy, nutrition ratings → ## 🏋️ Training & Health > ### Energy & Recovery (use `X/10` rating format)
+
+Formatting guidelines:
+- Workouts: `- **Type**: Strength` / `- **Focus**: Upper Body` / then `- Exercise: sets x reps @ weight`
+- Meals: `- Meal name: description, ~calories cal (P/C/F: Xg/Xg/Xg)` if the user provides macros
+- Tasks: `- [ ] description` (always use checkbox format)
+- Sleep/Energy/Nutrition: `Sleep: 7.5h (8/10)` or just `Sleep: 8/10`"""
 
 
 class ClaudeClient:

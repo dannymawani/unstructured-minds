@@ -1,7 +1,7 @@
 """API routes for vault file operations."""
 
 import re
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, Request, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -11,6 +11,7 @@ from ..db import DatabaseManager
 from ..middleware import validate_file_path, PathValidationError
 from ..middleware.validation import MAX_FILE_PATH_LENGTH, MAX_QUERY_LENGTH
 from ..storage import StorageBackend
+from ..templates.daily_note import render_daily_note
 
 router = APIRouter()
 
@@ -278,22 +279,6 @@ async def delete_file(
 # Quick Capture Endpoint
 # =============================================================================
 
-# Daily note template for quick capture (minimal version)
-QUICK_CAPTURE_DAILY_NOTE_TEMPLATE = """---
-date: {date}
-type: daily-note
-tags:
-  - daily
-  - journal
----
-
-## Quick Notes
-
-{quick_note}
-
----
-**Previous**: [[{prev_date}]] | **Next**: [[{next_date}]]
-"""
 
 
 @router.post("/vault/quick-capture", response_model=QuickCaptureResponse)
@@ -303,7 +288,7 @@ async def quick_capture(
 ) -> QuickCaptureResponse:
     """Quick capture - append text to today's daily note.
 
-    Appends the text with a timestamp to the "## Quick Notes" section
+    Appends the text with a timestamp to the Adhoc Notes section
     of today's daily note. Creates the daily note if it doesn't exist.
 
     Args:
@@ -316,8 +301,6 @@ async def quick_capture(
     date_str = now.strftime("%Y-%m-%d")
     time_str = now.strftime("%H:%M")
     year_month = now.strftime("%Y-%m")
-    prev_date = (now - timedelta(days=1)).strftime("%Y-%m-%d")
-    next_date = (now + timedelta(days=1)).strftime("%Y-%m-%d")
 
     # Build the file path: Daily-Notes/YYYY-MM/YYYY-MM-DD.md
     file_path = f"Daily-Notes/{year_month}/{date_str}.md"
@@ -332,9 +315,9 @@ async def quick_capture(
             content_bytes = await storage.read(file_path)
             content = content_bytes.decode("utf-8")
 
-            # Find the "## Quick Notes" section and append to it
-            quick_notes_pattern = r"(## Quick Notes\n)"
-            match = re.search(quick_notes_pattern, content)
+            # Find the Adhoc Notes section and append to it
+            adhoc_pattern = r"(## .*Adhoc Notes\n)"
+            match = re.search(adhoc_pattern, content)
 
             if match:
                 # Insert the new entry after the section header
@@ -350,7 +333,7 @@ async def quick_capture(
                     insert_pos = frontmatter_end + 3
                     new_content = (
                         content[:insert_pos]
-                        + "\n\n## Quick Notes\n"
+                        + "\n\n## 📝 Adhoc Notes\n"
                         + quick_note_entry
                         + "\n"
                         + content[insert_pos:]
@@ -358,18 +341,20 @@ async def quick_capture(
                 else:
                     # No frontmatter, prepend
                     new_content = (
-                        "## Quick Notes\n" + quick_note_entry + "\n\n" + content
+                        "## 📝 Adhoc Notes\n" + quick_note_entry + "\n\n" + content
                     )
 
             await storage.write(file_path, new_content.encode("utf-8"))
         else:
-            # Create new daily note with the quick capture
-            content = QUICK_CAPTURE_DAILY_NOTE_TEMPLATE.format(
-                date=date_str,
-                quick_note=quick_note_entry,
-                prev_date=prev_date,
-                next_date=next_date,
-            )
+            # Create new daily note from shared template, then append quick capture
+            content = render_daily_note(date_str)
+            # Insert quick note entry under the Adhoc Notes section
+            adhoc_match = re.search(r"(## .*Adhoc Notes\n)", content)
+            if adhoc_match:
+                insert_pos = adhoc_match.end()
+                content = (
+                    content[:insert_pos] + quick_note_entry + "\n" + content[insert_pos:]
+                )
             await storage.write(file_path, content.encode("utf-8"))
 
         return QuickCaptureResponse(
