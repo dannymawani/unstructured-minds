@@ -102,7 +102,7 @@ export function ActivityHeatmap({
     const currentDate = new Date(firstDay);
     let currentWeek: { date: Date; data: HeatmapDay | null }[] = [];
 
-    while (currentDate <= endDate || currentWeek.length < 7) {
+    while (currentDate <= endDate || (currentWeek.length > 0 && currentWeek.length < 7)) {
       const dateStr = currentDate.toISOString().split('T')[0];
       const isInYear = currentDate.getFullYear() === year;
 

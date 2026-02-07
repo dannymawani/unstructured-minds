@@ -1,16 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-  PieChart,
-  Pie,
-} from 'recharts';
 import { Activity, LayoutGrid, PieChart as PieIcon } from 'lucide-react';
+import { cachedFetch } from '../../lib/cachedFetch';
 
 interface ActivitySummary {
   activity_type: string;
@@ -44,58 +34,6 @@ const COLORS: Record<string, string> = {
   other: '#6b7280',
 };
 
-interface ChartDataPoint {
-  name: string;
-  duration: number;
-  count: number;
-  type: string;
-  percentage: number;
-}
-
-interface CustomTooltipProps {
-  active?: boolean;
-  payload?: Array<{
-    value: number;
-    dataKey: string;
-    payload: ChartDataPoint;
-  }>;
-}
-
-function CustomTooltip({ active, payload }: CustomTooltipProps) {
-  if (!active || !payload || !payload.length) return null;
-
-  const data = payload[0].payload;
-  const hours = Math.floor(data.duration / 60);
-  const minutes = data.duration % 60;
-  const timeStr = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
-
-  return (
-    <div className="bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm shadow-xl">
-      <div className="font-medium text-white mb-2 flex items-center gap-2">
-        <span
-          className="w-3 h-3 rounded-sm"
-          style={{ backgroundColor: COLORS[data.type] || COLORS.other }}
-        />
-        {data.name}
-      </div>
-      <div className="space-y-1 text-xs">
-        <div className="flex justify-between gap-4">
-          <span className="text-zinc-400">Duration:</span>
-          <span className="text-white font-medium">{timeStr}</span>
-        </div>
-        <div className="flex justify-between gap-4">
-          <span className="text-zinc-400">Sessions:</span>
-          <span className="text-white">{data.count}</span>
-        </div>
-        <div className="flex justify-between gap-4">
-          <span className="text-zinc-400">Share:</span>
-          <span className="text-white">{data.percentage.toFixed(1)}%</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 type ChartType = 'bar' | 'pie';
 
 export function WeeklyActivityChart({
@@ -107,46 +45,40 @@ export function WeeklyActivityChart({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [chartType, setChartType] = useState<ChartType>('bar');
+  const [hovered, setHovered] = useState<number | null>(null);
 
   useEffect(() => {
-    async function fetchData() {
-      try {
-        const response = await fetch(`${apiUrl}/dashboard/weekly-activity?days=${days}`);
-        if (!response.ok) throw new Error('Failed to fetch activity data');
-        const result = await response.json();
-        setData(result);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchData();
+    cachedFetch<WeeklyActivityData>(`${apiUrl}/dashboard/weekly-activity?days=${days}`)
+      .then(setData)
+      .catch((err) => setError(err instanceof Error ? err.message : 'Unknown error'))
+      .finally(() => setLoading(false));
   }, [apiUrl, days]);
 
-  const chartData: ChartDataPoint[] = useMemo(() => {
+  const items = useMemo(() => {
     if (!data) return [];
+    const maxDuration = Math.max(...data.activities.map((a) => a.total_duration_minutes));
     return data.activities.map((a) => ({
       name: a.activity_type.charAt(0).toUpperCase() + a.activity_type.slice(1),
       duration: a.total_duration_minutes,
       count: a.count,
       type: a.activity_type,
       percentage: (a.total_duration_minutes / data.total_duration_minutes) * 100,
+      barWidth: (a.total_duration_minutes / maxDuration) * 100,
+      color: COLORS[a.activity_type] || COLORS.other,
     }));
   }, [data]);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleBarClick = (data: any) => {
-    if (data?.type) {
-      onActivityClick?.(data.type);
-    }
-  };
-
-  const handlePieClick = (index: number) => {
-    if (chartData[index]) {
-      onActivityClick?.(chartData[index].type);
-    }
-  };
+  // Build conic-gradient for doughnut
+  const conicGradient = useMemo(() => {
+    if (items.length === 0) return '';
+    let angle = 0;
+    const stops = items.map((item) => {
+      const start = angle;
+      angle += (item.percentage / 100) * 360;
+      return `${item.color} ${start}deg ${angle}deg`;
+    });
+    return `conic-gradient(${stops.join(', ')})`;
+  }, [items]);
 
   if (loading) {
     return (
@@ -171,10 +103,15 @@ export function WeeklyActivityChart({
     );
   }
 
-  // Format total time
   const totalHours = Math.floor(data.total_duration_minutes / 60);
   const totalMinutes = data.total_duration_minutes % 60;
   const totalTimeStr = totalHours > 0 ? `${totalHours}h ${totalMinutes}m` : `${totalMinutes}m`;
+
+  const formatDuration = (mins: number) => {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  };
 
   return (
     <div className="bg-zinc-800 rounded-lg p-4" data-testid="weekly-activity-chart">
@@ -191,21 +128,16 @@ export function WeeklyActivityChart({
           </div>
         </div>
 
-        {/* Chart type toggle */}
         <div className="flex bg-zinc-700 rounded-lg p-1">
           <button
-            className={`p-2 rounded transition-colors ${
-              chartType === 'bar' ? 'bg-orange-500 text-white' : 'text-zinc-400 hover:text-white'
-            }`}
+            className={`p-2 rounded transition-colors ${chartType === 'bar' ? 'bg-orange-500 text-white' : 'text-zinc-400 hover:text-white'}`}
             onClick={() => setChartType('bar')}
             aria-label="Bar chart"
           >
             <LayoutGrid className="w-4 h-4" />
           </button>
           <button
-            className={`p-2 rounded transition-colors ${
-              chartType === 'pie' ? 'bg-orange-500 text-white' : 'text-zinc-400 hover:text-white'
-            }`}
+            className={`p-2 rounded transition-colors ${chartType === 'pie' ? 'bg-orange-500 text-white' : 'text-zinc-400 hover:text-white'}`}
             onClick={() => setChartType('pie')}
             aria-label="Pie chart"
           >
@@ -214,91 +146,80 @@ export function WeeklyActivityChart({
         </div>
       </div>
 
-      <div className="h-56">
-        <ResponsiveContainer width="100%" height="100%">
-          {chartType === 'bar' ? (
-            <BarChart data={chartData} layout="vertical">
-              <XAxis type="number" stroke="#71717a" fontSize={12} tickLine={false} />
-              <YAxis
-                type="category"
-                dataKey="name"
-                stroke="#71717a"
-                fontSize={12}
-                width={80}
-                tickLine={false}
-              />
-              <Tooltip content={<CustomTooltip />} />
-              <Bar
-                dataKey="duration"
-                radius={[0, 4, 4, 0]}
-                onClick={handleBarClick}
-                cursor="pointer"
-              >
-                {chartData.map((entry, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={COLORS[entry.type] || COLORS.other}
-                  />
-                ))}
-              </Bar>
-            </BarChart>
-          ) : (
-            <PieChart>
-              <Pie
-                data={chartData}
-                cx="50%"
-                cy="50%"
-                innerRadius={60}
-                outerRadius={90}
-                dataKey="duration"
-                nameKey="name"
-                onClick={(_, index) => handlePieClick(index)}
-                cursor="pointer"
-              >
-                {chartData.map((entry, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={COLORS[entry.type] || COLORS.other}
-                    stroke="#27272a"
-                    strokeWidth={2}
-                  />
-                ))}
-              </Pie>
-              <Tooltip content={<CustomTooltip />} />
-            </PieChart>
-          )}
-        </ResponsiveContainer>
-      </div>
-
-      {/* Legend for pie chart */}
-      {chartType === 'pie' && (
-        <div className="flex flex-wrap justify-center gap-3 mt-3 pt-3 border-t border-zinc-700">
-          {chartData.map((entry) => (
+      {chartType === 'bar' ? (
+        /* Horizontal bar chart */
+        <div className="space-y-2 h-56 overflow-y-auto">
+          {items.map((item, i) => (
             <button
-              key={entry.type}
-              className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white transition-colors"
-              onClick={() => onActivityClick?.(entry.type)}
+              key={item.type}
+              className="w-full flex items-center gap-3 group"
+              onClick={() => onActivityClick?.(item.type)}
+              onMouseEnter={() => setHovered(i)}
+              onMouseLeave={() => setHovered(null)}
             >
-              <span
-                className="w-2 h-2 rounded-full"
-                style={{ backgroundColor: COLORS[entry.type] || COLORS.other }}
-              />
-              {entry.name}
+              <span className="text-xs text-zinc-400 w-20 text-right shrink-0 group-hover:text-white transition-colors">
+                {item.name}
+              </span>
+              <div className="flex-1 h-5 bg-zinc-700/50 rounded overflow-hidden relative">
+                <div
+                  className="h-full rounded transition-all duration-300"
+                  style={{
+                    width: `${item.barWidth}%`,
+                    backgroundColor: item.color,
+                    opacity: hovered === null || hovered === i ? 1 : 0.4,
+                  }}
+                />
+                {hovered === i && (
+                  <span className="absolute inset-0 flex items-center justify-center text-white text-xs font-medium">
+                    {formatDuration(item.duration)} &middot; {item.count} sessions &middot; {item.percentage.toFixed(0)}%
+                  </span>
+                )}
+              </div>
             </button>
           ))}
         </div>
+      ) : (
+        /* Doughnut chart */
+        <div className="flex items-center justify-center h-56 gap-6">
+          <div className="relative">
+            <div
+              className="w-40 h-40 rounded-full"
+              style={{
+                background: conicGradient,
+                mask: 'radial-gradient(circle at center, transparent 55%, black 55%)',
+                WebkitMask: 'radial-gradient(circle at center, transparent 55%, black 55%)',
+              }}
+            />
+            {hovered !== null && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                <span className="text-white text-sm font-medium">{items[hovered].name}</span>
+                <span className="text-zinc-400 text-xs">{items[hovered].percentage.toFixed(0)}%</span>
+              </div>
+            )}
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {items.map((item, i) => (
+              <button
+                key={item.type}
+                className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white transition-colors"
+                onClick={() => onActivityClick?.(item.type)}
+                onMouseEnter={() => setHovered(i)}
+                onMouseLeave={() => setHovered(null)}
+              >
+                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                {item.name}
+              </button>
+            ))}
+          </div>
+        </div>
       )}
 
-      {/* Stats footer for bar chart */}
       {chartType === 'bar' && (
         <div className="flex items-center justify-between mt-3 pt-3 border-t border-zinc-700 text-xs text-zinc-400">
           <span>Click a bar to filter</span>
           <span>
             Avg per session:{' '}
-            {Math.round(
-              data.total_duration_minutes / data.activities.reduce((sum, a) => sum + a.count, 0)
-            )}{' '}
-            min
+            {Math.round(data.total_duration_minutes / data.activities.reduce((sum, a) => sum + a.count, 0))} min
           </span>
         </div>
       )}

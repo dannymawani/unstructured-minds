@@ -1,5 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+
+// Mock cachedFetch to use the mocked global fetch
+vi.mock('../../../lib/cachedFetch', () => ({
+  cachedFetch: async (url: string) => {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Failed to fetch ${url}`);
+    return response.json();
+  },
+  clearCache: vi.fn(),
+}));
+
 import { Dashboard } from '../Dashboard';
 import { DashboardSummary } from '../DashboardSummary';
 import { WeeklyActivityChart } from '../WeeklyActivityChart';
@@ -142,7 +153,6 @@ describe('WeeklyActivityChart', () => {
       expect(screen.getByTestId('weekly-activity-chart')).toBeInTheDocument();
     });
 
-    // Check for the activity breakdown title instead of the time format which changed
     expect(screen.getByText('Activity Breakdown')).toBeInTheDocument();
   });
 });
