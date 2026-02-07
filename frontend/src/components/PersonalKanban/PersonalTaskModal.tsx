@@ -44,6 +44,7 @@ export function PersonalTaskModal({
 }: PersonalTaskModalProps) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(task.description)
+  const [categoryDraft, setCategoryDraft] = useState(task.category || '')
   const [saving, setSaving] = useState(false)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -174,30 +175,62 @@ export function PersonalTaskModal({
           </button>
         </div>
 
-        {/* Deadline */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-700">
-          <span className="text-sm text-zinc-400">Deadline:</span>
-          <input
-            type="date"
-            value={task.deadline || ''}
-            onChange={async (e) => {
-              const val = e.target.value || null
-              try {
-                const res = await fetch(`${apiUrl}/tasks/${task.id}`, {
-                  method: 'PATCH',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ deadline: val }),
-                })
-                if (res.ok) {
-                  const updated: Task = await res.json()
-                  onTaskUpdated?.(updated)
+        {/* Deadline + Category */}
+        <div className="flex items-center gap-4 px-4 py-3 border-b border-zinc-700 flex-wrap">
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-zinc-400">Deadline:</span>
+            <input
+              type="date"
+              value={task.deadline || ''}
+              onChange={async (e) => {
+                const val = e.target.value || null
+                try {
+                  const res = await fetch(`${apiUrl}/tasks/${task.id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ deadline: val }),
+                  })
+                  if (res.ok) {
+                    const updated: Task = await res.json()
+                    onTaskUpdated?.(updated)
+                  }
+                } catch (err) {
+                  console.error('Failed to update deadline:', err)
                 }
-              } catch (err) {
-                console.error('Failed to update deadline:', err)
-              }
-            }}
-            className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-sm text-zinc-100 focus:outline-none focus:ring-1 focus:ring-teal-500"
-          />
+              }}
+              className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-sm text-zinc-100 focus:outline-none focus:ring-1 focus:ring-teal-500"
+            />
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-zinc-400">Category:</span>
+            <input
+              type="text"
+              value={categoryDraft}
+              placeholder="e.g. work, personal"
+              onChange={(e) => setCategoryDraft(e.target.value)}
+              onBlur={async () => {
+                const val = categoryDraft.trim() || null
+                if (val === (task.category || null)) return
+                try {
+                  const res = await fetch(`${apiUrl}/tasks/${task.id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ category: val }),
+                  })
+                  if (res.ok) {
+                    const updated: Task = await res.json()
+                    onTaskUpdated?.(updated)
+                  }
+                } catch (err) {
+                  console.error('Failed to update category:', err)
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+              }}
+              className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-teal-500 w-36"
+            />
+          </div>
         </div>
 
         {/* Move-to buttons */}
@@ -223,8 +256,14 @@ export function PersonalTaskModal({
           <div className="p-4">
             <button
               onClick={() => {
-                const [year, month] = task.date.split('-')
-                const notePath = `Daily-Notes/${year}-${month}/${task.date}.md`
+                // Use source_file if it's a markdown note, otherwise build from date
+                let notePath: string
+                if (task.source_file && task.source_file.endsWith('.md')) {
+                  notePath = task.source_file
+                } else {
+                  const [year, month] = task.date.split('-')
+                  notePath = `Daily-Notes/${year}-${month}/${task.date}.md`
+                }
                 onOpenNote(notePath)
               }}
               className="flex items-center gap-2 text-sm text-teal-400 hover:text-teal-300 transition-colors"
