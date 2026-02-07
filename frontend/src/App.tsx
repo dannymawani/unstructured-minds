@@ -57,6 +57,7 @@ function App() {
   const [view, setView] = useState<View>('editor')
   const [selectedFile, setSelectedFile] = useState<string | undefined>()
   const [content, setContent] = useState('')
+  const contentRef = useRef(content)
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'extracting' | 'saved'>('idle')
   const isDirtyRef = useRef(false)
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false)
@@ -103,6 +104,7 @@ function App() {
 
   const handleContentChange = useCallback((markdown: string) => {
     setContent(markdown)
+    contentRef.current = markdown
     isDirtyRef.current = true
   }, [])
 
@@ -115,7 +117,7 @@ function App() {
       const response = await fetch(`${API_BASE_URL}/vault/file?extract=false`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: selectedFile, content }),
+        body: JSON.stringify({ path: selectedFile, content: contentRef.current }),
       })
       if (!response.ok) {
         throw new Error('Failed to save file')
@@ -127,7 +129,7 @@ function App() {
       console.error('Error saving file:', err)
       setSaveState('idle')
     }
-  }, [selectedFile, content])
+  }, [selectedFile])
 
   // Explicit save: disk + extraction (Cmd+S)
   const handleSave = useCallback(async () => {
@@ -138,7 +140,7 @@ function App() {
       const response = await fetch(`${API_BASE_URL}/vault/file?extract=true`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: selectedFile, content }),
+        body: JSON.stringify({ path: selectedFile, content: contentRef.current }),
       })
       if (!response.ok) {
         throw new Error('Failed to save file')
@@ -150,7 +152,7 @@ function App() {
       console.error('Error saving file:', err)
       setSaveState('idle')
     }
-  }, [selectedFile, content])
+  }, [selectedFile])
 
   // Extract on file switch if content is dirty
   const prevFileRef = useRef<string | undefined>(selectedFile)
@@ -161,12 +163,12 @@ function App() {
       fetch(`${API_BASE_URL}/vault/file?extract=true`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: prevFile, content }),
+        body: JSON.stringify({ path: prevFile, content: contentRef.current }),
       }).catch((err) => console.error('Error saving on file switch:', err))
       isDirtyRef.current = false
     }
     prevFileRef.current = selectedFile
-  }, [selectedFile, content])
+  }, [selectedFile])
 
   // Toggle sidebar visibility
   const toggleSidebar = useCallback(() => {
