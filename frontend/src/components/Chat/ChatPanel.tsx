@@ -9,6 +9,7 @@ interface ChatPanelProps {
   currentFile?: string
   currentContent?: string
   onContentUpdate?: (content: string) => void
+  initialMessage?: string
 }
 
 type ChatMode = 'chat' | 'query' | 'note'
@@ -70,7 +71,7 @@ function fileToBase64(file: File): Promise<string> {
   })
 }
 
-export function ChatPanel({ apiBaseUrl = '', currentFile, currentContent, onContentUpdate }: ChatPanelProps) {
+export function ChatPanel({ apiBaseUrl = '', currentFile, currentContent, onContentUpdate, initialMessage }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -80,6 +81,7 @@ export function ChatPanel({ apiBaseUrl = '', currentFile, currentContent, onCont
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const initialMessageSentRef = useRef<string | null>(null)
 
   // Auto-select note mode when a file is open
   useEffect(() => {
@@ -87,6 +89,18 @@ export function ChatPanel({ apiBaseUrl = '', currentFile, currentContent, onCont
       setMode('note')
     }
   }, [currentFile])
+
+  // Send initial message when provided (e.g., new daily note wizard)
+  useEffect(() => {
+    if (initialMessage && initialMessage !== initialMessageSentRef.current && currentFile && !isLoading) {
+      initialMessageSentRef.current = initialMessage
+      setInput(initialMessage)
+      // Trigger submit on next tick so state has settled
+      setTimeout(() => {
+        inputRef.current?.form?.requestSubmit()
+      }, 100)
+    }
+  }, [initialMessage, currentFile, isLoading])
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
