@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, type FormEvent, type ClipboardEvent, type ChangeEvent } from 'react'
-import { Send, Loader2, Database, MessageSquare, FileText, Paperclip, X } from 'lucide-react'
+import { Send, Loader2, Database, FileText, Paperclip, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ChatMessage, type Message, type QueryData, type ImageAttachment } from './ChatMessage'
 import { cn } from '@/lib/utils'
@@ -12,51 +12,7 @@ interface ChatPanelProps {
   initialMessage?: string
 }
 
-type ChatMode = 'chat' | 'query' | 'note'
-
-// Keywords that suggest a data query
-const DATA_QUERY_KEYWORDS = [
-  'how much',
-  'how many',
-  'show me',
-  'show my',
-  'what was',
-  'what is',
-  'what are',
-  'when did',
-  'list',
-  'average',
-  'total',
-  'sum',
-  'count',
-  'max',
-  'min',
-  'heaviest',
-  'lightest',
-  'longest',
-  'shortest',
-  'last week',
-  'this week',
-  'last month',
-  'this month',
-  'yesterday',
-  'today',
-  'exercise',
-  'workout',
-  'sleep',
-  'food',
-  'calories',
-  'weight',
-  'task',
-  'squat',
-  'bench',
-  'deadlift',
-]
-
-function isLikelyDataQuery(input: string): boolean {
-  const lowerInput = input.toLowerCase()
-  return DATA_QUERY_KEYWORDS.some((keyword) => lowerInput.includes(keyword))
-}
+type ChatMode = 'query' | 'note'
 
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -218,7 +174,7 @@ export function ChatPanel({ apiBaseUrl = '', currentFile, currentContent, onCont
         }
 
         setMessages((prev) => [...prev, assistantMessage])
-      } else if (mode === 'query' || isLikelyDataQuery(userMessage.content)) {
+      } else {
         // Use natural language query endpoint
         const response = await fetch(`${apiBaseUrl}/query/natural`, {
           method: 'POST',
@@ -252,29 +208,6 @@ export function ChatPanel({ apiBaseUrl = '', currentFile, currentContent, onCont
         }
 
         setMessages((prev) => [...prev, assistantMessage])
-      } else {
-        // Use regular chat endpoint
-        const response = await fetch(`${apiBaseUrl}/chat`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: userMessage.content }),
-        })
-
-        if (!response.ok) {
-          const data = await response.json().catch(() => ({}))
-          throw new Error(data.detail || 'Failed to get response')
-        }
-
-        const data = await response.json()
-
-        const assistantMessage: Message = {
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          content: data.message.content,
-          timestamp: new Date(),
-        }
-
-        setMessages((prev) => [...prev, assistantMessage])
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
@@ -299,16 +232,14 @@ export function ChatPanel({ apiBaseUrl = '', currentFile, currentContent, onCont
         <div className="flex items-center justify-between">
           <div className="min-w-0">
             <h2 className="text-sm font-medium">
-              {mode === 'note' ? 'Note Assist' : mode === 'query' ? 'Data Query' : 'Chat'}
+              {mode === 'note' ? 'Note Assist' : 'Data Query'}
             </h2>
             <p className="text-xs text-muted-foreground truncate">
               {mode === 'note' && fileName
                 ? `Editing: ${fileName}`
                 : mode === 'note'
                   ? 'Open a file to get started'
-                  : mode === 'query'
-                    ? 'Ask questions about your data'
-                    : 'General conversation'}
+                  : 'Ask questions about your data'}
             </p>
           </div>
           <div className="flex gap-1 shrink-0">
@@ -330,15 +261,6 @@ export function ChatPanel({ apiBaseUrl = '', currentFile, currentContent, onCont
             >
               <Database className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
             </Button>
-            <Button
-              variant={mode === 'chat' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setMode('chat')}
-              className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 h-10 sm:h-7 px-3 sm:px-2"
-              title="Chat Mode"
-            >
-              <MessageSquare className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
-            </Button>
           </div>
         </div>
       </div>
@@ -351,9 +273,7 @@ export function ChatPanel({ apiBaseUrl = '', currentFile, currentContent, onCont
                 ? currentFile
                   ? 'Ask me to update your note'
                   : 'Open a file to get started'
-                : mode === 'query'
-                  ? 'Ask questions about your data'
-                  : 'Start a conversation'}
+                : 'Ask questions about your data'}
             </p>
             {mode === 'note' && currentFile && (
               <div className="text-xs space-y-1 text-center max-w-[250px]">
@@ -381,7 +301,7 @@ export function ChatPanel({ apiBaseUrl = '', currentFile, currentContent, onCont
           <div className="flex items-center gap-2 p-3 text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
             <span className="text-sm">
-              {mode === 'note' ? 'Updating note...' : mode === 'query' ? 'Querying data...' : 'Thinking...'}
+              {mode === 'note' ? 'Updating note...' : 'Querying data...'}
             </span>
           </div>
         )}
@@ -449,9 +369,7 @@ export function ChatPanel({ apiBaseUrl = '', currentFile, currentContent, onCont
             placeholder={
               mode === 'note'
                 ? 'Update your note...'
-                : mode === 'query'
-                  ? 'Ask about your data...'
-                  : 'Ask a question...'
+                : 'Ask about your data...'
             }
             className={cn(
               'flex-1 min-h-[44px] max-h-[120px] resize-none rounded-md border px-3 py-2 text-base sm:text-sm',
