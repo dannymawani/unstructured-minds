@@ -41,6 +41,8 @@ services:
       # Mount vault and data
       - ${VAULT_PATH:-./vault}:/app/vault:rw
       - ${DATA_PATH:-./data}:/app/data:rw
+    env_file:
+      - .env
     environment:
       - DEBUG=true
       - PYTHONDONTWRITEBYTECODE=1

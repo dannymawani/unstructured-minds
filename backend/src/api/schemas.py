@@ -296,16 +296,16 @@ def list_schemas() -> SchemaListResponse:
             )
         )
 
-    # Add custom schemas
+    # Add custom schemas (skip files that don't match expected format)
     for name in _list_custom_schemas():
         custom_schema = _load_custom_schema(name)
-        if custom_schema:
+        if custom_schema and "name" in custom_schema:
             schemas.append(
                 SchemaListItem(
                     name=custom_schema["name"],
                     description=custom_schema.get("description", ""),
                     is_builtin=False,
-                    field_count=len(custom_schema.get("fields", [])),
+                    field_count=len(custom_schema.get("fields", custom_schema.get("columns", []))),
                 )
             )
 
