@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { memo, useRef } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Clock, FileText } from 'lucide-react'
@@ -40,7 +40,7 @@ function getFilename(path: string): string {
   return parts[parts.length - 1] || path
 }
 
-export function PersonalTaskCard({ task, onTaskClick }: PersonalTaskCardProps) {
+export const PersonalTaskCard = memo(function PersonalTaskCard({ task, onTaskClick }: PersonalTaskCardProps) {
   const mouseStart = useRef<{ x: number; y: number } | null>(null)
 
   const {
@@ -134,4 +134,4 @@ export function PersonalTaskCard({ task, onTaskClick }: PersonalTaskCardProps) {
       </div>
     </div>
   )
-}
+})

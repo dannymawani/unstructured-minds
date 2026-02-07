@@ -2,11 +2,12 @@
 
 import asyncio
 import json
+import re
 import os
 from typing import Any, Optional
 
 import anthropic
-from anthropic import Anthropic
+from anthropic import AsyncAnthropic
 
 
 QUERY_SYSTEM_PROMPT = """You are a helpful assistant that answers questions about the user's personal data.
@@ -78,7 +79,7 @@ Formatting guidelines:
 
 
 class ClaudeClient:
-    """Client for interacting with Claude API."""
+    """Client for interacting with Claude API using async SDK."""
 
     def __init__(self, api_key: Optional[str] = None) -> None:
         """Initialize Claude client.
@@ -87,17 +88,17 @@ class ClaudeClient:
             api_key: Anthropic API key. If not provided, uses ANTHROPIC_API_KEY env var.
         """
         self.api_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
-        self._client: Optional[Anthropic] = None
+        self._client: Optional[AsyncAnthropic] = None
         self.model_fast = "claude-haiku-4-5-20251001"
         self.model_smart = "claude-sonnet-4-5-20250929"
 
     @property
-    def client(self) -> Anthropic:
-        """Get or create Anthropic client."""
+    def client(self) -> AsyncAnthropic:
+        """Get or create async Anthropic client."""
         if self._client is None:
             if not self.api_key:
                 raise ValueError("ANTHROPIC_API_KEY not configured")
-            self._client = Anthropic(api_key=self.api_key)
+            self._client = AsyncAnthropic(api_key=self.api_key)
         return self._client
 
     @property
@@ -118,7 +119,6 @@ class ClaudeClient:
         tool = self._create_extraction_tool(schema)
 
         response = await self._call_with_retry(
-            self._create_message,
             model=self.model_fast,
             max_tokens=4096,
             tools=[tool],
@@ -138,7 +138,6 @@ class ClaudeClient:
             Answer text
         """
         response = await self._call_with_retry(
-            self._create_message,
             model=self.model_fast,
             max_tokens=2048,
             system=QUERY_SYSTEM_PROMPT,
@@ -193,7 +192,6 @@ class ClaudeClient:
         content_parts.append({"type": "text", "text": "\n\n".join(text_parts)})
 
         response = await self._call_with_retry(
-            self._create_message,
             model=self.model_smart,
             max_tokens=8192,
             system=NOTE_ASSIST_SYSTEM_PROMPT,
@@ -203,7 +201,6 @@ class ClaudeClient:
         response_text = response.content[0].text
 
         # Parse <note-update> tags from response
-        import re
         match = re.search(r"<note-update>(.*?)</note-update>", response_text, re.DOTALL)
 
         if match:
@@ -250,7 +247,6 @@ Wizard answers:
 Populate the template with these answers and return only the complete markdown."""
 
         response = await self._call_with_retry(
-            self._create_message,
             model=self.model_fast,
             max_tokens=4096,
             system=DAILY_NOTE_POPULATE_SYSTEM_PROMPT,
@@ -272,7 +268,6 @@ Populate the template with these answers and return only the complete markdown."
             Skill response text
         """
         response = await self._call_with_retry(
-            self._create_message,
             model=self.model_smart,
             max_tokens=8192,
             system=system_prompt,
@@ -281,21 +276,17 @@ Populate the template with these answers and return only the complete markdown."
 
         return response.content[0].text
 
-    def _create_message(self, **kwargs) -> anthropic.types.Message:
-        """Create a message synchronously."""
-        return self.client.messages.create(**kwargs)
-
     async def _call_with_retry(
-        self, func, *args, max_retries: int = 3, **kwargs
+        self, max_retries: int = 3, **kwargs
     ) -> Any:
-        """Call function with exponential backoff retry.
+        """Call the async API with exponential backoff retry.
 
         Args:
-            func: Function to call
             max_retries: Maximum retry attempts
+            **kwargs: Arguments passed to messages.create
 
         Returns:
-            Function result
+            API response
 
         Raises:
             Exception: If max retries exceeded
@@ -303,9 +294,7 @@ Populate the template with these answers and return only the complete markdown."
         last_error = None
         for attempt in range(max_retries):
             try:
-                # Run sync function in thread pool
-                loop = asyncio.get_event_loop()
-                return await loop.run_in_executor(None, lambda: func(*args, **kwargs))
+                return await self.client.messages.create(**kwargs)
             except anthropic.RateLimitError as e:
                 last_error = e
                 await asyncio.sleep(2**attempt)

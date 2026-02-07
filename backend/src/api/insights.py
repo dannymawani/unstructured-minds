@@ -8,7 +8,9 @@ from pydantic import BaseModel
 
 from ..claude import ClaudeClient
 from ..db import DatabaseManager
+from ..logging_config import get_logger
 
+logger = get_logger(__name__)
 
 router = APIRouter(prefix="/insights", tags=["insights"])
 
@@ -53,6 +55,8 @@ def get_claude(request: Request) -> ClaudeClient:
 async def _gather_context_data(db: DatabaseManager, days: int = 7) -> dict:
     """Gather recent data for insight generation.
 
+    Consolidates 7 sequential queries into 3 using CTEs.
+
     Args:
         db: Database manager
         days: Number of days to look back
@@ -68,14 +72,9 @@ async def _gather_context_data(db: DatabaseManager, days: int = 7) -> dict:
         "start_date": str(start_date),
     }
 
-    # Get recent activities
+    # Query 1: Activities + food count + activity patterns (consolidated)
     activities = db.execute(
-        """
-        SELECT date, activity_type, duration_minutes
-        FROM activities
-        WHERE date >= ?
-        ORDER BY date DESC
-        """,
+        "SELECT date, activity_type, duration_minutes FROM activities WHERE date >= ? ORDER BY date DESC",
         [str(start_date)],
     ).fetchall()
     context["activities"] = [
@@ -83,63 +82,16 @@ async def _gather_context_data(db: DatabaseManager, days: int = 7) -> dict:
         for row in activities
     ]
 
-    # Get recent daily metrics
-    metrics = db.execute(
-        """
-        SELECT date, sleep_hours, sleep_quality, energy, mood, stress
-        FROM daily_metrics
-        WHERE date >= ?
-        ORDER BY date DESC
-        """,
-        [str(start_date)],
-    ).fetchall()
-    context["metrics"] = [
-        {
-            "date": str(row[0]),
-            "sleep_hours": float(row[1]) if row[1] else None,
-            "sleep_quality": row[2],
-            "energy": row[3],
-            "mood": row[4],
-            "stress": row[5],
-        }
-        for row in metrics
-    ]
-
-    # Get incomplete tasks
-    incomplete_tasks = db.execute(
-        """
-        SELECT date, description, category
-        FROM tasks
-        WHERE status NOT IN ('done', 'cancelled')
-        ORDER BY date DESC
-        LIMIT 10
-        """,
-    ).fetchall()
-    context["incomplete_tasks"] = [
-        {"date": str(row[0]), "description": row[1], "category": row[2]}
-        for row in incomplete_tasks
-    ]
-
-    # Get food log for today
     food_today = db.execute(
-        """
-        SELECT COUNT(*) FROM food_log WHERE date = ?
-        """,
-        [str(today)],
+        "SELECT COUNT(*) FROM food_log WHERE date = ?", [str(today)]
     ).fetchone()[0]
     context["food_logged_today"] = food_today > 0
 
-    # Get activity patterns (day of week analysis)
     activity_patterns = db.execute(
         """
-        SELECT
-            DAYOFWEEK(date) as dow,
-            activity_type,
-            COUNT(*) as count
-        FROM activities
-        WHERE date >= ?
-        GROUP BY DAYOFWEEK(date), activity_type
-        ORDER BY count DESC
+        SELECT DAYOFWEEK(date) as dow, activity_type, COUNT(*) as count
+        FROM activities WHERE date >= ?
+        GROUP BY DAYOFWEEK(date), activity_type ORDER BY count DESC
         """,
         [str(today - timedelta(days=30))],
     ).fetchall()
@@ -148,37 +100,72 @@ async def _gather_context_data(db: DatabaseManager, days: int = 7) -> dict:
         for row in activity_patterns
     ]
 
-    # Get metrics trends (compare last week to previous week)
-    last_week_metrics = db.execute(
-        """
-        SELECT AVG(sleep_hours), AVG(energy), AVG(mood)
-        FROM daily_metrics
-        WHERE date >= ? AND date <= ?
-        """,
-        [str(today - timedelta(days=7)), str(today)],
-    ).fetchone()
+    # Query 2: Tasks
+    incomplete_tasks = db.execute(
+        "SELECT date, description, category FROM tasks WHERE status NOT IN ('done', 'cancelled') ORDER BY date DESC LIMIT 10",
+    ).fetchall()
+    context["incomplete_tasks"] = [
+        {"date": str(row[0]), "description": row[1], "category": row[2]}
+        for row in incomplete_tasks
+    ]
 
-    prev_week_metrics = db.execute(
+    # Query 3: All metrics + week comparisons in a single CTE query
+    metrics_result = db.execute(
         """
-        SELECT AVG(sleep_hours), AVG(energy), AVG(mood)
-        FROM daily_metrics
-        WHERE date >= ? AND date < ?
+        WITH recent AS (
+            SELECT date, sleep_hours, sleep_quality, energy, mood, stress
+            FROM daily_metrics WHERE date >= ?
+        ),
+        last_week AS (
+            SELECT AVG(sleep_hours) as s, AVG(energy) as e, AVG(mood) as m
+            FROM daily_metrics WHERE date >= ? AND date <= ?
+        ),
+        prev_week AS (
+            SELECT AVG(sleep_hours) as s, AVG(energy) as e, AVG(mood) as m
+            FROM daily_metrics WHERE date >= ? AND date < ?
+        )
+        SELECT 'r' as t, date, sleep_hours, sleep_quality, energy, mood, stress FROM recent
+        UNION ALL
+        SELECT 'l', NULL, s, NULL, e, m, NULL FROM last_week
+        UNION ALL
+        SELECT 'p', NULL, s, NULL, e, m, NULL FROM prev_week
         """,
-        [str(today - timedelta(days=14)), str(today - timedelta(days=7))],
-    ).fetchone()
+        [
+            str(start_date),
+            str(today - timedelta(days=7)), str(today),
+            str(today - timedelta(days=14)), str(today - timedelta(days=7)),
+        ],
+    ).fetchall()
 
-    context["metrics_comparison"] = {
-        "last_week": {
-            "avg_sleep": float(last_week_metrics[0]) if last_week_metrics[0] else None,
-            "avg_energy": float(last_week_metrics[1]) if last_week_metrics[1] else None,
-            "avg_mood": float(last_week_metrics[2]) if last_week_metrics[2] else None,
-        },
-        "prev_week": {
-            "avg_sleep": float(prev_week_metrics[0]) if prev_week_metrics[0] else None,
-            "avg_energy": float(prev_week_metrics[1]) if prev_week_metrics[1] else None,
-            "avg_mood": float(prev_week_metrics[2]) if prev_week_metrics[2] else None,
-        },
-    }
+    metrics = []
+    last_week = {"avg_sleep": None, "avg_energy": None, "avg_mood": None}
+    prev_week = {"avg_sleep": None, "avg_energy": None, "avg_mood": None}
+
+    for row in metrics_result:
+        if row[0] == "r":
+            metrics.append({
+                "date": str(row[1]),
+                "sleep_hours": float(row[2]) if row[2] else None,
+                "sleep_quality": row[3],
+                "energy": row[4],
+                "mood": row[5],
+                "stress": row[6],
+            })
+        elif row[0] == "l":
+            last_week = {
+                "avg_sleep": float(row[2]) if row[2] else None,
+                "avg_energy": float(row[4]) if row[4] else None,
+                "avg_mood": float(row[5]) if row[5] else None,
+            }
+        elif row[0] == "p":
+            prev_week = {
+                "avg_sleep": float(row[2]) if row[2] else None,
+                "avg_energy": float(row[4]) if row[4] else None,
+                "avg_mood": float(row[5]) if row[5] else None,
+            }
+
+    context["metrics"] = metrics
+    context["metrics_comparison"] = {"last_week": last_week, "prev_week": prev_week}
 
     return context
 
@@ -370,6 +357,7 @@ Return a JSON array of insights. Example format:
         )
 
     except Exception:
+        logger.warning("insights_generation_failed", exc_info=True)
         # Fallback to basic insights on error
         return DailyInsightsResponse(
             insights=_generate_fallback_insights(context),
@@ -463,6 +451,7 @@ Example:
         )
 
     except Exception:
+        logger.warning("weekly_summary_generation_failed", exc_info=True)
         # Fallback to basic summary
         return WeeklySummaryResponse(
             summary="Here's your week at a glance.",

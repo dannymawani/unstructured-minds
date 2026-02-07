@@ -8,21 +8,36 @@ import path from 'path'
 const apiProxyTarget = process.env.VITE_API_PROXY_TARGET || 'http://localhost:8000'
 
 // https://vite.dev/config/
-export default defineConfig({
-  plugins: [react(), tailwindcss()],
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-    },
-  },
-  server: {
-    port: 5173,
-    proxy: {
-      '/api': {
-        target: apiProxyTarget,
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ''),
+export default defineConfig(async () => {
+  const plugins = [react(), tailwindcss()]
+
+  if (process.env.ANALYZE) {
+    const { visualizer } = await import('rollup-plugin-visualizer')
+    plugins.push(
+      visualizer({
+        open: true,
+        filename: 'dist/stats.html',
+        gzipSize: true,
+      }) as never
+    )
+  }
+
+  return {
+    plugins,
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, './src'),
       },
     },
-  },
+    server: {
+      port: 5173,
+      proxy: {
+        '/api': {
+          target: apiProxyTarget,
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api/, ''),
+        },
+      },
+    },
+  }
 })

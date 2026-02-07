@@ -7,11 +7,13 @@ from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
 
 from ..cache import search_cache
+from ..logging_config import get_logger
 from ..middleware import limiter
 from ..middleware.rate_limit import RATE_LIMIT_SEARCH
 from ..middleware.validation import validate_query_length, MAX_SEARCH_QUERY_LENGTH
 from ..storage import StorageBackend
 
+logger = get_logger(__name__)
 
 router = APIRouter()
 
@@ -212,6 +214,7 @@ async def search(
                     )
                 )
         except Exception:
+            logger.warning("search_file_read_failed", path=file_path, exc_info=True)
             # Skip files that can't be read
             continue
 

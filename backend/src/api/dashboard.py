@@ -404,26 +404,25 @@ def get_dashboard_summary(
     ), default=None)
 
     # Calculate streak (consecutive days with activities ending today or yesterday)
+    # Single query: fetch all distinct activity dates in the last year
+    activity_dates_result = db.execute(
+        """
+        SELECT DISTINCT date FROM activities
+        WHERE date >= ? AND date <= ?
+        ORDER BY date DESC
+        """,
+        [str(date.today() - timedelta(days=365)), str(date.today())],
+    ).fetchall()
+    activity_dates = {row[0] for row in activity_dates_result}
+
     streak = 0
     check_date = date.today()
-    while True:
-        has_activity = fetch_scalar(db.execute(
-            "SELECT COUNT(*) FROM activities WHERE date = ?",
-            [str(check_date)],
-        ))
-
-        if has_activity > 0:
-            streak += 1
-            check_date -= timedelta(days=1)
-        elif streak == 0 and check_date == date.today():
-            # Allow starting from yesterday if no activity today yet
-            check_date -= timedelta(days=1)
-        else:
-            break
-
-        # Safety limit
-        if streak > 365:
-            break
+    if check_date not in activity_dates:
+        # Allow starting from yesterday if no activity today yet
+        check_date -= timedelta(days=1)
+    while check_date in activity_dates and streak <= 365:
+        streak += 1
+        check_date -= timedelta(days=1)
 
     return DashboardSummaryResponse(
         total_activities=activity_count,

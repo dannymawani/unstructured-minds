@@ -1,5 +1,6 @@
 """DuckDB connection management."""
 
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Optional
 
@@ -38,8 +39,25 @@ class DatabaseManager:
             self._conn.close()
             self._conn = None
 
+    @contextmanager
+    def cursor(self):
+        """Get a cursor that auto-closes when done.
+
+        Usage:
+            with db.cursor() as cur:
+                cur.execute("SELECT ...").fetchall()
+        """
+        cur = self.connect().cursor()
+        try:
+            yield cur
+        finally:
+            cur.close()
+
     def execute(self, query: str, params: Optional[list] = None) -> duckdb.DuckDBPyRelation:
         """Execute a query using a per-call cursor for thread safety.
+
+        Note: Callers should consume results (fetchall/fetchone) immediately.
+        For explicit cursor lifecycle control, use the cursor() context manager.
 
         Args:
             query: SQL query

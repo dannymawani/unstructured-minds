@@ -111,6 +111,10 @@ def validate_sql(sql: str) -> bool:
     if not (normalized.startswith("SELECT") or normalized.startswith("WITH")):
         return False
 
+    # Block multiple statements (semicolons)
+    if ";" in sql.strip().rstrip(";"):
+        return False
+
     # Block dangerous keywords
     dangerous = [
         "INSERT",
@@ -129,6 +133,10 @@ def validate_sql(sql: str) -> bool:
         "COPY",
         "LOAD",
         "INSTALL",
+        "PRAGMA",
+        "CALL",
+        "SET",
+        "EXPLAIN",
     ]
 
     for keyword in dangerous:
@@ -200,7 +208,6 @@ async def natural_language_query(
         # Step 1: Generate SQL from natural language
         sql_prompt = SQL_GENERATION_PROMPT.format(question=question)
         sql_response = await claude._call_with_retry(
-            claude._create_message,
             model=claude.model_fast,
             max_tokens=1024,
             messages=[{"role": "user", "content": sql_prompt}],
@@ -255,7 +262,6 @@ async def natural_language_query(
             )
 
             format_response = await claude._call_with_retry(
-                claude._create_message,
                 model=claude.model_fast,
                 max_tokens=1024,
                 messages=[{"role": "user", "content": format_prompt}],
