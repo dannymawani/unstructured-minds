@@ -18,6 +18,7 @@ interface FileTreeItemProps {
   selected: boolean
   onToggle: (path: string) => void
   onSelect: (path: string) => void
+  onContextMenu?: (e: React.MouseEvent, path: string) => void
 }
 
 function FileTreeItemComponent({
@@ -27,6 +28,7 @@ function FileTreeItemComponent({
   selected,
   onToggle,
   onSelect,
+  onContextMenu,
 }: FileTreeItemProps) {
   const handleClick = useCallback(() => {
     if (node.isDirectory) {
@@ -44,6 +46,16 @@ function FileTreeItemComponent({
       }
     },
     [handleClick]
+  )
+
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      if (!node.isDirectory && onContextMenu) {
+        e.preventDefault()
+        onContextMenu(e, node.path)
+      }
+    },
+    [node.isDirectory, node.path, onContextMenu]
   )
 
   // Memoize style to avoid object recreation on each render
@@ -75,6 +87,7 @@ function FileTreeItemComponent({
       style={style}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
+      onContextMenu={handleContextMenu}
     >
       {node.isDirectory ? (
         <>
@@ -109,6 +122,7 @@ export const FileTreeItem = memo(FileTreeItemComponent, (prevProps, nextProps) =
     prevProps.expanded === nextProps.expanded &&
     prevProps.selected === nextProps.selected &&
     prevProps.onToggle === nextProps.onToggle &&
-    prevProps.onSelect === nextProps.onSelect
+    prevProps.onSelect === nextProps.onSelect &&
+    prevProps.onContextMenu === nextProps.onContextMenu
   )
 })

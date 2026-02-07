@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react'
+import { createPortal } from 'react-dom'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { Plus, FolderPlus, RefreshCw, FileText, CalendarDays, LayoutTemplate, ChevronDown } from 'lucide-react'
+import { Plus, FolderPlus, RefreshCw, FileText, CalendarDays, LayoutTemplate, ChevronDown, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { FileTreeItem, type FileNode } from './FileTreeItem'
 
@@ -16,6 +17,7 @@ interface FileTreeProps {
   apiBaseUrl?: string
   onCreateDailyNote?: () => void
   onOpenTemplatePicker?: () => void
+  onDeleteFile?: (path: string) => void
 }
 
 interface FlattenedNode {
@@ -151,6 +153,7 @@ export function FileTree({
   apiBaseUrl = '',
   onCreateDailyNote,
   onOpenTemplatePicker,
+  onDeleteFile,
 }: FileTreeProps) {
   const [files, setFiles] = useState<FileNode[]>([])
   const [expanded, setExpanded] = useState<Set<string>>(() => {
@@ -255,6 +258,63 @@ export function FileTree({
       setError(err instanceof Error ? err.message : 'Failed to create folder')
     }
   }, [apiBaseUrl, fetchFiles])
+
+  // Context menu state for file deletion
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; path: string } | null>(null)
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const contextMenuRef = useRef<HTMLDivElement>(null)
+
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent, path: string) => {
+      setContextMenu({ x: e.clientX, y: e.clientY, path })
+      setDeleteConfirm(null)
+    },
+    []
+  )
+
+  const handleDeleteFile = useCallback(
+    async (path: string) => {
+      try {
+        const response = await fetch(`${apiBaseUrl}/vault/file?path=${encodeURIComponent(path)}`, {
+          method: 'DELETE',
+        })
+        if (!response.ok) {
+          throw new Error('Failed to delete file')
+        }
+        await fetchFiles()
+        onDeleteFile?.(path)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to delete file')
+      } finally {
+        setContextMenu(null)
+        setDeleteConfirm(null)
+      }
+    },
+    [apiBaseUrl, fetchFiles, onDeleteFile]
+  )
+
+  // Close context menu on click outside or Escape
+  useEffect(() => {
+    if (!contextMenu) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
+        setContextMenu(null)
+        setDeleteConfirm(null)
+      }
+    }
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setContextMenu(null)
+        setDeleteConfirm(null)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [contextMenu])
 
   // Close new menu on click outside
   useEffect(() => {
@@ -404,6 +464,7 @@ export function FileTree({
                     selected={selectedFile === node.path}
                     onToggle={handleToggle}
                     onSelect={handleSelect}
+                    onContextMenu={handleContextMenu}
                   />
                 </div>
               )
@@ -411,6 +472,48 @@ export function FileTree({
           </div>
         )}
       </div>
+
+      {/* Context menu portal */}
+      {contextMenu && createPortal(
+        <div
+          ref={contextMenuRef}
+          className="fixed z-[9999] min-w-[160px] rounded-md border bg-popover shadow-md"
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+        >
+          {deleteConfirm === contextMenu.path ? (
+            <div className="p-2">
+              <p className="text-sm mb-2 px-1">
+                Delete <span className="font-medium">{contextMenu.path.split('/').pop()}</span>?
+              </p>
+              <div className="flex gap-1">
+                <button
+                  className="flex-1 px-2 py-1 text-xs rounded hover:bg-accent"
+                  onClick={() => { setContextMenu(null); setDeleteConfirm(null) }}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="flex-1 px-2 py-1 text-xs rounded bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  onClick={() => handleDeleteFile(contextMenu.path)}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="py-1">
+              <button
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-sm hover:bg-accent text-destructive"
+                onClick={() => setDeleteConfirm(contextMenu.path)}
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </button>
+            </div>
+          )}
+        </div>,
+        document.body
+      )}
     </div>
   )
 }

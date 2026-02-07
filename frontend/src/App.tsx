@@ -230,6 +230,20 @@ function App() {
     }
   }, [fileParam, selectedFile, fetchFileContent])
 
+  // Handle file deletion — clear editor if deleted file was open
+  const handleDeleteFile = useCallback(
+    (path: string) => {
+      if (selectedFile === path) {
+        setSelectedFile(undefined)
+        setContent('')
+        contentRef.current = ''
+        isDirtyRef.current = false
+        navigate('/editor')
+      }
+    },
+    [selectedFile, navigate]
+  )
+
   // Toggle sidebar visibility
   const toggleSidebar = useCallback(() => {
     if (isMobile || isTablet) {
@@ -507,6 +521,7 @@ function App() {
             apiBaseUrl={API_BASE_URL}
             onCreateDailyNote={createDailyNote}
             onOpenTemplatePicker={openTemplatePicker}
+            onDeleteFile={handleDeleteFile}
           />
         )}
         {sidebarTab === 'tags' && (
