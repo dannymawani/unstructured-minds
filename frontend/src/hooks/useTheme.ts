@@ -5,8 +5,8 @@ type Theme = 'light' | 'dark'
 const THEME_KEY = 'unstructured-minds-theme'
 
 function getSystemTheme(): Theme {
-  if (typeof window === 'undefined') return 'dark'
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  // Default to dark — this is a dark-mode-first app
+  return 'dark'
 }
 
 function getStoredTheme(): Theme | null {
