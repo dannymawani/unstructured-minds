@@ -9,9 +9,10 @@ Access the dev app from any device on your WiFi network.
    ipconfig getifaddr en0
    ```
 
-2. **Set the API URL in `.env`:**
+2. **Set the API URL and CORS in `.env`:**
    ```bash
    VITE_API_URL=http://192.168.x.x:8000
+   CORS_ORIGINS=http://localhost:3000,http://localhost:5173,http://192.168.x.x:5173
    ```
    Replace `192.168.x.x` with the IP from step 1.
 
@@ -29,9 +30,10 @@ Access the dev app from any device on your WiFi network.
 
 ## Disable
 
-1. Comment out the line in `.env`:
+1. Comment out both lines in `.env`:
    ```bash
    # VITE_API_URL=http://192.168.x.x:8000
+   # CORS_ORIGINS=http://localhost:3000,http://localhost:5173,http://192.168.x.x:5173
    ```
 
 2. Restart containers:
