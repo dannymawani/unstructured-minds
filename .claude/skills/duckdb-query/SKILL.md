@@ -10,7 +10,7 @@ Query the project's DuckDB database for data analysis.
 
 ## Database Location
 
-The database is at `.unstructured/unstructured.duckdb` (relative to vault root).
+The database is at `data/unstructured.duckdb` (relative to project root).
 
 ## Common Schemas
 
@@ -164,7 +164,7 @@ WHERE status = 'backlog' AND date < '2025-01-01';
 1. Parse the user's question: $ARGUMENTS
 2. Identify relevant tables
 3. Write an efficient SQL query
-4. Execute with `duckdb .unstructured/unstructured.duckdb -c "QUERY"`
+4. Execute with `duckdb data/unstructured.duckdb -c "QUERY"`
 5. Present results in a readable format
 6. Provide insights from the data
 
