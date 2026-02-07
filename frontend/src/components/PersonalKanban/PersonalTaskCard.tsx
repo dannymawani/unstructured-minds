@@ -58,17 +58,25 @@ export function PersonalTaskCard({ task, onFileSelect }: PersonalTaskCardProps) 
     ? categoryColors[task.category.toLowerCase()] || 'bg-zinc-500/20 text-zinc-400'
     : null
 
+  const handleClick = () => {
+    if (task.source_file && onFileSelect) {
+      onFileSelect(task.source_file)
+    }
+  }
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       {...attributes}
       {...listeners}
+      onClick={handleClick}
       className={cn(
         'bg-zinc-900 border border-zinc-700 rounded-lg p-3 cursor-grab',
         'hover:border-zinc-500 transition-colors text-zinc-100',
         'active:cursor-grabbing',
-        isDragging && 'opacity-50 shadow-lg ring-2 ring-primary/50'
+        isDragging && 'opacity-50 shadow-lg ring-2 ring-primary/50',
+        task.source_file && onFileSelect && 'cursor-pointer'
       )}
     >
       <p className="text-sm leading-tight mb-2 text-zinc-100">

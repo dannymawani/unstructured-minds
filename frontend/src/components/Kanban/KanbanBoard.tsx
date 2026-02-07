@@ -45,52 +45,7 @@ type KanbanTab = 'personal' | 'implementation'
 const COLUMN_STATUSES = ['not_started', 'in_progress', 'done']
 
 export function KanbanBoard({ apiUrl, onFileSelect }: KanbanBoardProps) {
-  const [activeTab, setActiveTab] = useState<KanbanTab>('personal')
-
-  return (
-    <div className="h-full flex flex-col">
-      {/* Tab bar */}
-      <div className="flex border-b border-border bg-background">
-        <button
-          onClick={() => setActiveTab('personal')}
-          className={cn(
-            'px-4 py-2.5 text-sm font-medium transition-colors relative',
-            activeTab === 'personal'
-              ? 'text-foreground'
-              : 'text-muted-foreground hover:text-foreground'
-          )}
-        >
-          Personal Tasks
-          {activeTab === 'personal' && (
-            <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
-          )}
-        </button>
-        <button
-          onClick={() => setActiveTab('implementation')}
-          className={cn(
-            'px-4 py-2.5 text-sm font-medium transition-colors relative',
-            activeTab === 'implementation'
-              ? 'text-foreground'
-              : 'text-muted-foreground hover:text-foreground'
-          )}
-        >
-          Implementation
-          {activeTab === 'implementation' && (
-            <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
-          )}
-        </button>
-      </div>
-
-      {/* Tab content */}
-      <div className="flex-1 overflow-hidden">
-        {activeTab === 'personal' ? (
-          <PersonalKanban apiUrl={apiUrl} onFileSelect={onFileSelect} />
-        ) : (
-          <ImplementationKanban apiUrl={apiUrl} />
-        )}
-      </div>
-    </div>
-  )
+  return <PersonalKanban apiUrl={apiUrl} onFileSelect={onFileSelect} />
 }
 
 function ImplementationKanban({ apiUrl }: { apiUrl: string }) {

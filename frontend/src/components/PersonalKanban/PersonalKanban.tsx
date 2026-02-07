@@ -13,7 +13,7 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
-import { Plus, Calendar, Loader2 } from 'lucide-react'
+import { Plus, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { PersonalTaskCard, type Task } from './PersonalTaskCard'
@@ -121,10 +121,6 @@ export function PersonalKanban({ apiUrl, onFileSelect }: PersonalKanbanProps) {
   const [newTask, setNewTask] = useState<NewTaskForm>(INITIAL_FORM)
   const [submitting, setSubmitting] = useState(false)
 
-  // Date filters
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
-
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 5 },
@@ -134,13 +130,7 @@ export function PersonalKanban({ apiUrl, onFileSelect }: PersonalKanbanProps) {
   const fetchTasks = useCallback(async () => {
     try {
       setLoading(true)
-      const params = new URLSearchParams()
-      if (dateFrom) params.set('date_from', dateFrom)
-      if (dateTo) params.set('date_to', dateTo)
-      const qs = params.toString()
-      const url = `${apiUrl}/tasks${qs ? `?${qs}` : ''}`
-
-      const response = await fetch(url)
+      const response = await fetch(`${apiUrl}/tasks`)
       if (!response.ok) throw new Error('Failed to fetch tasks')
       const data: TasksResponse = await response.json()
       setTasks(data.tasks)
@@ -150,7 +140,7 @@ export function PersonalKanban({ apiUrl, onFileSelect }: PersonalKanbanProps) {
     } finally {
       setLoading(false)
     }
-  }, [apiUrl, dateFrom, dateTo])
+  }, [apiUrl])
 
   useEffect(() => {
     fetchTasks()
@@ -312,48 +302,6 @@ export function PersonalKanban({ apiUrl, onFileSelect }: PersonalKanbanProps) {
             <Plus className="w-4 h-4 mr-1" />
             New Task
           </Button>
-        </div>
-
-        {/* Date filters */}
-        <div className="flex flex-wrap items-center gap-3 mt-2">
-          <div className="flex items-center gap-1.5">
-            <Calendar className="w-4 h-4 text-muted-foreground" />
-            <label htmlFor="date-from" className="text-xs text-muted-foreground">
-              From
-            </label>
-            <input
-              id="date-from"
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className="text-xs bg-muted border border-border rounded px-2 py-1 text-foreground"
-            />
-          </div>
-          <div className="flex items-center gap-1.5">
-            <label htmlFor="date-to" className="text-xs text-muted-foreground">
-              To
-            </label>
-            <input
-              id="date-to"
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              className="text-xs bg-muted border border-border rounded px-2 py-1 text-foreground"
-            />
-          </div>
-          {(dateFrom || dateTo) && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-xs h-7"
-              onClick={() => {
-                setDateFrom('')
-                setDateTo('')
-              }}
-            >
-              Clear
-            </Button>
-          )}
         </div>
 
         {/* Inline new task form */}
