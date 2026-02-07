@@ -101,7 +101,7 @@ Plan → Approve → Implement → Test → Review → Deploy
 ## Brand & Design
 
 For visual identity, colors, typography, and component styling, see:
-- **`DESIGN_MANUAL.md`** — Full design system document (generated via `/design-manual`)
+- **`docs/DESIGN_MANUAL.md`** — Full design system document (generated via `/design-manual`)
 - **`brand-guidelines` skill** — Quick reference for colors, fonts, CSS variables
 
 ### Quick Color Reference
@@ -114,23 +114,6 @@ For visual identity, colors, typography, and component styling, see:
 | Amber | `#f59e0b` | Warnings, highlights |
 | Indigo | `#6366f1` | Links |
 | Rose | `#f43f5e` | Errors, destructive |
-
----
-
-## Implementation Docs
-
-All planning documents are in `/implementation_plan/`:
-
-| Document | Purpose |
-|----------|---------|
-| 01-VISION.md | Product vision, user stories |
-| 02-ARCHITECTURE.md | System design |
-| 03-FRONTEND.md | UI/UX specs |
-| 04-DATA-LAYER.md | Database design |
-| 05-LLM-INTEGRATION.md | Claude integration |
-| 06-IMPLEMENTATION.md | Code patterns |
-| 07-DECISIONS.md | ADRs |
-| 09-IMPLEMENTATION-PLAN-AND-STEPS.md | Build phases |
 
 ---
 
