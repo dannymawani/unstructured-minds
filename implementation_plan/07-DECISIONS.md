@@ -547,21 +547,20 @@ This adds complexity without benefit at personal data volumes.
 3. **DuckDB only** - No CSV export
 
 ### Decision
-**Flat CSV files** - one file per data type.
+**DuckDB only** - all extracted data stored directly in DuckDB tables.
 
 ```
 data/
-├── exercise_log.csv
-├── food_log.csv
-├── daily_metrics.csv
-└── daily_tasks.csv
+├── unstructured.duckdb    # All data in tables: exercise_log, food_log, daily_metrics, tasks
+├── settings.json
+└── schemas/*.json
 ```
 
 ### Consequences
-- Simpler file structure
+- Simplest file structure — single database file
 - DuckDB handles date filtering efficiently (~10K rows is trivial)
-- Easy to inspect/edit CSVs manually
-- Can partition later if data grows significantly
+- No redundant CSV files alongside the database
+- Schemas drive extraction, DuckDB is the source of truth
 - CSV export still available for portability
 
 ---
