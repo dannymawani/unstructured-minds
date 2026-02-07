@@ -19,7 +19,8 @@ RUN npm ci
 # Copy source files
 COPY . .
 
-# Build the production bundle
+# Build the production bundle (route API calls through nginx proxy)
+ENV VITE_API_URL=/api
 RUN npm run build
 
 # -----------------------------------------------------------------------------
