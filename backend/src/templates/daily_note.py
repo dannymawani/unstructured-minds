@@ -38,6 +38,7 @@ tags:
 ### Energy & Recovery
 - Sleep:
 - Energy Level:
+- Mood:
 - Nutrition:
 
 ---

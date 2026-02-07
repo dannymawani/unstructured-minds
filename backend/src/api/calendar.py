@@ -1,7 +1,8 @@
 """Calendar API endpoints."""
 
+import logging
 from calendar import monthrange
-from datetime import date
+from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel
@@ -9,6 +10,8 @@ from pydantic import BaseModel
 from ..db import DatabaseManager
 from ..storage import StorageBackend
 from ..templates.daily_note import render_daily_note
+
+logger = logging.getLogger(__name__)
 
 
 router = APIRouter(prefix="/calendar", tags=["calendar"])
@@ -209,10 +212,44 @@ async def create_or_get_daily_note(
         content = content_bytes.decode("utf-8")
         return DailyNoteResponse(path=path, created=False, content=content)
 
-    # Create new note from shared template
-    content = render_daily_note(request.date)
+    # Try reading vault template first, fall back to hardcoded
+    content = await _render_from_vault_template(storage, request.date)
+    if content is None:
+        content = render_daily_note(request.date)
 
     # Write the new note
     await storage.write(path, content.encode("utf-8"))
 
     return DailyNoteResponse(path=path, created=True, content=content)
+
+
+async def _render_from_vault_template(storage: StorageBackend, date_str: str) -> str | None:
+    """Try to render a daily note from the vault template.
+
+    Reads Templates/daily.md, wraps it with frontmatter and nav links.
+    Returns None if the vault template doesn't exist.
+    """
+    try:
+        template_bytes = await storage.read("Templates/daily.md")
+        template_body = template_bytes.decode("utf-8")
+    except (FileNotFoundError, Exception):
+        logger.debug("Vault template not found, using hardcoded template")
+        return None
+
+    dt = datetime.strptime(date_str, "%Y-%m-%d")
+    prev_date = (dt - timedelta(days=1)).strftime("%Y-%m-%d")
+    next_date = (dt + timedelta(days=1)).strftime("%Y-%m-%d")
+
+    return f"""\
+---
+date: {date_str}
+type: daily-note
+tags:
+  - daily
+  - journal
+---
+
+{template_body}
+---
+**Previous**: [[{prev_date}]] | **Next**: [[{next_date}]]
+"""
