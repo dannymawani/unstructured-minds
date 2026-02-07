@@ -123,10 +123,10 @@ def init_database(db_path: Path | str) -> duckdb.DuckDBPyConnection:
     conn.execute("UPDATE tasks SET status = 'backlog' WHERE status IN ('pending', 'todo')")
     conn.execute("UPDATE tasks SET status = 'done' WHERE status = 'completed'")
     conn.execute("UPDATE tasks SET status = 'in_progress' WHERE status = 'rolled_over'")
-    # Backfill completed_at for cancelled tasks that don't have it
+    # Backfill completed_at for done/cancelled tasks that don't have it
     conn.execute("""
-        UPDATE tasks SET completed_at = extracted_at
-        WHERE status = 'cancelled' AND completed_at IS NULL
+        UPDATE tasks SET completed_at = COALESCE(extracted_at, CURRENT_TIMESTAMP)
+        WHERE status IN ('done', 'cancelled') AND completed_at IS NULL
     """)
 
     # Kanban task updates / notes timeline
