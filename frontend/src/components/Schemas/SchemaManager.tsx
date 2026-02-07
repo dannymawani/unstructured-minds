@@ -9,6 +9,7 @@ import {
   Check,
   X,
   AlertCircle,
+  Database,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -226,7 +227,7 @@ export function SchemaManager({ apiBaseUrl = '' }: SchemaManagerProps) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <Loader2 className="w-6 h-6 animate-spin text-zinc-400" />
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
       </div>
     )
   }
@@ -235,7 +236,10 @@ export function SchemaManager({ apiBaseUrl = '' }: SchemaManagerProps) {
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-zinc-300">Extraction Schemas</h3>
+        <div className="flex items-center gap-1.5">
+          <Database className="w-3.5 h-3.5 text-muted-foreground" />
+          <h3 className="text-sm font-semibold text-muted-foreground">Extraction Schemas</h3>
+        </div>
         {!isCreating && !isEditing && (
           <Button
             variant="outline"
@@ -259,14 +263,14 @@ export function SchemaManager({ apiBaseUrl = '' }: SchemaManagerProps) {
 
       {/* Create/Edit Form */}
       {(isCreating || isEditing) && editForm && (
-        <div className="bg-zinc-800 rounded-lg p-4 space-y-4">
-          <h4 className="text-sm font-medium text-zinc-200">
+        <div className="bg-muted rounded-lg p-4 space-y-4">
+          <h4 className="text-sm font-medium text-foreground">
             {isCreating ? 'Create New Schema' : 'Edit Schema'}
           </h4>
 
           {/* Name */}
           <div>
-            <label className="block text-xs text-zinc-400 mb-1">Name</label>
+            <label className="block text-xs text-muted-foreground mb-1">Name</label>
             <input
               type="text"
               value={editForm.name}
@@ -274,8 +278,8 @@ export function SchemaManager({ apiBaseUrl = '' }: SchemaManagerProps) {
               disabled={!!isEditing}
               placeholder="e.g., book_notes"
               className={cn(
-                'w-full bg-zinc-700 border border-zinc-600 rounded px-3 py-2 text-sm text-zinc-100',
-                'focus:outline-none focus:ring-2 focus:ring-blue-500',
+                'w-full bg-secondary border border-input rounded px-3 py-2 text-sm text-foreground',
+                'focus:outline-none focus:ring-2 focus:ring-ring',
                 isEditing && 'opacity-50 cursor-not-allowed'
               )}
             />
@@ -283,19 +287,19 @@ export function SchemaManager({ apiBaseUrl = '' }: SchemaManagerProps) {
 
           {/* Description */}
           <div>
-            <label className="block text-xs text-zinc-400 mb-1">Description</label>
+            <label className="block text-xs text-muted-foreground mb-1">Description</label>
             <input
               type="text"
               value={editForm.description}
               onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
               placeholder="Describe what this schema extracts"
-              className="w-full bg-zinc-700 border border-zinc-600 rounded px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full bg-secondary border border-input rounded px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
 
           {/* Extraction Hints */}
           <div>
-            <label className="block text-xs text-zinc-400 mb-1">
+            <label className="block text-xs text-muted-foreground mb-1">
               Extraction Hints (optional)
             </label>
             <textarea
@@ -305,14 +309,14 @@ export function SchemaManager({ apiBaseUrl = '' }: SchemaManagerProps) {
               }
               placeholder="e.g., Look for book titles in headers"
               rows={2}
-              className="w-full bg-zinc-700 border border-zinc-600 rounded px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              className="w-full bg-secondary border border-input rounded px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
             />
           </div>
 
           {/* Fields */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-xs text-zinc-400">Fields</label>
+              <label className="text-xs text-muted-foreground">Fields</label>
               <Button
                 variant="ghost"
                 size="sm"
@@ -327,7 +331,7 @@ export function SchemaManager({ apiBaseUrl = '' }: SchemaManagerProps) {
               {editForm.fields.map((field, index) => (
                 <div
                   key={index}
-                  className="flex items-start gap-2 bg-zinc-700/50 rounded p-2"
+                  className="flex items-start gap-2 bg-secondary/50 rounded p-2"
                 >
                   <div className="flex-1 grid grid-cols-3 gap-2">
                     <input
@@ -335,14 +339,14 @@ export function SchemaManager({ apiBaseUrl = '' }: SchemaManagerProps) {
                       value={field.name}
                       onChange={(e) => updateField(index, { name: e.target.value })}
                       placeholder="Field name"
-                      className="bg-zinc-700 border border-zinc-600 rounded px-2 py-1 text-xs text-zinc-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      className="bg-secondary border border-input rounded px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                     />
                     <select
                       value={field.type}
                       onChange={(e) =>
                         updateField(index, { type: e.target.value as SchemaField['type'] })
                       }
-                      className="bg-zinc-700 border border-zinc-600 rounded px-2 py-1 text-xs text-zinc-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      className="bg-secondary border border-input rounded px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                     >
                       {FIELD_TYPES.map((type) => (
                         <option key={type} value={type}>
@@ -350,7 +354,7 @@ export function SchemaManager({ apiBaseUrl = '' }: SchemaManagerProps) {
                         </option>
                       ))}
                     </select>
-                    <label className="flex items-center gap-1 text-xs text-zinc-400">
+                    <label className="flex items-center gap-1 text-xs text-muted-foreground">
                       <input
                         type="checkbox"
                         checked={field.required}
@@ -365,7 +369,7 @@ export function SchemaManager({ apiBaseUrl = '' }: SchemaManagerProps) {
                     size="sm"
                     onClick={() => removeField(index)}
                     disabled={editForm.fields.length <= 1}
-                    className="h-6 w-6 p-0 text-zinc-400 hover:text-red-400"
+                    className="h-6 w-6 p-0 text-muted-foreground hover:text-red-400"
                   >
                     <X className="w-3 h-3" />
                   </Button>
@@ -406,59 +410,59 @@ export function SchemaManager({ apiBaseUrl = '' }: SchemaManagerProps) {
       {!isCreating && !isEditing && (
         <div className="space-y-2">
           {schemas.length === 0 ? (
-            <p className="text-sm text-zinc-500 text-center py-4">
+            <p className="text-sm text-muted-foreground text-center py-4">
               No schemas defined yet
             </p>
           ) : (
             schemas.map((schema) => (
               <div
                 key={schema.name}
-                className="bg-zinc-800/50 rounded-lg overflow-hidden"
+                className="bg-muted rounded-lg overflow-hidden"
               >
                 {/* Schema header */}
                 <button
                   onClick={() => toggleSchema(schema.name)}
-                  className="w-full flex items-center justify-between p-3 text-left hover:bg-zinc-700/50 transition-colors"
+                  className="w-full flex items-center justify-between p-3 text-left hover:bg-secondary/50 transition-colors"
                 >
                   <div className="flex items-center gap-2">
                     {expandedSchema === schema.name ? (
-                      <ChevronDown className="w-4 h-4 text-zinc-400" />
+                      <ChevronDown className="w-4 h-4 text-muted-foreground" />
                     ) : (
-                      <ChevronRight className="w-4 h-4 text-zinc-400" />
+                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
                     )}
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-zinc-200">
+                        <span className="text-sm font-medium text-foreground">
                           {schema.name}
                         </span>
                         {schema.is_builtin && (
-                          <span className="text-xs bg-zinc-700 text-zinc-400 px-1.5 py-0.5 rounded">
+                          <span className="text-xs bg-secondary text-muted-foreground px-1.5 py-0.5 rounded">
                             Built-in
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-zinc-500">{schema.description}</p>
+                      <p className="text-xs text-muted-foreground">{schema.description}</p>
                     </div>
                   </div>
-                  <span className="text-xs text-zinc-500">
+                  <span className="text-xs text-muted-foreground">
                     {schema.field_count} field{schema.field_count !== 1 ? 's' : ''}
                   </span>
                 </button>
 
                 {/* Schema details */}
                 {expandedSchema === schema.name && schemaDetails[schema.name] && (
-                  <div className="px-3 pb-3 border-t border-zinc-700">
+                  <div className="px-3 pb-3 border-t border-border">
                     <div className="pt-3 space-y-2">
                       {/* Fields */}
-                      <div className="text-xs text-zinc-400 mb-1">Fields:</div>
+                      <div className="text-xs text-muted-foreground mb-1">Fields:</div>
                       <div className="grid grid-cols-2 gap-2">
                         {schemaDetails[schema.name].fields.map((field) => (
                           <div
                             key={field.name}
-                            className="flex items-center gap-2 text-xs bg-zinc-700/50 rounded px-2 py-1"
+                            className="flex items-center gap-2 text-xs bg-secondary/50 rounded px-2 py-1"
                           >
-                            <span className="text-zinc-300">{field.name}</span>
-                            <span className="text-zinc-500">{field.type}</span>
+                            <span className="text-muted-foreground">{field.name}</span>
+                            <span className="text-muted-foreground">{field.type}</span>
                             {field.required && (
                               <span className="text-amber-500">*</span>
                             )}

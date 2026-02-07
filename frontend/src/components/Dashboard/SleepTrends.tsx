@@ -54,7 +54,7 @@ export function SleepTrends({
 
   if (loading) {
     return (
-      <div className="bg-zinc-800 rounded-lg p-4 h-64 animate-pulse" data-testid="sleep-loading" />
+      <div className="bg-card rounded-md shadow-sm p-4 h-64 animate-pulse" data-testid="sleep-loading" />
     );
   }
 
@@ -68,9 +68,9 @@ export function SleepTrends({
 
   if (!data || data.metrics.length === 0) {
     return (
-      <div className="bg-zinc-800 rounded-lg p-4" data-testid="sleep-empty">
-        <h3 className="text-lg font-semibold text-white mb-2">Sleep Trends</h3>
-        <p className="text-zinc-400">No sleep data recorded yet.</p>
+      <div className="bg-card rounded-md shadow-sm p-4" data-testid="sleep-empty">
+        <h3 className="text-lg font-semibold text-foreground mb-2">Sleep Trends</h3>
+        <p className="text-muted-foreground">No sleep data recorded yet.</p>
       </div>
     );
   }
@@ -79,9 +79,9 @@ export function SleepTrends({
 
   if (sleepData.length === 0) {
     return (
-      <div className="bg-zinc-800 rounded-lg p-4" data-testid="sleep-empty">
-        <h3 className="text-lg font-semibold text-white mb-2">Sleep Trends</h3>
-        <p className="text-zinc-400">No sleep data recorded yet.</p>
+      <div className="bg-card rounded-md shadow-sm p-4" data-testid="sleep-empty">
+        <h3 className="text-lg font-semibold text-foreground mb-2">Sleep Trends</h3>
+        <p className="text-muted-foreground">No sleep data recorded yet.</p>
       </div>
     );
   }
@@ -98,7 +98,7 @@ export function SleepTrends({
   else if (recentAvg < previousAvg - 0.25) trend = 'down';
 
   const TrendIcon = trend === 'up' ? TrendingUp : trend === 'down' ? TrendingDown : Minus;
-  const trendColor = trend === 'up' ? 'text-green-400' : trend === 'down' ? 'text-red-400' : 'text-zinc-400';
+  const trendColor = trend === 'up' ? 'text-green-400' : trend === 'down' ? 'text-red-400' : 'text-muted-foreground';
 
   // Build SVG points
   const points = values.map((v, i) => `${sx(i, n)},${sy(v)}`);
@@ -125,18 +125,18 @@ export function SleepTrends({
   const hoveredEntry = hovered !== null ? sleepData[hovered] : null;
 
   return (
-    <div className="bg-zinc-800 rounded-lg p-4" data-testid="sleep-trends">
+    <div className="bg-card rounded-md shadow-sm p-4" data-testid="sleep-trends">
       <div className="flex justify-between items-start mb-4">
         <div className="flex items-center gap-2">
           <Moon className="w-5 h-5 text-blue-400" />
-          <h3 className="text-lg font-semibold text-white">Sleep Trends</h3>
+          <h3 className="text-lg font-semibold text-foreground">Sleep Trends</h3>
         </div>
         <div className="text-right">
           <div className="flex items-center gap-1">
             <TrendIcon className={`w-4 h-4 ${trendColor}`} />
-            <span className="text-xl font-bold text-white">{avgSleep.toFixed(1)} hrs</span>
+            <span className="text-xl font-bold text-foreground">{avgSleep.toFixed(1)} hrs</span>
           </div>
-          <p className="text-xs text-zinc-400">avg / night</p>
+          <p className="text-xs text-muted-foreground">avg / night</p>
         </div>
       </div>
 
@@ -185,25 +185,25 @@ export function SleepTrends({
         {/* Tooltip */}
         {hoveredEntry && hovered !== null && (
           <div
-            className="absolute pointer-events-none bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm shadow-xl z-10"
+            className="absolute pointer-events-none bg-popover text-popover-foreground rounded-md shadow-lg border border-border px-3 py-2 text-sm z-10"
             style={{
               left: `${(sx(hovered, n) / W) * 100}%`,
               top: `${(sy(values[hovered]) / H) * 100}%`,
               transform: 'translate(-50%, -120%)',
             }}
           >
-            <div className="font-medium text-white text-xs mb-1">
+            <div className="font-medium text-foreground text-xs mb-1">
               {new Date(hoveredEntry.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
             </div>
             <div className="text-blue-400 text-xs">{(hoveredEntry.sleep_hours || 0).toFixed(1)} hours</div>
             {hoveredEntry.sleep_quality !== null && (
-              <div className="text-zinc-400 text-xs">Quality: {hoveredEntry.sleep_quality}/10</div>
+              <div className="text-muted-foreground text-xs">Quality: {hoveredEntry.sleep_quality}/10</div>
             )}
           </div>
         )}
       </div>
 
-      <div className="flex items-center justify-between mt-3 text-xs text-zinc-500">
+      <div className="flex items-center justify-between mt-3 text-xs text-muted-foreground">
         <span>Last {days} days</span>
         <span>
           7-day avg: {recentAvg.toFixed(1)} hrs {trend === 'up' ? '(improving)' : trend === 'down' ? '(declining)' : ''}

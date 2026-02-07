@@ -13,7 +13,7 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
-import { Plus, Loader2 } from 'lucide-react'
+import { Plus, Loader2, ListTodo } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { PersonalTaskCard, type Task } from './PersonalTaskCard'
@@ -41,7 +41,7 @@ const COLUMNS: ColumnDef[] = [
   { id: 'backlog', label: 'Backlog', borderColor: 'border-t-blue-500' },
   { id: 'in_progress', label: 'In Progress', borderColor: 'border-t-amber-500' },
   { id: 'done', label: 'Done', borderColor: 'border-t-green-500' },
-  { id: 'cancelled', label: 'Cancelled', borderColor: 'border-t-zinc-500' },
+  { id: 'cancelled', label: 'Cancelled', borderColor: 'border-t-muted-foreground' },
 ]
 
 interface NewTaskForm {
@@ -292,9 +292,12 @@ export function PersonalKanban({ apiUrl, onFileSelect }: PersonalKanbanProps) {
       <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-border">
         <div className="flex items-center justify-between mb-2">
           <div>
-            <h2 className="text-lg sm:text-xl font-semibold text-foreground">
-              Personal Tasks
-            </h2>
+            <div className="flex items-center gap-2">
+              <ListTodo className="w-5 h-5 text-accent" />
+              <h2 className="text-lg sm:text-xl font-semibold text-foreground">
+                Personal Tasks
+              </h2>
+            </div>
             <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
               {tasks.length} task{tasks.length !== 1 ? 's' : ''} total
             </p>

@@ -24,7 +24,7 @@ interface PersonalTaskCardProps {
 const priorityConfig: Record<number, { label: string; className: string }> = {
   1: { label: 'High', className: 'bg-red-500/20 text-red-400 border-red-500/30' },
   2: { label: 'Med', className: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
-  3: { label: 'Low', className: 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30' },
+  3: { label: 'Low', className: 'bg-muted text-muted-foreground border-border' },
 }
 
 const categoryColors: Record<string, string> = {
@@ -59,7 +59,7 @@ export function PersonalTaskCard({ task, onTaskClick }: PersonalTaskCardProps) {
 
   const priority = task.priority != null ? priorityConfig[task.priority] : null
   const categoryClass = task.category
-    ? categoryColors[task.category.toLowerCase()] || 'bg-zinc-500/20 text-zinc-400'
+    ? categoryColors[task.category.toLowerCase()] || 'bg-muted text-muted-foreground'
     : null
 
   // Use mouse events for click detection — completely independent of
@@ -87,13 +87,13 @@ export function PersonalTaskCard({ task, onTaskClick }: PersonalTaskCardProps) {
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
       className={cn(
-        'bg-zinc-900 border border-zinc-700 rounded-lg p-3 cursor-grab',
-        'hover:border-zinc-500 transition-colors text-zinc-100',
+        'bg-popover border border-border rounded-lg p-3 cursor-grab',
+        'hover:border-muted-foreground transition-colors text-foreground',
         'active:cursor-grabbing',
         isDragging && 'opacity-50 shadow-lg ring-2 ring-primary/50',
       )}
     >
-      <p className="text-sm leading-tight mb-2 text-zinc-100">
+      <p className="text-sm leading-tight mb-2 text-foreground">
         {task.description}
       </p>
 
@@ -121,10 +121,10 @@ export function PersonalTaskCard({ task, onTaskClick }: PersonalTaskCardProps) {
         )}
       </div>
 
-      <div className="flex items-center justify-between text-xs text-zinc-500">
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span>{task.date}</span>
         {task.source_file && (
-          <span className="flex items-center gap-1 text-zinc-400">
+          <span className="flex items-center gap-1 text-muted-foreground">
             <FileText className="w-3 h-3" />
             <span className="max-w-[120px] truncate">
               {getFilename(task.source_file)}

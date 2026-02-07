@@ -47,9 +47,9 @@ interface DataPoint {
 }
 
 function getCorrelationColor(correlation: number | null): string {
-  if (correlation === null) return 'text-zinc-500';
+  if (correlation === null) return 'text-muted-foreground';
   const abs = Math.abs(correlation);
-  if (abs < 0.3) return 'text-zinc-400';
+  if (abs < 0.3) return 'text-muted-foreground';
   if (abs < 0.6) return correlation > 0 ? 'text-yellow-400' : 'text-orange-400';
   return correlation > 0 ? 'text-green-400' : 'text-red-400';
 }
@@ -107,7 +107,7 @@ export function MoodCorrelation({
 
   if (loading) {
     return (
-      <div className="bg-zinc-800 rounded-lg p-4 h-72 animate-pulse" data-testid="correlation-loading" />
+      <div className="bg-card rounded-md shadow-sm p-4 h-72 animate-pulse" data-testid="correlation-loading" />
     );
   }
 
@@ -121,12 +121,12 @@ export function MoodCorrelation({
 
   if (!data || chartDataPoints.length < 3) {
     return (
-      <div className="bg-zinc-800 rounded-lg p-4" data-testid="correlation-empty">
+      <div className="bg-card rounded-md shadow-sm p-4" data-testid="correlation-empty">
         <div className="flex items-center gap-2 mb-2">
           <Brain className="w-5 h-5 text-purple-400" />
-          <h3 className="text-lg font-semibold text-white">Mood Correlations</h3>
+          <h3 className="text-lg font-semibold text-foreground">Mood Correlations</h3>
         </div>
-        <p className="text-zinc-400">Need at least 3 days of data to show correlations.</p>
+        <p className="text-muted-foreground">Need at least 3 days of data to show correlations.</p>
       </div>
     );
   }
@@ -158,28 +158,28 @@ export function MoodCorrelation({
   const hoveredPoint = hovered !== null ? chartDataPoints[hovered] : null;
 
   return (
-    <div className="bg-zinc-800 rounded-lg p-4" data-testid="mood-correlation">
+    <div className="bg-card rounded-md shadow-sm p-4" data-testid="mood-correlation">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 mb-4">
         <div className="flex items-center gap-2">
           <Brain className="w-5 h-5 text-purple-400" />
-          <h3 className="text-lg font-semibold text-white">Mood Correlations</h3>
+          <h3 className="text-lg font-semibold text-foreground">Mood Correlations</h3>
         </div>
 
         <div className="relative">
           <button
-            className="flex items-center gap-2 bg-zinc-700 hover:bg-zinc-600 text-white text-sm px-3 py-2 rounded-lg transition-colors"
+            className="flex items-center gap-2 bg-secondary hover:bg-secondary text-foreground text-sm px-3 py-2 rounded-lg transition-colors"
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
           >
             {currentPair.label}
             <ChevronDown className={`w-4 h-4 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
           </button>
           {isDropdownOpen && (
-            <div className="absolute right-0 mt-1 w-48 bg-zinc-700 rounded-lg shadow-lg z-10 overflow-hidden">
+            <div className="absolute right-0 mt-1 w-48 bg-secondary rounded-lg shadow-lg z-10 overflow-hidden">
               {METRIC_PAIRS.map((pair) => (
                 <button
                   key={pair.value}
-                  className={`w-full text-left px-3 py-2 text-sm hover:bg-zinc-600 transition-colors ${
-                    pair.value === selectedPair ? 'bg-zinc-600 text-white' : 'text-zinc-300'
+                  className={`w-full text-left px-3 py-2 text-sm hover:bg-secondary transition-colors ${
+                    pair.value === selectedPair ? 'bg-secondary text-foreground' : 'text-muted-foreground'
                   }`}
                   onClick={() => { setSelectedPair(pair.value); setIsDropdownOpen(false); }}
                 >
@@ -192,7 +192,7 @@ export function MoodCorrelation({
       </div>
 
       <div className="flex items-center gap-3 mb-3 text-sm">
-        <span className="text-zinc-400">Correlation:</span>
+        <span className="text-muted-foreground">Correlation:</span>
         <span className={`font-medium ${getCorrelationColor(correlation)}`}>
           {correlation !== null ? correlation.toFixed(2) : 'N/A'}
         </span>
@@ -241,26 +241,26 @@ export function MoodCorrelation({
         {/* Tooltip */}
         {hoveredPoint && hovered !== null && (
           <div
-            className="absolute pointer-events-none bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs shadow-xl z-10"
+            className="absolute pointer-events-none bg-popover text-popover-foreground rounded-md shadow-lg border border-border px-3 py-2 text-xs z-10"
             style={{
               left: `${(scaleX(hoveredPoint[currentPair.xKey as keyof DataPoint] as number) / W) * 100}%`,
               top: `${(scaleY(hoveredPoint[currentPair.yKey as keyof DataPoint] as number) / H) * 100}%`,
               transform: 'translate(-50%, -120%)',
             }}
           >
-            <div className="font-medium text-white mb-1">
+            <div className="font-medium text-foreground mb-1">
               {new Date(hoveredPoint.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
             </div>
-            <div className="text-zinc-300">Sleep: {hoveredPoint.sleep.toFixed(1)} hrs</div>
-            <div className="text-zinc-300">Energy: {hoveredPoint.energy}/10</div>
-            <div className="text-zinc-300">Mood: {hoveredPoint.mood}/10</div>
-            <div className="text-zinc-300">Stress: {hoveredPoint.stress}/10</div>
-            {hoveredPoint.activity > 0 && <div className="text-zinc-300">Activity: {hoveredPoint.activity} min</div>}
+            <div className="text-muted-foreground">Sleep: {hoveredPoint.sleep.toFixed(1)} hrs</div>
+            <div className="text-muted-foreground">Energy: {hoveredPoint.energy}/10</div>
+            <div className="text-muted-foreground">Mood: {hoveredPoint.mood}/10</div>
+            <div className="text-muted-foreground">Stress: {hoveredPoint.stress}/10</div>
+            {hoveredPoint.activity > 0 && <div className="text-muted-foreground">Activity: {hoveredPoint.activity} min</div>}
           </div>
         )}
       </div>
 
-      <div className="flex items-center justify-between mt-2 text-xs text-zinc-500">
+      <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
         <span>{chartDataPoints.length} data points</span>
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1">
