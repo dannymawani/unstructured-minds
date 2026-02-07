@@ -39,7 +39,7 @@ class DatabaseManager:
             self._conn = None
 
     def execute(self, query: str, params: Optional[list] = None) -> duckdb.DuckDBPyRelation:
-        """Execute a query.
+        """Execute a query using a per-call cursor for thread safety.
 
         Args:
             query: SQL query
@@ -48,10 +48,10 @@ class DatabaseManager:
         Returns:
             Query result
         """
-        conn = self.connect()
+        cursor = self.connect().cursor()
         if params:
-            return conn.execute(query, params)
-        return conn.execute(query)
+            return cursor.execute(query, params)
+        return cursor.execute(query)
 
     def __enter__(self) -> "DatabaseManager":
         """Context manager entry."""
