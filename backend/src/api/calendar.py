@@ -3,10 +3,12 @@
 import logging
 from calendar import monthrange
 from datetime import date, datetime, timedelta
+from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
+from ..claude import ClaudeClient
 from ..db import DatabaseManager
 from ..storage import StorageBackend
 from ..templates.daily_note import render_daily_note
@@ -42,6 +44,11 @@ def get_db(request: Request) -> DatabaseManager:
 def get_storage(request: Request) -> StorageBackend:
     """Get storage backend from app state."""
     return request.app.state.storage
+
+
+def get_claude(request: Request) -> ClaudeClient:
+    """Get Claude client from app state."""
+    return request.app.state.claude
 
 
 @router.get("/month", response_model=MonthDataResponse)
@@ -253,3 +260,122 @@ tags:
 ---
 **Previous**: [[{prev_date}]] | **Next**: [[{next_date}]]
 """
+
+
+class PopulateDailyNoteRequest(BaseModel):
+    """Request to populate a daily note template with wizard answers."""
+
+    date: str
+    template: str
+    workout: Optional[str] = None
+    sleep: Optional[int] = None
+    energy: Optional[int] = None
+    mood: Optional[int] = None
+    work_priorities: Optional[str] = None
+    personal: Optional[str] = None
+    adhoc: Optional[str] = None
+
+
+class PopulateDailyNoteResponse(BaseModel):
+    """Response for daily note population."""
+
+    content: str
+    used_ai: bool
+
+
+@router.post("/daily-note/populate", response_model=PopulateDailyNoteResponse)
+async def populate_daily_note(
+    request: PopulateDailyNoteRequest,
+    claude: ClaudeClient = Depends(get_claude),
+) -> PopulateDailyNoteResponse:
+    """Populate a daily note template with wizard answers using AI.
+
+    Falls back to simple string replacement if Claude is not configured.
+    """
+    answers = {
+        "workout": request.workout,
+        "sleep": request.sleep,
+        "energy": request.energy,
+        "mood": request.mood,
+        "work_priorities": request.work_priorities or "",
+        "personal": request.personal or "",
+        "adhoc": request.adhoc or "",
+    }
+
+    if claude.is_configured:
+        try:
+            content = await claude.populate_daily_note(
+                template=request.template,
+                answers=answers,
+                date=request.date,
+            )
+            return PopulateDailyNoteResponse(content=content, used_ai=True)
+        except Exception as e:
+            logger.warning("AI populate failed, falling back to string replacement: %s", e)
+
+    # Fallback: simple string replacement
+    content = _populate_fallback(request.template, answers)
+    return PopulateDailyNoteResponse(content=content, used_ai=False)
+
+
+def _populate_fallback(template: str, answers: dict) -> str:
+    """Simple string replacement fallback when AI is unavailable."""
+    import re
+
+    result = template
+
+    # Workout
+    workout = answers.get("workout")
+    if workout:
+        if workout == "Rest":
+            result = re.sub(
+                r"- \*\*Type\*\*:.*\n- \*\*Focus\*\*:.*",
+                "- Rest day",
+                result,
+            )
+        else:
+            result = re.sub(r"^(- \*\*Type\*\*:)\s*$", rf"\1 {workout}", result, flags=re.MULTILINE)
+            result = re.sub(r"^(- \*\*Focus\*\*:)\s*$", rf"\1 {workout}", result, flags=re.MULTILINE)
+
+    # Metrics
+    sleep = answers.get("sleep")
+    if sleep:
+        result = re.sub(r"^(- Sleep:)\s*$", rf"\1 {sleep}/10", result, flags=re.MULTILINE)
+    energy = answers.get("energy")
+    if energy:
+        result = re.sub(r"^(- Energy Level:)\s*$", rf"\1 {energy}/10", result, flags=re.MULTILINE)
+    mood = answers.get("mood")
+    if mood:
+        result = re.sub(r"^(- Mood:)\s*$", rf"\1 {mood}/10", result, flags=re.MULTILINE)
+
+    # Work priorities -> checkboxes under ## 💼 Work
+    work = answers.get("work_priorities", "")
+    if work.strip():
+        items = [line.strip() for line in work.replace(",", "\n").split("\n") if line.strip()]
+        checkboxes = "\n".join(f"- [ ] {item}" for item in items)
+        result = result.replace("## 💼 Work\n\n", f"## 💼 Work\n{checkboxes}\n\n")
+
+        # Also populate Today's Focus with top items
+        focus_items = items[:4]
+        focus_checkboxes = "\n".join(f"- [ ] {item}" for item in focus_items)
+        result = re.sub(
+            r"## 🎯 Today's Focus\n\n- \[ \]\n\n- \[ \]",
+            f"## 🎯 Today's Focus\n\n{focus_checkboxes}",
+            result,
+        )
+
+    # Personal -> checkboxes under ## 🤷🏽 Personal
+    personal = answers.get("personal", "")
+    if personal.strip():
+        items = [line.strip() for line in personal.replace(",", "\n").split("\n") if line.strip()]
+        checkboxes = "\n".join(f"- [ ] {item}" for item in items)
+        result = result.replace("## 🤷🏽 Personal\n\n", f"## 🤷🏽 Personal\n{checkboxes}\n\n")
+
+    # Adhoc -> bullets under ## 📝 Adhoc Notes
+    adhoc = answers.get("adhoc", "")
+    if adhoc.strip():
+        items = [line.strip() for line in adhoc.split("\n") if line.strip()]
+        bullets = "\n".join(f"- {item}" for item in items)
+        result = result.replace("## 📝 Adhoc Notes\n-\n", f"## 📝 Adhoc Notes\n{bullets}\n")
+
+    return result

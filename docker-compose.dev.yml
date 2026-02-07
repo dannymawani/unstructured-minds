@@ -73,7 +73,7 @@ services:
     environment:
       - NODE_ENV=development
       # Client-side API URL (used by browser, reaches host-mapped backend port)
-      - VITE_API_URL=http://localhost:8000
+      - VITE_API_URL=${VITE_API_URL:-http://localhost:8000}
       # Server-side proxy target (used by Vite dev server inside the container)
       - VITE_API_PROXY_TARGET=http://backend:8000
     # Override ports: only expose Vite dev server, not nginx port 80

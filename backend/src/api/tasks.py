@@ -292,6 +292,46 @@ async def update_task(
     return _row_to_task(row, columns)
 
 
+@router.delete("/{task_id}", status_code=204)
+async def delete_task(
+    task_id: str,
+    db: DatabaseManager = Depends(get_db),
+    storage: StorageBackend = Depends(get_storage),
+) -> None:
+    """Delete a task by ID and remove from source markdown."""
+    result = db.execute("SELECT * FROM tasks WHERE id = ?", [task_id])
+    columns = [desc[0] for desc in result.description]
+    row = result.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail=f"Task not found: {task_id}")
+
+    task = dict(zip(columns, row))
+    db.execute("DELETE FROM tasks WHERE id = ?", [task_id])
+
+    # Remove checkbox from source markdown
+    if task.get("source_file"):
+        try:
+            content_bytes = await storage.read(task["source_file"])
+            content = content_bytes.decode("utf-8")
+
+            description = task["description"]
+            status = task.get("status", "backlog")
+            checkbox = "x" if status == "done" else " "
+            pattern = rf"^- \[{re.escape(checkbox)}\] {re.escape(description)}\n?"
+            updated = re.sub(pattern, "", content, count=1, flags=re.MULTILINE)
+
+            # Try opposite checkbox state as fallback
+            if updated == content:
+                alt_checkbox = " " if status == "done" else "x"
+                pattern = rf"^- \[{re.escape(alt_checkbox)}\] {re.escape(description)}\n?"
+                updated = re.sub(pattern, "", content, count=1, flags=re.MULTILINE)
+
+            if updated != content:
+                await storage.write(task["source_file"], updated.encode("utf-8"))
+        except (FileNotFoundError, ValueError):
+            pass  # Task deleted from DB even if markdown sync fails
+
+
 @router.post("", response_model=TaskOut, status_code=201)
 async def create_task(
     request: TaskCreateRequest,

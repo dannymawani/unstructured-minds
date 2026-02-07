@@ -864,6 +864,7 @@ function App() {
         onComplete={handleWizardComplete}
         noteContent={wizardNoteContent}
         date={wizardDate}
+        apiBaseUrl={API_BASE_URL}
       />
     </div>
   )
