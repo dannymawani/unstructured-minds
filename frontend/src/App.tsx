@@ -97,6 +97,7 @@ function App() {
       const fileContent = await fetchFileContent(path)
       setContent(fileContent)
       setSelectedFile(path)
+      setView('editor')
       // Close mobile sidebar after selection
       if (isMobile || isTablet) {
         setIsMobileSidebarOpen(false)
