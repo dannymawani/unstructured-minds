@@ -319,6 +319,8 @@ async def import_vault(
             status_code=400,
             detail="Invalid ZIP file",
         )
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions (e.g., path traversal 400)
     except Exception as e:
         raise HTTPException(
             status_code=500,

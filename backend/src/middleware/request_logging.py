@@ -71,7 +71,7 @@ class RequestMetrics:
             return None
 
         sorted_latencies = sorted(self.latencies)
-        index = int(len(sorted_latencies) * percentile / 100)
+        index = int((len(sorted_latencies) - 1) * percentile / 100)
         index = min(index, len(sorted_latencies) - 1)
         return sorted_latencies[index]
 

@@ -25,6 +25,7 @@ import type { EditorState } from '@milkdown/prose/state'
 function createSlashMenuElement(getEditor: () => any, hide: () => void): HTMLElement {
   const el = document.createElement('div')
   el.className = 'slash-menu rounded-md border bg-popover shadow-md p-1 w-56'
+  el.style.zIndex = '50'
 
   const items: { label: string; icon: string; commandFn: () => (ctx: any) => boolean }[] = [
     { label: 'Heading 1', icon: 'H1', commandFn: () => callCommand(wrapInHeadingCommand.key, 1) },
@@ -111,6 +112,7 @@ export function useSlashPlugin() {
 function createToolbarElement(getEditor: () => any): HTMLElement {
   const el = document.createElement('div')
   el.className = 'floating-toolbar flex items-center gap-0.5 rounded-md border bg-popover shadow-md p-1'
+  el.style.zIndex = '50'
 
   const buttons: { label: string; title: string; commandFn: () => (ctx: any) => boolean }[] = [
     { label: '<b>B</b>', title: 'Bold', commandFn: () => callCommand(toggleStrongCommand.key) },

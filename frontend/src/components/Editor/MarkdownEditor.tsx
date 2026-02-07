@@ -92,7 +92,7 @@ interface MarkdownEditorProps {
 
 export function MarkdownEditor(props: MarkdownEditorProps) {
   return (
-    <div className="milkdown-editor h-full prose prose-sm max-w-none">
+    <div className="milkdown-editor h-full max-w-none">
       <MilkdownProvider>
         <EditorContent {...props} />
       </MilkdownProvider>

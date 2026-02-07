@@ -6,6 +6,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
 
+from ..cache import search_cache
 from ..middleware import limiter
 from ..middleware.rate_limit import RATE_LIMIT_SEARCH
 from ..middleware.validation import validate_query_length, MAX_SEARCH_QUERY_LENGTH
@@ -155,8 +156,8 @@ def calculate_score(content: str, query_terms: list[str]) -> float:
 @router.post("/search", response_model=SearchResponse)
 @limiter.limit(RATE_LIMIT_SEARCH)
 async def search(
-    request: SearchRequest,
-    http_request: Request,
+    request: Request,
+    body: SearchRequest,
     storage: StorageBackend = Depends(get_storage),
 ) -> SearchResponse:
     """Search across all vault notes.
@@ -165,15 +166,21 @@ async def search(
     returning results with snippets and relevance scores.
 
     Args:
-        request: Search query and options
+        request: HTTP request (required by slowapi rate limiter)
+        body: Search query and options
         storage: Storage backend for file access
 
     Returns:
         Search results with paths, titles, snippets, and scores
     """
-    query = request.query.strip()
+    query = body.query.strip()
     if not query:
         return SearchResponse(results=[])
+
+    cache_key = f"{query}:{body.limit}"
+    cached = search_cache.get(cache_key)
+    if cached is not None:
+        return cached
 
     # Split query into terms
     query_terms = query.split()
@@ -212,6 +219,8 @@ async def search(
     results.sort(key=lambda r: r.score, reverse=True)
 
     # Apply limit
-    results = results[: request.limit]
+    results = results[: body.limit]
 
-    return SearchResponse(results=results)
+    response = SearchResponse(results=results)
+    search_cache.set(cache_key, response)
+    return response

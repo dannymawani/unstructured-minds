@@ -237,10 +237,10 @@ class WebhookDispatcher:
         webhooks = self._storage.get_by_event(event)
 
         if not webhooks:
-            logger.debug("webhook_no_subscribers", event=event)
+            logger.debug("webhook_no_subscribers", event_type=event)
             return []
 
-        logger.info("webhook_dispatching", event=event, webhook_count=len(webhooks))
+        logger.info("webhook_dispatching", event_type=event, webhook_count=len(webhooks))
 
         # Dispatch to all webhooks concurrently
         tasks = [self._deliver(webhook, event, data) for webhook in webhooks]

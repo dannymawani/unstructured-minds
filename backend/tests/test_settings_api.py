@@ -25,7 +25,6 @@ def test_settings(tmp_path: Path):
         mock_settings.data_path.mkdir(parents=True, exist_ok=True)
 
         with patch("src.main.settings", mock_settings), \
-             patch("src.api.routes.settings", mock_settings), \
              patch("src.api.settings.settings", mock_settings):
             yield mock_settings
 

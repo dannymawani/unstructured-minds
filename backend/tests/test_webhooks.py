@@ -78,7 +78,7 @@ class TestWebhookStorage:
         storage = WebhookStorage(tmp_path)
 
         # Initially empty
-        assert storage.list() == []
+        assert storage.list_all() == []
 
         # Create a webhook
         webhook = Webhook(
@@ -92,7 +92,7 @@ class TestWebhookStorage:
         assert created.url == "https://example.com/test"
 
         # List should have one
-        webhooks = storage.list()
+        webhooks = storage.list_all()
         assert len(webhooks) == 1
         assert webhooks[0].id == webhook.id
 
@@ -124,7 +124,7 @@ class TestWebhookStorage:
 
         # Create new storage instance and verify data loads
         storage2 = WebhookStorage(tmp_path)
-        webhooks = storage2.list()
+        webhooks = storage2.list_all()
         assert len(webhooks) == 1
         assert webhooks[0].url == "https://example.com/persist"
 
@@ -195,7 +195,7 @@ class TestWebhookStorage:
 
         # Verify deleted
         assert storage.get(webhook.id) is None
-        assert len(storage.list()) == 0
+        assert len(storage.list_all()) == 0
 
         # Delete non-existent
         result = storage.delete("non-existent-id")

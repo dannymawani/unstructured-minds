@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, Request, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from ..cache import file_list_cache, invalidate_all
 from ..db import DatabaseManager
 from ..middleware import validate_file_path, PathValidationError
 from ..middleware.validation import MAX_FILE_PATH_LENGTH, MAX_QUERY_LENGTH
@@ -106,6 +107,11 @@ async def list_files(
         List of files matching the prefix
     """
     try:
+        cache_key = f"files:{prefix}"
+        cached = file_list_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
         file_paths = await storage.list(prefix)
         files = []
         seen_dirs: set[str] = set()
@@ -151,7 +157,9 @@ async def list_files(
                 )
             )
 
-        return FileListResponse(files=files)
+        response = FileListResponse(files=files)
+        file_list_cache.set(cache_key, response)
+        return response
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -189,15 +197,15 @@ async def read_file(
 
 @router.post("/vault/file", response_model=FileWriteResponse)
 async def write_file(
-    request_obj: Request,
-    request: FileWriteRequest,
+    request: Request,
+    body: FileWriteRequest,
     extract: bool = Query(True, description="Whether to trigger Claude extraction after save"),
     storage: StorageBackend = Depends(get_storage),
 ) -> FileWriteResponse:
     """Write a file to the vault.
 
     Args:
-        request: File path and content
+        body: File path and content
         extract: If False, save to disk only (no Claude extraction).
                  Used by autosave to avoid unnecessary API calls.
 
@@ -206,50 +214,51 @@ async def write_file(
     """
     # Validate path for security
     try:
-        validate_file_path(request.path, allow_any_extension=True)
+        validate_file_path(body.path, allow_any_extension=True)
     except PathValidationError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
     try:
         # Check if file exists to determine create vs update
-        is_new = not await storage.exists(request.path)
-        await storage.write(request.path, request.content.encode("utf-8"))
+        is_new = not await storage.exists(body.path)
+        await storage.write(body.path, body.content.encode("utf-8"))
+        invalidate_all()
 
         # Dispatch webhook event
         event = WebhookEvent.NOTE_CREATED if is_new else WebhookEvent.NOTE_UPDATED
         await dispatch_event(
             event.value,
             {
-                "path": request.path,
-                "content_length": len(request.content),
+                "path": body.path,
+                "content_length": len(body.content),
             },
         )
 
         # Check if this is a daily note creation
-        if is_new and "Daily-Notes/" in request.path:
+        if is_new and "Daily-Notes/" in body.path:
             await dispatch_event(
                 WebhookEvent.DAILY_CREATED.value,
                 {
-                    "path": request.path,
-                    "content_length": len(request.content),
+                    "path": body.path,
+                    "content_length": len(body.content),
                 },
             )
 
         # Only trigger extraction if requested
         did_extract = False
-        if extract and request.path.endswith(".md"):
+        if extract and body.path.endswith(".md"):
             try:
-                claude = request_obj.app.state.claude
-                db = request_obj.app.state.db
+                claude = request.app.state.claude
+                db = request.app.state.db
                 if claude.is_configured:
                     from ..extraction import ExtractionPipeline
                     pipeline = ExtractionPipeline(db, claude)
-                    result = await pipeline.extract(request.path, request.content)
+                    result = await pipeline.extract(body.path, body.content)
                     did_extract = result.success
             except Exception:
                 pass  # Extraction failure shouldn't fail the save
 
-        return FileWriteResponse(path=request.path, success=True, extracted=did_extract)
+        return FileWriteResponse(path=body.path, success=True, extracted=did_extract)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -277,6 +286,7 @@ async def delete_file(
 
     try:
         await storage.delete(path)
+        invalidate_all()
 
         # Dispatch webhook event for deletion
         await dispatch_event(

@@ -86,15 +86,15 @@ class TestChatEndpoint:
         assert "Chat failed" in response.json()["detail"]
 
     def test_chat_empty_message(self, client, mock_claude):
-        """Test chat with empty message still works."""
+        """Test chat with empty message returns validation error."""
         with patch.object(app.state, "claude", mock_claude):
             response = client.post(
                 "/chat",
                 json={"message": ""},
             )
 
-        # Should still work, let Claude handle empty input
-        assert response.status_code == 200
+        # min_length=1 on ChatRequest.message rejects empty strings
+        assert response.status_code == 422
 
     def test_chat_gathers_context_from_db(self, client, mock_claude):
         """Test that chat gathers context from database."""
