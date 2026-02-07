@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo } from 'react'
+import { memo, useCallback, useMemo, useRef, useEffect } from 'react'
 import { ChevronRight, ChevronDown, Folder, FileText } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -19,6 +19,11 @@ interface FileTreeItemProps {
   onToggle: (path: string) => void
   onSelect: (path: string) => void
   onContextMenu?: (e: React.MouseEvent, path: string) => void
+  isRenaming?: boolean
+  renameValue?: string
+  onRenameChange?: (value: string) => void
+  onRenameSubmit?: () => void
+  onRenameCancel?: () => void
 }
 
 function FileTreeItemComponent({
@@ -29,7 +34,22 @@ function FileTreeItemComponent({
   onToggle,
   onSelect,
   onContextMenu,
+  isRenaming,
+  renameValue,
+  onRenameChange,
+  onRenameSubmit,
+  onRenameCancel,
 }: FileTreeItemProps) {
+  const renameInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (isRenaming && renameInputRef.current) {
+      renameInputRef.current.focus()
+      // Select filename without extension
+      const dotIdx = (renameValue ?? '').lastIndexOf('.')
+      renameInputRef.current.setSelectionRange(0, dotIdx > 0 ? dotIdx : (renameValue ?? '').length)
+    }
+  }, [isRenaming, renameValue])
   const handleClick = useCallback(() => {
     if (node.isDirectory) {
       onToggle(node.path)
@@ -104,7 +124,28 @@ function FileTreeItemComponent({
           <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
         </>
       )}
-      <span className="truncate">{node.displayName || node.name}</span>
+      {isRenaming ? (
+        <input
+          ref={renameInputRef}
+          className="flex-1 min-w-0 bg-background border border-ring rounded px-1 py-0 text-sm outline-none"
+          value={renameValue ?? ''}
+          onChange={(e) => onRenameChange?.(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              onRenameSubmit?.()
+            } else if (e.key === 'Escape') {
+              e.preventDefault()
+              onRenameCancel?.()
+            }
+            e.stopPropagation()
+          }}
+          onBlur={() => onRenameCancel?.()}
+          onClick={(e) => e.stopPropagation()}
+        />
+      ) : (
+        <span className="truncate">{node.displayName || node.name}</span>
+      )}
     </div>
   )
 }
@@ -123,6 +164,8 @@ export const FileTreeItem = memo(FileTreeItemComponent, (prevProps, nextProps) =
     prevProps.selected === nextProps.selected &&
     prevProps.onToggle === nextProps.onToggle &&
     prevProps.onSelect === nextProps.onSelect &&
-    prevProps.onContextMenu === nextProps.onContextMenu
+    prevProps.onContextMenu === nextProps.onContextMenu &&
+    prevProps.isRenaming === nextProps.isRenaming &&
+    prevProps.renameValue === nextProps.renameValue
   )
 })

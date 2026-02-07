@@ -64,6 +64,21 @@ class FileDeleteResponse(BaseModel):
     success: bool
 
 
+class FileRenameRequest(BaseModel):
+    """Request to rename a file."""
+
+    old_path: str = Field(..., max_length=MAX_FILE_PATH_LENGTH)
+    new_path: str = Field(..., max_length=MAX_FILE_PATH_LENGTH)
+
+
+class FileRenameResponse(BaseModel):
+    """Response for file rename."""
+
+    old_path: str
+    new_path: str
+    success: bool
+
+
 class QuickCaptureRequest(BaseModel):
     """Request for quick capture."""
 
@@ -269,6 +284,47 @@ async def delete_file(
         return FileDeleteResponse(path=path, success=True)
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"File not found: {path}")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch("/vault/file", response_model=FileRenameResponse)
+async def rename_file(
+    body: FileRenameRequest,
+    storage: StorageBackend = Depends(get_storage),
+) -> FileRenameResponse:
+    """Rename a file in the vault.
+
+    Args:
+        body: Old and new file paths
+
+    Returns:
+        Success status with old and new paths
+    """
+    # Validate both paths for security
+    try:
+        validate_file_path(body.old_path, allow_any_extension=True)
+        validate_file_path(body.new_path, allow_any_extension=True)
+    except PathValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    try:
+        await storage.rename(body.old_path, body.new_path)
+        invalidate_all()
+
+        return FileRenameResponse(
+            old_path=body.old_path, new_path=body.new_path, success=True
+        )
+    except FileNotFoundError:
+        raise HTTPException(
+            status_code=404, detail=f"File not found: {body.old_path}"
+        )
+    except FileExistsError:
+        raise HTTPException(
+            status_code=409, detail=f"File already exists: {body.new_path}"
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react'
 import { createPortal } from 'react-dom'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { Plus, FolderPlus, RefreshCw, FileText, CalendarDays, LayoutTemplate, ChevronDown, Trash2 } from 'lucide-react'
+import { Plus, FolderPlus, RefreshCw, FileText, CalendarDays, LayoutTemplate, ChevronDown, Trash2, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { FileTreeItem, type FileNode } from './FileTreeItem'
 
@@ -18,6 +18,7 @@ interface FileTreeProps {
   onCreateDailyNote?: () => void
   onOpenTemplatePicker?: () => void
   onDeleteFile?: (path: string) => void
+  onRenameFile?: (oldPath: string, newPath: string) => void
 }
 
 interface FlattenedNode {
@@ -154,6 +155,7 @@ export function FileTree({
   onCreateDailyNote,
   onOpenTemplatePicker,
   onDeleteFile,
+  onRenameFile,
 }: FileTreeProps) {
   const [files, setFiles] = useState<FileNode[]>([])
   const [expanded, setExpanded] = useState<Set<string>>(() => {
@@ -292,6 +294,56 @@ export function FileTree({
     },
     [apiBaseUrl, fetchFiles, onDeleteFile]
   )
+
+  // Rename state
+  const [renamingFile, setRenamingFile] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
+
+  const handleStartRename = useCallback((path: string) => {
+    const fileName = path.split('/').pop() || ''
+    setRenamingFile(path)
+    setRenameValue(fileName)
+    setContextMenu(null)
+  }, [])
+
+  const handleRenameSubmit = useCallback(async () => {
+    if (!renamingFile || !renameValue.trim()) {
+      setRenamingFile(null)
+      return
+    }
+
+    const oldPath = renamingFile
+    const parts = oldPath.split('/')
+    parts[parts.length - 1] = renameValue.trim()
+    const newPath = parts.join('/')
+
+    if (newPath === oldPath) {
+      setRenamingFile(null)
+      return
+    }
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/vault/file`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ old_path: oldPath, new_path: newPath }),
+      })
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.detail || 'Failed to rename file')
+      }
+      await fetchFiles()
+      onRenameFile?.(oldPath, newPath)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to rename file')
+    } finally {
+      setRenamingFile(null)
+    }
+  }, [renamingFile, renameValue, apiBaseUrl, fetchFiles, onRenameFile])
+
+  const handleRenameCancel = useCallback(() => {
+    setRenamingFile(null)
+  }, [])
 
   // Close context menu on click outside or Escape
   useEffect(() => {
@@ -465,6 +517,11 @@ export function FileTree({
                     onToggle={handleToggle}
                     onSelect={handleSelect}
                     onContextMenu={handleContextMenu}
+                    isRenaming={renamingFile === node.path}
+                    renameValue={renamingFile === node.path ? renameValue : undefined}
+                    onRenameChange={setRenameValue}
+                    onRenameSubmit={handleRenameSubmit}
+                    onRenameCancel={handleRenameCancel}
                   />
                 </div>
               )
@@ -502,6 +559,13 @@ export function FileTree({
             </div>
           ) : (
             <div className="py-1">
+              <button
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-sm hover:bg-accent"
+                onClick={() => handleStartRename(contextMenu.path)}
+              >
+                <Pencil className="h-4 w-4" />
+                Rename
+              </button>
               <button
                 className="flex w-full items-center gap-2 px-3 py-1.5 text-sm hover:bg-accent text-destructive"
                 onClick={() => setDeleteConfirm(contextMenu.path)}

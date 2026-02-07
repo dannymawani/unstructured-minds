@@ -244,6 +244,17 @@ function App() {
     [selectedFile, navigate]
   )
 
+  // Handle file rename — update editor if renamed file was open
+  const handleRenameFile = useCallback(
+    (oldPath: string, newPath: string) => {
+      if (selectedFile === oldPath) {
+        setSelectedFile(newPath)
+        navigate(`/editor?file=${encodeURIComponent(newPath)}`)
+      }
+    },
+    [selectedFile, navigate]
+  )
+
   // Toggle sidebar visibility
   const toggleSidebar = useCallback(() => {
     if (isMobile || isTablet) {
@@ -522,6 +533,7 @@ function App() {
             onCreateDailyNote={createDailyNote}
             onOpenTemplatePicker={openTemplatePicker}
             onDeleteFile={handleDeleteFile}
+            onRenameFile={handleRenameFile}
           />
         )}
         {sidebarTab === 'tags' && (
