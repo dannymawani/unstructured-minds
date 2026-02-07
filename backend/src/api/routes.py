@@ -134,15 +134,15 @@ async def list_files(
                             )
                         )
             else:
-                # Add top-level directories
-                if len(parts) > 1:
-                    dir_path = parts[0]
+                # Add all intermediate directories
+                for i in range(len(parts) - 1):
+                    dir_path = "/".join(parts[: i + 1])
                     if dir_path not in seen_dirs:
                         seen_dirs.add(dir_path)
                         files.append(
                             FileInfo(
                                 path=dir_path,
-                                name=parts[0],
+                                name=parts[i],
                                 is_directory=True,
                             )
                         )

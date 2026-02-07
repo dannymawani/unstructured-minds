@@ -15,7 +15,7 @@ vi.mock('@tanstack/react-virtual', () => ({
   }),
 }))
 
-import { FileTree } from '../FileTree'
+import { FileTree, buildTree, transformDailyNotes } from '../FileTree'
 import { FileTreeItem, type FileNode } from '../FileTreeItem'
 
 describe('FileTreeItem', () => {
@@ -301,5 +301,122 @@ describe('FileTree', () => {
     fireEvent.click(screen.getByTitle('Refresh'))
 
     expect(global.fetch).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('transformDailyNotes', () => {
+  function makeDailyNotesTree(): FileNode[] {
+    return [
+      {
+        path: 'Daily-Notes',
+        name: 'Daily-Notes',
+        isDirectory: true,
+        children: [
+          {
+            path: 'Daily-Notes/Life-Profile.md',
+            name: 'Life-Profile.md',
+            isDirectory: false,
+          },
+          {
+            path: 'Daily-Notes/2026-02',
+            name: '2026-02',
+            isDirectory: true,
+            children: [
+              { path: 'Daily-Notes/2026-02/2026-02-07.md', name: '2026-02-07.md', isDirectory: false },
+            ],
+          },
+          {
+            path: 'Daily-Notes/2026-01',
+            name: '2026-01',
+            isDirectory: true,
+            children: [
+              { path: 'Daily-Notes/2026-01/2026-01-15.md', name: '2026-01-15.md', isDirectory: false },
+            ],
+          },
+          {
+            path: 'Daily-Notes/2025-12',
+            name: '2025-12',
+            isDirectory: true,
+            children: [
+              { path: 'Daily-Notes/2025-12/2025-12-25.md', name: '2025-12-25.md', isDirectory: false },
+            ],
+          },
+        ],
+      },
+      {
+        path: 'Templates',
+        name: 'Templates',
+        isDirectory: true,
+        children: [],
+      },
+    ]
+  }
+
+  it('groups month folders under virtual year nodes', () => {
+    const result = transformDailyNotes(makeDailyNotesTree())
+    const dailyNotes = result.find((n) => n.path === 'Daily-Notes')!
+
+    // Should have: Life-Profile.md, 2026 year node, 2025 year node
+    expect(dailyNotes.children).toHaveLength(3)
+
+    const yearNode2026 = dailyNotes.children!.find((n) => n.name === '2026')!
+    expect(yearNode2026).toBeDefined()
+    expect(yearNode2026.isVirtual).toBe(true)
+    expect(yearNode2026.path).toBe('Daily-Notes/__year__/2026')
+    expect(yearNode2026.children).toHaveLength(2) // February, January
+  })
+
+  it('uses human-readable month names as displayName', () => {
+    const result = transformDailyNotes(makeDailyNotesTree())
+    const dailyNotes = result.find((n) => n.path === 'Daily-Notes')!
+    const yearNode2026 = dailyNotes.children!.find((n) => n.name === '2026')!
+
+    const feb = yearNode2026.children!.find((n) => n.path === 'Daily-Notes/2026-02')!
+    const jan = yearNode2026.children!.find((n) => n.path === 'Daily-Notes/2026-01')!
+
+    expect(feb.displayName).toBe('February')
+    expect(jan.displayName).toBe('January')
+  })
+
+  it('keeps non-month files as direct children of Daily-Notes', () => {
+    const result = transformDailyNotes(makeDailyNotesTree())
+    const dailyNotes = result.find((n) => n.path === 'Daily-Notes')!
+
+    const lifeProfile = dailyNotes.children!.find((n) => n.name === 'Life-Profile.md')
+    expect(lifeProfile).toBeDefined()
+    expect(lifeProfile!.isDirectory).toBe(false)
+  })
+
+  it('sorts years newest first, months newest first', () => {
+    const result = transformDailyNotes(makeDailyNotesTree())
+    const dailyNotes = result.find((n) => n.path === 'Daily-Notes')!
+
+    // Non-month children come first, then year nodes newest-first
+    const dirChildren = dailyNotes.children!.filter((n) => n.isDirectory)
+    expect(dirChildren[0].name).toBe('2026')
+    expect(dirChildren[1].name).toBe('2025')
+
+    // Within 2026, February before January
+    const yearNode2026 = dirChildren[0]
+    expect(yearNode2026.children![0].displayName).toBe('February')
+    expect(yearNode2026.children![1].displayName).toBe('January')
+  })
+
+  it('does not modify trees without Daily-Notes', () => {
+    const roots: FileNode[] = [
+      { path: 'Templates', name: 'Templates', isDirectory: true, children: [] },
+    ]
+    const result = transformDailyNotes(roots)
+    expect(result).toEqual(roots)
+  })
+
+  it('preserves month folder children (daily note files)', () => {
+    const result = transformDailyNotes(makeDailyNotesTree())
+    const dailyNotes = result.find((n) => n.path === 'Daily-Notes')!
+    const yearNode2026 = dailyNotes.children!.find((n) => n.name === '2026')!
+    const feb = yearNode2026.children!.find((n) => n.path === 'Daily-Notes/2026-02')!
+
+    expect(feb.children).toHaveLength(1)
+    expect(feb.children![0].name).toBe('2026-02-07.md')
   })
 })
