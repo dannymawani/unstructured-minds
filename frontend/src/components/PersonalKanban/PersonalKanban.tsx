@@ -28,7 +28,7 @@ interface TasksResponse {
   total: number
 }
 
-type ColumnId = 'pending' | 'completed' | 'cancelled' | 'rolled_over'
+type ColumnId = 'backlog' | 'in_progress' | 'done' | 'cancelled'
 
 interface ColumnDef {
   id: ColumnId
@@ -37,10 +37,10 @@ interface ColumnDef {
 }
 
 const COLUMNS: ColumnDef[] = [
-  { id: 'pending', label: 'Pending', borderColor: 'border-t-blue-500' },
-  { id: 'completed', label: 'Completed', borderColor: 'border-t-green-500' },
+  { id: 'backlog', label: 'Backlog', borderColor: 'border-t-blue-500' },
+  { id: 'in_progress', label: 'In Progress', borderColor: 'border-t-amber-500' },
+  { id: 'done', label: 'Done', borderColor: 'border-t-green-500' },
   { id: 'cancelled', label: 'Cancelled', borderColor: 'border-t-zinc-500' },
-  { id: 'rolled_over', label: 'Rolled Over', borderColor: 'border-t-amber-500' },
 ]
 
 interface NewTaskForm {
@@ -159,8 +159,8 @@ export function PersonalKanban({ apiUrl, onFileSelect }: PersonalKanbanProps) {
   const getColumnTasks = useCallback(
     (columnId: ColumnId): Task[] => {
       return tasks.filter((t) => {
-        if (columnId === 'pending') {
-          return t.status === 'pending' || t.status === null
+        if (columnId === 'backlog') {
+          return t.status === 'backlog' || t.status === null
         }
         return t.status === columnId
       })
@@ -209,7 +209,7 @@ export function PersonalKanban({ apiUrl, onFileSelect }: PersonalKanbanProps) {
     (taskId: string): ColumnId | null => {
       const task = tasks.find((t) => t.id === taskId)
       if (!task) return null
-      if (task.status === null || task.status === 'pending') return 'pending'
+      if (task.status === null || task.status === 'backlog') return 'backlog'
       return (task.status as ColumnId) || null
     },
     [tasks]
@@ -258,7 +258,7 @@ export function PersonalKanban({ apiUrl, onFileSelect }: PersonalKanbanProps) {
       try {
         const body: Record<string, string | number> = {
           description: newTask.description.trim(),
-          status: 'pending',
+          status: 'backlog',
         }
         if (newTask.category.trim()) body.category = newTask.category.trim()
         if (newTask.priority) body.priority = Number(newTask.priority)

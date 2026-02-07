@@ -76,7 +76,7 @@ def db_with_data(client):
         INSERT INTO tasks (id, date, description, status, category)
         VALUES (?, ?, ?, ?, ?)
         """,
-        ["task_1", str(today - timedelta(days=1)), "Review code", "pending", "work"],
+        ["task_1", str(today - timedelta(days=1)), "Review code", "backlog", "work"],
     )
     db.execute(
         """

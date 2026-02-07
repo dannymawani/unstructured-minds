@@ -110,7 +110,7 @@ async def _gather_context_data(db: DatabaseManager, days: int = 7) -> dict:
         """
         SELECT date, description, category
         FROM tasks
-        WHERE status != 'completed' AND status != 'done'
+        WHERE status NOT IN ('done', 'cancelled')
         ORDER BY date DESC
         LIMIT 10
         """,

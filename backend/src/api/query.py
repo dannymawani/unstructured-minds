@@ -29,7 +29,7 @@ Available tables and their schemas:
 
 4. food_log (id VARCHAR, date DATE, meal_type VARCHAR, time TIME, description VARCHAR, calories INTEGER, protein_g INTEGER, carbs_g INTEGER, fat_g INTEGER, notes VARCHAR)
 
-5. tasks (id VARCHAR, date DATE, description VARCHAR, status VARCHAR, completed_at TIMESTAMP, category VARCHAR, priority INTEGER)
+5. tasks (id VARCHAR, date DATE, description VARCHAR, status VARCHAR [values: 'backlog', 'in_progress', 'done', 'cancelled'], completed_at TIMESTAMP, category VARCHAR, priority INTEGER)
 
 Rules:
 - Only generate SELECT queries (no INSERT, UPDATE, DELETE, DROP, etc.)

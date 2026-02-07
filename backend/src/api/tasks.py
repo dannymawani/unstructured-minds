@@ -2,7 +2,7 @@
 
 import re
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Request, HTTPException, Query
@@ -36,7 +36,7 @@ class TaskListResponse(BaseModel):
 
 
 class TaskUpdateRequest(BaseModel):
-    status: Optional[str] = Field(None, pattern=r"^(pending|completed|cancelled|rolled_over)$")
+    status: Optional[str] = Field(None, pattern=r"^(backlog|in_progress|done|cancelled)$")
     category: Optional[str] = None
     priority: Optional[int] = Field(None, ge=1, le=3)
 
@@ -87,7 +87,7 @@ async def _sync_task_to_markdown(
     except (FileNotFoundError, ValueError):
         return
 
-    checked = new_status == "completed"
+    checked = new_status == "done"
     old_pattern = r"- \[([ xX])\] " + re.escape(description)
     new_checkbox = f"- [{'x' if checked else ' '}] {description}"
     updated = re.sub(old_pattern, new_checkbox, content, count=1)
@@ -107,6 +107,7 @@ async def list_tasks(
     category: Optional[str] = Query(None, description="Filter by category"),
     date_from: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
     date_to: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
+    hide_old: bool = Query(True, description="Hide done/cancelled tasks older than 7 days"),
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
     db: DatabaseManager = Depends(get_db),
@@ -114,6 +115,12 @@ async def list_tasks(
     """List personal tasks with optional filters."""
     conditions = []
     params: list = []
+
+    if hide_old and not status:
+        conditions.append(
+            "(status NOT IN ('done', 'cancelled') OR completed_at IS NULL OR completed_at >= ?)"
+        )
+        params.append((datetime.now() - timedelta(days=7)).isoformat())
 
     if status:
         conditions.append("status = ?")
@@ -182,7 +189,7 @@ async def update_task(
     if request.status is not None:
         updates.append("status = ?")
         values.append(request.status)
-        if request.status == "completed":
+        if request.status in ("done", "cancelled"):
             updates.append("completed_at = ?")
             values.append(datetime.now().isoformat())
         elif existing.get("completed_at"):
@@ -233,7 +240,7 @@ async def create_task(
     # Insert into DuckDB
     db.execute(
         """INSERT INTO tasks (id, date, description, status, category, priority, source_file)
-           VALUES (?, ?, ?, 'pending', ?, ?, ?)""",
+           VALUES (?, ?, ?, 'backlog', ?, ?, ?)""",
         [task_id, date_str, request.description, request.category, request.priority, daily_note_path],
     )
 
