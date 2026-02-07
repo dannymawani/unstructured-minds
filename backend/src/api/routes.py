@@ -11,7 +11,6 @@ from ..db import DatabaseManager
 from ..middleware import validate_file_path, PathValidationError
 from ..middleware.validation import MAX_FILE_PATH_LENGTH, MAX_QUERY_LENGTH
 from ..storage import StorageBackend
-from ..webhooks import dispatch_event, WebhookEvent
 
 router = APIRouter()
 
@@ -219,30 +218,8 @@ async def write_file(
         raise HTTPException(status_code=400, detail=str(e))
 
     try:
-        # Check if file exists to determine create vs update
-        is_new = not await storage.exists(body.path)
         await storage.write(body.path, body.content.encode("utf-8"))
         invalidate_all()
-
-        # Dispatch webhook event
-        event = WebhookEvent.NOTE_CREATED if is_new else WebhookEvent.NOTE_UPDATED
-        await dispatch_event(
-            event.value,
-            {
-                "path": body.path,
-                "content_length": len(body.content),
-            },
-        )
-
-        # Check if this is a daily note creation
-        if is_new and "Daily-Notes/" in body.path:
-            await dispatch_event(
-                WebhookEvent.DAILY_CREATED.value,
-                {
-                    "path": body.path,
-                    "content_length": len(body.content),
-                },
-            )
 
         # Only trigger extraction if requested
         did_extract = False
@@ -287,12 +264,6 @@ async def delete_file(
     try:
         await storage.delete(path)
         invalidate_all()
-
-        # Dispatch webhook event for deletion
-        await dispatch_event(
-            WebhookEvent.NOTE_DELETED.value,
-            {"path": path},
-        )
 
         return FileDeleteResponse(path=path, success=True)
     except FileNotFoundError:
@@ -400,16 +371,6 @@ async def quick_capture(
                 next_date=next_date,
             )
             await storage.write(file_path, content.encode("utf-8"))
-
-            # Dispatch webhook events for new daily note
-            await dispatch_event(
-                WebhookEvent.NOTE_CREATED.value,
-                {"path": file_path, "content_length": len(content)},
-            )
-            await dispatch_event(
-                WebhookEvent.DAILY_CREATED.value,
-                {"path": file_path, "date": date_str},
-            )
 
         return QuickCaptureResponse(
             success=True,

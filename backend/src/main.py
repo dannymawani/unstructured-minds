@@ -1,8 +1,6 @@
 """FastAPI application entry point."""
 
-import asyncio
 from contextlib import asynccontextmanager
-from typing import Optional
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -29,14 +27,10 @@ from .api.tasks import router as tasks_router
 from .api.health import router as health_router, set_start_time
 from .api.metrics import router as metrics_router
 from .api.insights import router as insights_router
-from .api.plugins import router as plugins_router
-from .api.webhooks import router as webhooks_router
 from .claude import ClaudeClient
-from .plugins import PluginManager
 from .db import DatabaseManager
 from .middleware import limiter, SecurityHeadersMiddleware, RequestLoggingMiddleware
 from .storage import get_storage_backend
-from .watcher import FileWatcher
 
 # Configure structured logging
 configure_logging(
@@ -44,24 +38,6 @@ configure_logging(
     json_logs=not settings.debug,  # JSON in production, console in dev
 )
 logger = get_logger(__name__)
-
-
-def create_file_change_callback() -> callable:
-    """Create a callback function for file change events.
-
-    Extraction is no longer triggered by file watcher — it is handled
-    explicitly by the POST /vault/file endpoint when ?extract=true.
-    The watcher callback now only logs changes for debugging.
-
-    Returns:
-        Callback function
-    """
-
-    def on_file_change(file_path: str) -> None:
-        """Handle file change event (logging only)."""
-        logger.debug("file_changed", file=file_path)
-
-    return on_file_change
 
 
 @asynccontextmanager
@@ -94,45 +70,12 @@ async def lifespan(app: FastAPI):
     app.state.claude = claude
     logger.info("claude_client_initialized", configured=claude.is_configured)
 
-    # Initialize plugin system
-    from pathlib import Path
-
-    plugins_state_path = settings.data_path / "plugins.json"
-    plugin_manager = PluginManager(plugins_state_path)
-    app.state.plugin_manager = plugin_manager
-
-    # Load built-in plugins from examples directory
-    examples_dir = Path(__file__).parent / "plugins" / "examples"
-    await plugin_manager.load_builtin_plugins(examples_dir)
-    logger.info(
-        "plugin_system_initialized",
-        plugins_loaded=len(plugin_manager.list_plugins()),
-    )
-
-    # Initialize file watcher for auto-extraction
-    watcher: Optional[FileWatcher] = None
-    if settings.vault_path.exists():
-        file_change_callback = create_file_change_callback()
-        watcher = FileWatcher(
-            vault_path=settings.vault_path,
-            on_change=file_change_callback,
-            debounce_seconds=1.0,
-        )
-        watcher.start(loop=asyncio.get_running_loop())
-        app.state.watcher = watcher
-        logger.info("file_watcher_started", vault_path=str(settings.vault_path))
-    else:
-        logger.warning("file_watcher_disabled", reason="vault_path_not_exists")
-
     logger.info("application_ready")
 
     yield
 
     # Cleanup
     logger.info("application_shutting_down")
-    if watcher:
-        watcher.stop()
-        logger.info("file_watcher_stopped")
     app.state.db.close()
     logger.info("database_closed")
 
@@ -191,8 +134,6 @@ app.include_router(templates_router)
 app.include_router(tags_router)
 app.include_router(tasks_router)
 app.include_router(insights_router)
-app.include_router(plugins_router)
-app.include_router(webhooks_router)
 
 
 if __name__ == "__main__":

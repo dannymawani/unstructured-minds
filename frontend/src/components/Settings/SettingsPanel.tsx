@@ -1,18 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { X, Folder, Palette, Key, Check, Loader2, Download, Upload, Database, Archive, FileJson, Puzzle } from 'lucide-react'
+import { X, Folder, Palette, Key, Check, Loader2, Download, Upload, Database, Archive, FileJson } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { SchemaManager } from '@/components/Schemas'
-import { WebhooksSection } from './WebhooksSection'
-
-interface PluginInfo {
-  name: string
-  version: string
-  description: string
-  author: string
-  enabled: boolean
-  hooks: string[]
-}
 
 interface Settings {
   vault_path: string
@@ -45,9 +35,6 @@ export function SettingsPanel({
   const [exportStatus, setExportStatus] = useState<string | null>(null)
   const [isExporting, setIsExporting] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
-  const [plugins, setPlugins] = useState<PluginInfo[]>([])
-  const [isLoadingPlugins, setIsLoadingPlugins] = useState(false)
-  const [pluginTogglingName, setPluginTogglingName] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const fetchSettings = useCallback(async () => {
@@ -67,48 +54,11 @@ export function SettingsPanel({
     }
   }, [apiBaseUrl])
 
-  const fetchPlugins = useCallback(async () => {
-    setIsLoadingPlugins(true)
-    try {
-      const response = await fetch(`${apiBaseUrl}/plugins`)
-      if (!response.ok) {
-        throw new Error('Failed to fetch plugins')
-      }
-      const data = await response.json()
-      setPlugins(data.plugins || [])
-    } catch (err) {
-      console.error('Failed to fetch plugins:', err)
-      setPlugins([])
-    } finally {
-      setIsLoadingPlugins(false)
-    }
-  }, [apiBaseUrl])
-
-  const togglePlugin = async (pluginName: string, enabled: boolean) => {
-    setPluginTogglingName(pluginName)
-    try {
-      const action = enabled ? 'disable' : 'enable'
-      const response = await fetch(`${apiBaseUrl}/plugins/${pluginName}/${action}`, {
-        method: 'POST',
-      })
-      if (!response.ok) {
-        throw new Error(`Failed to ${action} plugin`)
-      }
-      // Refresh plugins list
-      await fetchPlugins()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to toggle plugin')
-    } finally {
-      setPluginTogglingName(null)
-    }
-  }
-
   useEffect(() => {
     if (isOpen) {
       fetchSettings()
-      fetchPlugins()
     }
-  }, [isOpen, fetchSettings, fetchPlugins])
+  }, [isOpen, fetchSettings])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -350,39 +300,6 @@ export function SettingsPanel({
                 </div>
               </section>
 
-              {/* Plugins Section */}
-              <section>
-                <div className="flex items-center gap-2 mb-3">
-                  <Puzzle className="w-4 h-4 text-pink-400" />
-                  <h3 className="text-sm font-semibold text-zinc-300 uppercase tracking-wide">
-                    Plugins
-                  </h3>
-                </div>
-                <div className="space-y-3">
-                  {isLoadingPlugins ? (
-                    <div className="flex items-center justify-center py-4">
-                      <Loader2 className="w-4 h-4 animate-spin text-zinc-400" />
-                    </div>
-                  ) : plugins.length === 0 ? (
-                    <div className="bg-zinc-800/50 rounded-lg p-3">
-                      <p className="text-sm text-zinc-500">No plugins installed</p>
-                    </div>
-                  ) : (
-                    plugins.map((plugin) => (
-                      <PluginItem
-                        key={plugin.name}
-                        plugin={plugin}
-                        isToggling={pluginTogglingName === plugin.name}
-                        onToggle={() => togglePlugin(plugin.name, plugin.enabled)}
-                      />
-                    ))
-                  )}
-                </div>
-              </section>
-
-              {/* Webhooks Section */}
-              <WebhooksSection apiBaseUrl={apiBaseUrl} />
-
               {/* Export/Import Section */}
               <section>
                 <div className="flex items-center gap-2 mb-3">
@@ -603,47 +520,3 @@ function ApiStatus({ enabled, configured, keySet }: ApiStatusProps) {
   )
 }
 
-interface PluginItemProps {
-  plugin: PluginInfo
-  isToggling: boolean
-  onToggle: () => void
-}
-
-function PluginItem({ plugin, isToggling, onToggle }: PluginItemProps) {
-  return (
-    <div className="bg-zinc-800/50 rounded-lg p-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-sm font-medium text-zinc-200">{plugin.name}</span>
-            <span className="text-xs text-zinc-500">v{plugin.version}</span>
-          </div>
-          <p className="text-xs text-zinc-400 mb-2">{plugin.description}</p>
-          {plugin.author && (
-            <p className="text-xs text-zinc-500">by {plugin.author}</p>
-          )}
-        </div>
-        <button
-          onClick={onToggle}
-          disabled={isToggling}
-          className={cn(
-            'relative w-11 h-6 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-zinc-900',
-            plugin.enabled ? 'bg-blue-500' : 'bg-zinc-600',
-            isToggling && 'opacity-50 cursor-not-allowed'
-          )}
-        >
-          {isToggling ? (
-            <Loader2 className="w-3 h-3 animate-spin absolute top-1.5 left-1.5 text-white" />
-          ) : (
-            <span
-              className={cn(
-                'absolute top-1 w-4 h-4 rounded-full bg-white transition-transform',
-                plugin.enabled ? 'translate-x-6' : 'translate-x-1'
-              )}
-            />
-          )}
-        </button>
-      </div>
-    </div>
-  )
-}
