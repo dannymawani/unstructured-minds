@@ -164,6 +164,25 @@ def init_database(db_path: Path | str) -> duckdb.DuckDBPyConnection:
         )
     """)
 
+    # Progress reviews table (bi-weekly life profile reviews)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS progress_reviews (
+            id VARCHAR PRIMARY KEY,
+            period_start DATE NOT NULL,
+            period_end DATE NOT NULL,
+            key_wins TEXT[],
+            challenges TEXT[],
+            work_highlights TEXT,
+            training_summary TEXT,
+            personal_wins TEXT[],
+            health_metrics JSON,
+            goal_progress JSON,
+            focus_next TEXT[],
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
     # File index table for fast file lookups
     conn.execute("""
         CREATE TABLE IF NOT EXISTS file_index (
@@ -262,6 +281,12 @@ def _create_indexes(conn: duckdb.DuckDBPyConnection) -> None:
     conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_file_index_extension
         ON file_index(extension)
+    """)
+
+    # Index on progress_reviews for timeline queries
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_reviews_period
+        ON progress_reviews(period_start)
     """)
 
     # Index on activities for dashboard queries
