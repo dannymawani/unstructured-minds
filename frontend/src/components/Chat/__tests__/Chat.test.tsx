@@ -49,12 +49,15 @@ describe('ChatPanel', () => {
 
   it('renders empty state', () => {
     render(<ChatPanel />)
-    expect(screen.getByText('Start a conversation')).toBeInTheDocument()
+    // Default mode is 'query' — text appears in header and empty state
+    const matches = screen.getAllByText('Ask questions about your data')
+    expect(matches.length).toBeGreaterThanOrEqual(1)
   })
 
   it('has input field and send button', () => {
     render(<ChatPanel />)
-    expect(screen.getByPlaceholderText('Ask a question...')).toBeInTheDocument()
+    // Default mode is 'query', placeholder is 'Ask about your data...'
+    expect(screen.getByPlaceholderText('Ask about your data...')).toBeInTheDocument()
     expect(screen.getByTitle('Send message')).toBeInTheDocument()
   })
 
@@ -65,25 +68,29 @@ describe('ChatPanel', () => {
 
   it('send button is enabled when input has text', () => {
     render(<ChatPanel />)
-    const input = screen.getByPlaceholderText('Ask a question...')
+    const input = screen.getByPlaceholderText('Ask about your data...')
     fireEvent.change(input, { target: { value: 'Hello' } })
     expect(screen.getByTitle('Send message')).not.toBeDisabled()
   })
 
   it('sends message on form submit', async () => {
+    // Default mode is 'query', so fetch hits /query/natural
     global.fetch = vi.fn(() =>
       Promise.resolve({
         ok: true,
         json: () =>
           Promise.resolve({
-            message: { role: 'assistant', content: 'Hello back!' },
-            context_used: false,
+            answer: 'Hello back!',
+            columns: [],
+            data: [],
+            sql: null,
+            row_count: 0,
           }),
       })
     )
 
     render(<ChatPanel />)
-    const input = screen.getByPlaceholderText('Ask a question...')
+    const input = screen.getByPlaceholderText('Ask about your data...')
     fireEvent.change(input, { target: { value: 'Hello' } })
     fireEvent.click(screen.getByTitle('Send message'))
 
@@ -104,14 +111,17 @@ describe('ChatPanel', () => {
         ok: true,
         json: () =>
           Promise.resolve({
-            message: { role: 'assistant', content: 'Response' },
-            context_used: false,
+            answer: 'Response',
+            columns: [],
+            data: [],
+            sql: null,
+            row_count: 0,
           }),
       })
     )
 
     render(<ChatPanel />)
-    const input = screen.getByPlaceholderText('Ask a question...')
+    const input = screen.getByPlaceholderText('Ask about your data...')
     fireEvent.change(input, { target: { value: 'Test' } })
     fireEvent.keyDown(input, { key: 'Enter' })
 
@@ -122,7 +132,7 @@ describe('ChatPanel', () => {
 
   it('does not send on Shift+Enter', () => {
     render(<ChatPanel />)
-    const input = screen.getByPlaceholderText('Ask a question...')
+    const input = screen.getByPlaceholderText('Ask about your data...')
     fireEvent.change(input, { target: { value: 'Test' } })
     fireEvent.keyDown(input, { key: 'Enter', shiftKey: true })
 
@@ -139,8 +149,11 @@ describe('ChatPanel', () => {
                 ok: true,
                 json: () =>
                   Promise.resolve({
-                    message: { role: 'assistant', content: 'Delayed response' },
-                    context_used: false,
+                    answer: 'Delayed response',
+                    columns: [],
+                    data: [],
+                    sql: null,
+                    row_count: 0,
                   }),
               }),
             100
@@ -149,13 +162,13 @@ describe('ChatPanel', () => {
     )
 
     render(<ChatPanel />)
-    const input = screen.getByPlaceholderText('Ask a question...')
+    const input = screen.getByPlaceholderText('Ask about your data...')
     fireEvent.change(input, { target: { value: 'Hello' } })
     fireEvent.click(screen.getByTitle('Send message'))
 
     // Should show loading state
     await waitFor(() => {
-      expect(screen.getByText('Thinking...')).toBeInTheDocument()
+      expect(screen.getByText('Querying data...')).toBeInTheDocument()
     })
 
     // Should show response after loading
@@ -173,7 +186,7 @@ describe('ChatPanel', () => {
     )
 
     render(<ChatPanel />)
-    const input = screen.getByPlaceholderText('Ask a question...')
+    const input = screen.getByPlaceholderText('Ask about your data...')
     fireEvent.change(input, { target: { value: 'Hello' } })
     fireEvent.click(screen.getByTitle('Send message'))
 
@@ -188,14 +201,17 @@ describe('ChatPanel', () => {
         ok: true,
         json: () =>
           Promise.resolve({
-            message: { role: 'assistant', content: 'Response' },
-            context_used: false,
+            answer: 'Response',
+            columns: [],
+            data: [],
+            sql: null,
+            row_count: 0,
           }),
       })
     )
 
     render(<ChatPanel />)
-    const input = screen.getByPlaceholderText('Ask a question...')
+    const input = screen.getByPlaceholderText('Ask about your data...')
     fireEvent.change(input, { target: { value: 'Hello' } })
     fireEvent.click(screen.getByTitle('Send message'))
 

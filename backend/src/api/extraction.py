@@ -78,8 +78,8 @@ def get_claude(request: Request) -> ClaudeClient:
 @router.post("/extract", response_model=ExtractResponse)
 @limiter.limit(RATE_LIMIT_EXTRACTION)
 async def extract_file(
-    request: ExtractRequest,
-    http_request: Request,
+    request: Request,
+    body: ExtractRequest,
     db: DatabaseManager = Depends(get_db),
     storage: StorageBackend = Depends(get_storage),
     claude: ClaudeClient = Depends(get_claude),
@@ -87,8 +87,8 @@ async def extract_file(
     """Extract structured data from a markdown file.
 
     Args:
-        request: Extraction request with file path
-        http_request: HTTP request for rate limiting
+        request: HTTP request (required by slowapi rate limiter)
+        body: Extraction request with file path
         db: Database manager
         storage: Storage backend
         claude: Claude client
@@ -98,16 +98,16 @@ async def extract_file(
     """
     # Validate file path
     try:
-        validate_file_path(request.file_path)
+        validate_file_path(body.file_path)
     except PathValidationError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
     # Read file content
     try:
-        content_bytes = await storage.read(request.file_path)
+        content_bytes = await storage.read(body.file_path)
         content = content_bytes.decode("utf-8")
     except FileNotFoundError:
-        raise HTTPException(status_code=404, detail=f"File not found: {request.file_path}")
+        raise HTTPException(status_code=404, detail=f"File not found: {body.file_path}")
     except ValueError as e:
         # Path traversal caught by storage backend
         raise HTTPException(status_code=400, detail=str(e))
@@ -117,10 +117,10 @@ async def extract_file(
     # Run extraction
     pipeline = ExtractionPipeline(db, claude)
     result = await pipeline.extract(
-        request.file_path,
+        body.file_path,
         content,
-        force=request.force,
-        schema_name=request.schema_name,
+        force=body.force,
+        schema_name=body.schema_name,
     )
 
     return ExtractResponse(
@@ -135,8 +135,8 @@ async def extract_file(
 @router.post("/extract/batch", response_model=ExtractBatchResponse)
 @limiter.limit(RATE_LIMIT_EXTRACTION)
 async def extract_batch(
-    request: ExtractBatchRequest,
-    http_request: Request,
+    request: Request,
+    body: ExtractBatchRequest,
     db: DatabaseManager = Depends(get_db),
     storage: StorageBackend = Depends(get_storage),
     claude: ClaudeClient = Depends(get_claude),
@@ -144,8 +144,8 @@ async def extract_batch(
     """Extract structured data from multiple files.
 
     Args:
-        request: Batch extraction request
-        http_request: HTTP request for rate limiting
+        request: HTTP request (required by slowapi rate limiter)
+        body: Batch extraction request
         db: Database manager
         storage: Storage backend
         claude: Claude client
@@ -154,7 +154,7 @@ async def extract_batch(
         Batch extraction results
     """
     # Validate all file paths first
-    for file_path in request.file_paths:
+    for file_path in body.file_paths:
         try:
             validate_file_path(file_path)
         except PathValidationError as e:
@@ -165,15 +165,15 @@ async def extract_batch(
     successful = 0
     failed = 0
 
-    for file_path in request.file_paths:
+    for file_path in body.file_paths:
         try:
             content_bytes = await storage.read(file_path)
             content = content_bytes.decode("utf-8")
             result = await pipeline.extract(
                 file_path,
                 content,
-                force=request.force,
-                schema_name=request.schema_name,
+                force=body.force,
+                schema_name=body.schema_name,
             )
 
             if result.success:
@@ -209,7 +209,7 @@ async def extract_batch(
             )
 
     return ExtractBatchResponse(
-        total=len(request.file_paths),
+        total=len(body.file_paths),
         successful=successful,
         failed=failed,
         results=results,

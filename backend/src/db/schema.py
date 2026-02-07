@@ -112,6 +112,18 @@ def init_database(db_path: Path | str) -> duckdb.DuckDBPyConnection:
         )
     """)
 
+    # File index table for fast file lookups
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS file_index (
+            path VARCHAR PRIMARY KEY,
+            filename VARCHAR NOT NULL,
+            extension VARCHAR,
+            size_bytes BIGINT,
+            modified_at TIMESTAMP,
+            content_hash VARCHAR
+        )
+    """)
+
     # Extraction log table
     conn.execute("""
         CREATE TABLE IF NOT EXISTS extraction_log (
@@ -186,6 +198,17 @@ def _create_indexes(conn: duckdb.DuckDBPyConnection) -> None:
     conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_kanban_phase
         ON kanban_tasks(phase)
+    """)
+
+    # Index on file_index for file search
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_file_index_filename
+        ON file_index(filename)
+    """)
+
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_file_index_extension
+        ON file_index(extension)
     """)
 
     # Index on activities for dashboard queries

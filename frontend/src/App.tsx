@@ -558,7 +558,7 @@ function App() {
           <>
             {/* Desktop Sidebar */}
             {!isMobile && !isTablet && isSidebarVisible && (
-              <aside className="w-64 border-r flex flex-col">
+              <aside className="w-64 border-r flex flex-col overflow-hidden">
                 {sidebarContent}
               </aside>
             )}
@@ -576,9 +576,9 @@ function App() {
             )}
 
             {/* Editor */}
-            <section className="flex-1 overflow-auto">
+            <section className="flex-1 flex flex-col min-h-0 overflow-hidden">
               {selectedFile ? (
-                <div className="h-full p-2 sm:p-4">
+                <div className="flex-1 overflow-auto p-2 sm:p-4">
                   <MarkdownEditor
                     content={content}
                     onChange={handleContentChange}
@@ -598,7 +598,7 @@ function App() {
 
             {/* Desktop Chat panel */}
             {!isMobile && !isTablet && (
-              <aside className="w-80 border-l">
+              <aside className="w-80 border-l flex flex-col overflow-hidden">
                 <ChatPanel apiBaseUrl={API_BASE_URL} />
               </aside>
             )}

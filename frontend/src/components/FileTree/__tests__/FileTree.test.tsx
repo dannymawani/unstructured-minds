@@ -1,5 +1,20 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+
+// Mock @tanstack/react-virtual to avoid jsdom/memory issues
+vi.mock('@tanstack/react-virtual', () => ({
+  useVirtualizer: ({ count, getScrollElement, estimateSize }: any) => ({
+    getVirtualItems: () =>
+      Array.from({ length: count }, (_, i) => ({
+        index: i,
+        start: i * (estimateSize?.() ?? 28),
+        size: estimateSize?.() ?? 28,
+        key: i,
+      })),
+    getTotalSize: () => count * (estimateSize?.() ?? 28),
+  }),
+}))
+
 import { FileTree } from '../FileTree'
 import { FileTreeItem, type FileNode } from '../FileTreeItem'
 
@@ -128,9 +143,19 @@ describe('FileTree', () => {
   })
 
   it('shows loading state initially', () => {
-    global.fetch = vi.fn(() => new Promise(() => {}))
-    render(<FileTree onFileSelect={vi.fn()} />)
+    // Use a promise that will eventually resolve to avoid memory leaks
+    let resolvePromise: (value: any) => void
+    global.fetch = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          resolvePromise = resolve
+        })
+    )
+    const { unmount } = render(<FileTree onFileSelect={vi.fn()} />)
     expect(screen.getByText('Loading...')).toBeInTheDocument()
+    unmount()
+    // Resolve the dangling promise to prevent leak
+    resolvePromise!({ ok: true, json: () => Promise.resolve({ files: [] }) })
   })
 
   it('shows error message on fetch failure', async () => {

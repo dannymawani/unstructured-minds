@@ -117,15 +117,16 @@ async def gather_context(db: DatabaseManager, query: str) -> str:
 @router.post("/chat", response_model=ChatResponse)
 @limiter.limit(RATE_LIMIT_CLAUDE_API)
 async def chat(
-    request: ChatRequest,
-    http_request: Request,
+    request: Request,
+    body: ChatRequest,
     db: DatabaseManager = Depends(get_db),
     claude: ClaudeClient = Depends(get_claude),
 ) -> ChatResponse:
     """Process a chat message and return a response.
 
     Args:
-        request: Chat request with user message
+        request: HTTP request (required by slowapi rate limiter)
+        body: Chat request with user message
         db: Database manager for context
         claude: Claude client for AI response
 
@@ -139,11 +140,11 @@ async def chat(
         )
 
     # Gather context from database
-    context = request.context or await gather_context(db, request.message)
+    context = body.context or await gather_context(db, body.message)
     context_used = bool(context and context != "No data available yet.")
 
     try:
-        response_text = await claude.query(request.message, context)
+        response_text = await claude.query(body.message, context)
 
         return ChatResponse(
             message=ChatMessage(role="assistant", content=response_text),

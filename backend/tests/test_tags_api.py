@@ -6,9 +6,7 @@ from unittest.mock import patch, MagicMock
 
 from fastapi.testclient import TestClient
 
-# Import modules first to make patching work
 import src.main
-import src.api.routes
 
 
 @pytest.fixture
@@ -28,8 +26,7 @@ def test_settings(tmp_path: Path):
     mock_settings.vault_path.mkdir(parents=True, exist_ok=True)
     mock_settings.data_path.mkdir(parents=True, exist_ok=True)
 
-    with patch.object(src.main, "settings", mock_settings), \
-         patch.object(src.api.routes, "settings", mock_settings):
+    with patch.object(src.main, "settings", mock_settings):
         yield mock_settings
 
 
