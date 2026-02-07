@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useRef, useEffect, lazy, Suspense } from 'react'
+import { Routes, Route, Navigate, useNavigate, useLocation, useSearchParams } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { FileTree } from '@/components/FileTree'
 import { MarkdownEditor } from '@/components/Editor/MarkdownEditor'
@@ -56,7 +57,19 @@ type SidebarTab = 'files' | 'tags' | 'links'
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 function App() {
-  const [view, setView] = useState<View>('editor')
+  const navigate = useNavigate()
+  const location = useLocation()
+  const [searchParams] = useSearchParams()
+
+  // Derive view from URL pathname instead of state
+  const view: View = useMemo(() => {
+    const path = location.pathname.replace(/^\//, '')
+    if (path === 'dashboard') return 'dashboard'
+    if (path === 'kanban') return 'kanban'
+    if (path === 'calendar') return 'calendar'
+    return 'editor'
+  }, [location.pathname])
+
   const [selectedFile, setSelectedFile] = useState<string | undefined>()
   const [content, setContent] = useState('')
   const contentRef = useRef(content)
@@ -101,13 +114,13 @@ function App() {
       const fileContent = await fetchFileContent(path)
       setContent(fileContent)
       setSelectedFile(path)
-      setView('editor')
+      navigate(`/editor?file=${encodeURIComponent(path)}`)
       // Close mobile sidebar after selection
       if (isMobile || isTablet) {
         setIsMobileSidebarOpen(false)
       }
     },
-    [fetchFileContent, isMobile, isTablet]
+    [fetchFileContent, isMobile, isTablet, navigate]
   )
 
   const handleContentChange = useCallback((markdown: string) => {
@@ -196,6 +209,19 @@ function App() {
     prevFileRef.current = selectedFile
   }, [selectedFile])
 
+  // Deep link: load file from ?file= query param (supports browser back/forward)
+  const fileParam = searchParams.get('file')
+  useEffect(() => {
+    if (fileParam && fileParam !== selectedFile) {
+      fetchFileContent(fileParam).then((fileContent) => {
+        setContent(fileContent)
+        contentRef.current = fileContent
+        isDirtyRef.current = false
+        setSelectedFile(fileParam)
+      })
+    }
+  }, [fileParam, selectedFile, fetchFileContent])
+
   // Toggle sidebar visibility
   const toggleSidebar = useCallback(() => {
     if (isMobile || isTablet) {
@@ -231,7 +257,7 @@ function App() {
     // Always open the file - fetch content first, then set selectedFile
     const fileContent = await fetchFileContent(dailyNotePath)
     setContent(fileContent)
-    setView('editor')
+    navigate(`/editor?file=${encodeURIComponent(dailyNotePath)}`)
     setSelectedFile(dailyNotePath)
 
     // Auto-expand chat with welcome prompt for new notes
@@ -239,7 +265,7 @@ function App() {
       setIsChatExpanded(true)
       setChatInitialMessage(`I just created today's daily note. What should I focus on today?`)
     }
-  }, [fetchFileContent])
+  }, [fetchFileContent, navigate])
 
   // Open command palette
   const openCommandPalette = useCallback(() => {
@@ -266,10 +292,10 @@ function App() {
     async (path: string) => {
       const fileContent = await fetchFileContent(path)
       setContent(fileContent)
-      setView('editor')
       setSelectedFile(path)
+      navigate(`/editor?file=${encodeURIComponent(path)}`)
     },
-    [fetchFileContent]
+    [fetchFileContent, navigate]
   )
 
   // Handle template creation result
@@ -277,10 +303,10 @@ function App() {
     async (path: string) => {
       const fileContent = await fetchFileContent(path)
       setContent(fileContent)
-      setView('editor')
       setSelectedFile(path)
+      navigate(`/editor?file=${encodeURIComponent(path)}`)
     },
-    [fetchFileContent]
+    [fetchFileContent, navigate]
   )
 
   // Handle calendar day selection
@@ -304,8 +330,8 @@ function App() {
       // Fetch content first, then set selectedFile
       const fileContent = await fetchFileContent(dailyNotePath)
       setContent(fileContent)
-      setView('editor')
       setSelectedFile(dailyNotePath)
+      navigate(`/editor?file=${encodeURIComponent(dailyNotePath)}`)
 
       // Auto-expand chat with welcome prompt for new notes
       if (!hasNote) {
@@ -313,7 +339,7 @@ function App() {
         setChatInitialMessage(`I just created a daily note for ${date}. What should I focus on?`)
       }
     },
-    [fetchFileContent]
+    [fetchFileContent, navigate]
   )
 
   // Command palette commands
@@ -324,15 +350,15 @@ function App() {
         onToggleSidebar: toggleSidebar,
         onCreateDailyNote: createDailyNote,
         onOpenCommandPalette: openCommandPalette,
-        onSwitchToEditor: () => setView('editor'),
-        onSwitchToDashboard: () => setView('dashboard'),
-        onSwitchToKanban: () => setView('kanban'),
-        onSwitchToCalendar: () => setView('calendar'),
+        onSwitchToEditor: () => navigate('/editor'),
+        onSwitchToDashboard: () => navigate('/dashboard'),
+        onSwitchToKanban: () => navigate('/kanban'),
+        onSwitchToCalendar: () => navigate('/calendar'),
         onSearch: openSearch,
         onNewFromTemplate: openTemplatePicker,
         onQuickCapture: openQuickCapture,
       }),
-    [handleSave, toggleSidebar, createDailyNote, openCommandPalette, openSearch, openTemplatePicker, openQuickCapture]
+    [handleSave, toggleSidebar, createDailyNote, openCommandPalette, navigate, openSearch, openTemplatePicker, openQuickCapture]
   )
 
   // Keyboard shortcuts
@@ -460,6 +486,98 @@ function App() {
     </div>
   )
 
+  // Editor view element (used by both / and /editor routes)
+  const editorElement = (
+    <>
+      {/* Desktop Sidebar */}
+      {!isMobile && !isTablet && isSidebarVisible && (
+        <aside className="w-64 border-r flex flex-col overflow-hidden">
+          {sidebarContent}
+        </aside>
+      )}
+
+      {/* Mobile/Tablet Sidebar Drawer */}
+      {(isMobile || isTablet) && (
+        <Drawer
+          isOpen={isMobileSidebarOpen}
+          onClose={() => setIsMobileSidebarOpen(false)}
+          position="left"
+          title="Files"
+        >
+          {sidebarContent}
+        </Drawer>
+      )}
+
+      {/* Editor + Chat below */}
+      <section className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        {selectedFile ? (
+          <div className="flex-1 overflow-auto p-2 sm:p-4">
+            <MarkdownEditor
+              key={selectedFile}
+              content={content}
+              onChange={handleContentChange}
+              onAutosave={handleAutosave}
+            />
+          </div>
+        ) : (
+          <div className="flex items-center justify-center h-full text-muted-foreground p-4 text-center">
+            <p>
+              {isMobile || isTablet
+                ? 'Tap the menu to select a file'
+                : 'Select a file to start editing'}
+            </p>
+          </div>
+        )}
+
+        {/* Desktop Chat panel — below editor, collapsible */}
+        {!isMobile && !isTablet && (
+          <>
+            <button
+              onClick={() => setIsChatExpanded(prev => !prev)}
+              className="flex items-center justify-center gap-2 px-3 py-1.5 border-t text-xs text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
+            >
+              <MessageSquare className="h-3.5 w-3.5" />
+              <span>{isChatExpanded ? 'Hide Chat' : 'Chat'}</span>
+              {isChatExpanded
+                ? <ChevronDown className="h-3.5 w-3.5" />
+                : <ChevronUp className="h-3.5 w-3.5" />
+              }
+            </button>
+            {isChatExpanded && (
+              <div className="h-72 border-t flex flex-col overflow-hidden">
+                <ChatPanel
+                  apiBaseUrl={API_BASE_URL}
+                  currentFile={selectedFile}
+                  currentContent={content}
+                  onContentUpdate={handleNoteContentUpdate}
+                  initialMessage={chatInitialMessage}
+                />
+              </div>
+            )}
+          </>
+        )}
+      </section>
+
+      {/* Mobile/Tablet Chat Drawer */}
+      {(isMobile || isTablet) && (
+        <Drawer
+          isOpen={isMobileChatOpen}
+          onClose={() => setIsMobileChatOpen(false)}
+          position={isMobile ? 'bottom' : 'right'}
+          title="Chat"
+        >
+          <ChatPanel
+            apiBaseUrl={API_BASE_URL}
+            currentFile={selectedFile}
+            currentContent={content}
+            onContentUpdate={handleNoteContentUpdate}
+            initialMessage={chatInitialMessage}
+          />
+        </Drawer>
+      )}
+    </>
+  )
+
   return (
     <div className={`h-screen flex flex-col overflow-hidden ${isMobile ? 'pb-16' : ''}`}>
       {/* Header */}
@@ -488,7 +606,7 @@ function App() {
               <Button
                 variant={view === 'editor' ? 'secondary' : 'ghost'}
                 size="sm"
-                onClick={() => setView('editor')}
+                onClick={() => navigate('/editor')}
                 className="gap-1"
               >
                 <FileText className="w-4 h-4" />
@@ -497,7 +615,7 @@ function App() {
               <Button
                 variant={view === 'dashboard' ? 'secondary' : 'ghost'}
                 size="sm"
-                onClick={() => setView('dashboard')}
+                onClick={() => navigate('/dashboard')}
                 className="gap-1"
               >
                 <LayoutDashboard className="w-4 h-4" />
@@ -506,7 +624,7 @@ function App() {
               <Button
                 variant={view === 'kanban' ? 'secondary' : 'ghost'}
                 size="sm"
-                onClick={() => setView('kanban')}
+                onClick={() => navigate('/kanban')}
                 className="gap-1"
               >
                 <Kanban className="w-4 h-4" />
@@ -515,7 +633,7 @@ function App() {
               <Button
                 variant={view === 'calendar' ? 'secondary' : 'ghost'}
                 size="sm"
-                onClick={() => setView('calendar')}
+                onClick={() => navigate('/calendar')}
                 className="gap-1"
               >
                 <Calendar className="w-4 h-4" />
@@ -584,121 +702,39 @@ function App() {
 
       {/* Main content */}
       <main className="flex-1 flex overflow-hidden">
-        {view === 'editor' ? (
-          <>
-            {/* Desktop Sidebar */}
-            {!isMobile && !isTablet && isSidebarVisible && (
-              <aside className="w-64 border-r flex flex-col overflow-hidden">
-                {sidebarContent}
-              </aside>
-            )}
-
-            {/* Mobile/Tablet Sidebar Drawer */}
-            {(isMobile || isTablet) && (
-              <Drawer
-                isOpen={isMobileSidebarOpen}
-                onClose={() => setIsMobileSidebarOpen(false)}
-                position="left"
-                title="Files"
-              >
-                {sidebarContent}
-              </Drawer>
-            )}
-
-            {/* Editor + Chat below */}
-            <section className="flex-1 flex flex-col min-h-0 overflow-hidden">
-              {selectedFile ? (
-                <div className="flex-1 overflow-auto p-2 sm:p-4">
-                  <MarkdownEditor
-                    key={selectedFile}
-                    content={content}
-                    onChange={handleContentChange}
-                    onAutosave={handleAutosave}
-                  />
-                </div>
-              ) : (
-                <div className="flex items-center justify-center h-full text-muted-foreground p-4 text-center">
-                  <p>
-                    {isMobile || isTablet
-                      ? 'Tap the menu to select a file'
-                      : 'Select a file to start editing'}
-                  </p>
-                </div>
-              )}
-
-              {/* Desktop Chat panel — below editor, collapsible */}
-              {!isMobile && !isTablet && (
-                <>
-                  <button
-                    onClick={() => setIsChatExpanded(prev => !prev)}
-                    className="flex items-center justify-center gap-2 px-3 py-1.5 border-t text-xs text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
-                  >
-                    <MessageSquare className="h-3.5 w-3.5" />
-                    <span>{isChatExpanded ? 'Hide Chat' : 'Chat'}</span>
-                    {isChatExpanded
-                      ? <ChevronDown className="h-3.5 w-3.5" />
-                      : <ChevronUp className="h-3.5 w-3.5" />
-                    }
-                  </button>
-                  {isChatExpanded && (
-                    <div className="h-72 border-t flex flex-col overflow-hidden">
-                      <ChatPanel
-                        apiBaseUrl={API_BASE_URL}
-                        currentFile={selectedFile}
-                        currentContent={content}
-                        onContentUpdate={handleNoteContentUpdate}
-                        initialMessage={chatInitialMessage}
-                      />
-                    </div>
-                  )}
-                </>
-              )}
-            </section>
-
-            {/* Mobile/Tablet Chat Drawer */}
-            {(isMobile || isTablet) && (
-              <Drawer
-                isOpen={isMobileChatOpen}
-                onClose={() => setIsMobileChatOpen(false)}
-                position={isMobile ? 'bottom' : 'right'}
-                title="Chat"
-              >
-                <ChatPanel
-                  apiBaseUrl={API_BASE_URL}
-                  currentFile={selectedFile}
-                  currentContent={content}
-                  onContentUpdate={handleNoteContentUpdate}
-                  initialMessage={chatInitialMessage}
+        <Routes>
+          <Route path="/dashboard" element={
+            <Suspense fallback={<ViewLoadingFallback />}>
+              <section className="flex-1 overflow-auto bg-background">
+                <Dashboard apiUrl={API_BASE_URL} />
+              </section>
+            </Suspense>
+          } />
+          <Route path="/kanban" element={
+            <Suspense fallback={<ViewLoadingFallback />}>
+              <section className="flex-1 overflow-auto bg-background">
+                <KanbanBoard apiUrl={API_BASE_URL} onFileSelect={handleFileSelect} />
+              </section>
+            </Suspense>
+          } />
+          <Route path="/calendar" element={
+            <Suspense fallback={<ViewLoadingFallback />}>
+              <section className="flex-1 overflow-auto bg-background">
+                <CalendarView
+                  apiUrl={API_BASE_URL}
+                  onDaySelect={handleCalendarDaySelect}
                 />
-              </Drawer>
-            )}
-          </>
-        ) : view === 'dashboard' ? (
-          <Suspense fallback={<ViewLoadingFallback />}>
-            <section className="flex-1 overflow-auto bg-background">
-              <Dashboard apiUrl={API_BASE_URL} />
-            </section>
-          </Suspense>
-        ) : view === 'kanban' ? (
-          <Suspense fallback={<ViewLoadingFallback />}>
-            <section className="flex-1 overflow-auto bg-background">
-              <KanbanBoard apiUrl={API_BASE_URL} onFileSelect={handleFileSelect} />
-            </section>
-          </Suspense>
-        ) : (
-          <Suspense fallback={<ViewLoadingFallback />}>
-            <section className="flex-1 overflow-auto bg-background">
-              <CalendarView
-                apiUrl={API_BASE_URL}
-                onDaySelect={handleCalendarDaySelect}
-              />
-            </section>
-          </Suspense>
-        )}
+              </section>
+            </Suspense>
+          } />
+          <Route path="/editor" element={editorElement} />
+          <Route path="/" element={editorElement} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
       </main>
 
       {/* Mobile bottom navigation */}
-      {isMobile && <MobileNav currentView={view} onViewChange={setView} />}
+      {isMobile && <MobileNav currentView={view} onViewChange={(v) => navigate(v === 'editor' ? '/editor' : `/${v}`)} />}
 
       {/* Command Palette */}
       <CommandPalette
