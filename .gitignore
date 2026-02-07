@@ -56,8 +56,18 @@ frontend/build/
 
 # Data (keep structure, ignore contents)
 data/*.duckdb
+data/*.duckdb.wal
 data/*.csv
 !data/.gitkeep
+
+# Backend runtime data
+backend/data/*.duckdb
+backend/data/*.duckdb.wal
+backend/data/*.json
+!backend/data/.gitkeep
+
+# User vault - personal notes
+vault/
 
 # Docker
 .docker/
