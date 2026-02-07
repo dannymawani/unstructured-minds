@@ -1,0 +1,39 @@
+{
+    "active_injuries": [
+        {
+            "id": "left_shoulder_instability",
+            "name": "Left Shoulder Mobility/Instability",
+            "status": "active",
+            "prehab_required": true,
+            "prehab_routine": [
+                "Band Pull-Aparts (2x20)",
+                "Face Pulls (2x15)",
+                "Scapular Pushups (2x10)"
+            ],
+            "constraints": [
+                {
+                    "type": "warning",
+                    "target": "overhead_press",
+                    "message": "⚠️ Use active stability (shrug at top), do not let shoulder hang."
+                }
+            ]
+        },
+        {
+            "id": "wrist_pain",
+            "name": "Wrist Pain (Hypermobility)",
+            "status": "active",
+            "constraints": [
+                {
+                    "type": "substitution",
+                    "target": [
+                        "pushup",
+                        "floor_press",
+                        "burpee"
+                    ],
+                    "substitution": "neutral_grip_pushup_handles",
+                    "message": "⛔ No flat palm loading. Use parallettes or dumbbells."
+                }
+            ]
+        }
+    ]
+}

@@ -1,0 +1,67 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Exercise Definitions Schema",
+  "description": "Unified exercise definitions with aliases, display names, muscle groups, and recovery times",
+  "type": "object",
+  "patternProperties": {
+    "^[a-z_]+$": {
+      "type": "object",
+      "required": ["display", "aliases", "muscle_groups", "category", "recovery_hours"],
+      "properties": {
+        "display": {
+          "type": "string",
+          "description": "Human-readable display name for the exercise"
+        },
+        "aliases": {
+          "type": "array",
+          "description": "Alternative names or spellings (e.g., Danish translations)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "muscle_groups": {
+          "type": "array",
+          "description": "Primary and secondary muscle groups targeted",
+          "items": {
+            "type": "string",
+            "enum": [
+              "chest",
+              "back",
+              "shoulders",
+              "quads",
+              "hamstrings",
+              "glutes",
+              "triceps",
+              "biceps",
+              "core",
+              "lower_back",
+              "adductors",
+              "abductors"
+            ]
+          },
+          "minItems": 1
+        },
+        "category": {
+          "type": "string",
+          "description": "Exercise category for grouping",
+          "enum": [
+            "compound",
+            "back",
+            "chest",
+            "legs",
+            "arms",
+            "functional"
+          ]
+        },
+        "recovery_hours": {
+          "type": "integer",
+          "description": "Recommended recovery time in hours before training same muscle groups",
+          "minimum": 0,
+          "enum": [24, 48, 72]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

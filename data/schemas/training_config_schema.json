@@ -1,0 +1,209 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Training Configuration Schema",
+  "description": "Unified training configuration including athlete profile, recovery settings, and targets",
+  "type": "object",
+  "required": ["athlete", "recovery", "targets", "core_lifts", "preferences", "constraints"],
+  "properties": {
+    "athlete": {
+      "type": "object",
+      "required": ["name", "height_cm", "weight_kg", "age", "bjj_days", "timezone"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Athlete's full name"
+        },
+        "height_cm": {
+          "type": "integer",
+          "description": "Height in centimeters",
+          "minimum": 100,
+          "maximum": 250
+        },
+        "weight_kg": {
+          "type": "number",
+          "description": "Weight in kilograms",
+          "minimum": 40,
+          "maximum": 200
+        },
+        "age": {
+          "type": "integer",
+          "description": "Age in years",
+          "minimum": 13,
+          "maximum": 100
+        },
+        "bjj_days": {
+          "type": "array",
+          "description": "Days of the week for BJJ training",
+          "items": {
+            "type": "string",
+            "enum": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+          }
+        },
+        "timezone": {
+          "type": "string",
+          "description": "IANA timezone identifier",
+          "default": "Europe/Copenhagen"
+        }
+      },
+      "additionalProperties": false
+    },
+    "recovery": {
+      "type": "object",
+      "required": ["large_muscles_hours", "medium_muscles_hours", "small_muscles_hours", "bjj_recovery_hours", "cardio_recovery_hours"],
+      "properties": {
+        "large_muscles_hours": {
+          "type": "integer",
+          "description": "Recovery hours for large muscle groups (legs, back)",
+          "minimum": 24,
+          "maximum": 168
+        },
+        "medium_muscles_hours": {
+          "type": "integer",
+          "description": "Recovery hours for medium muscle groups (chest, shoulders)",
+          "minimum": 24,
+          "maximum": 96
+        },
+        "small_muscles_hours": {
+          "type": "integer",
+          "description": "Recovery hours for small muscle groups (biceps, triceps)",
+          "minimum": 12,
+          "maximum": 72
+        },
+        "bjj_recovery_hours": {
+          "type": "integer",
+          "description": "Recovery hours after BJJ session",
+          "minimum": 12,
+          "maximum": 48
+        },
+        "cardio_recovery_hours": {
+          "type": "integer",
+          "description": "Recovery hours after cardio session",
+          "minimum": 12,
+          "maximum": 48
+        }
+      },
+      "additionalProperties": false
+    },
+    "targets": {
+      "type": "object",
+      "required": ["strength_sessions_per_week", "bjj_sessions_per_week", "cardio_sessions_per_week", "daily_protein_g", "daily_calories", "sleep_hours", "min_energy_for_training"],
+      "properties": {
+        "strength_sessions_per_week": {
+          "type": "integer",
+          "description": "Target number of strength training sessions per week",
+          "minimum": 0,
+          "maximum": 7
+        },
+        "bjj_sessions_per_week": {
+          "type": "integer",
+          "description": "Target number of BJJ sessions per week",
+          "minimum": 0,
+          "maximum": 7
+        },
+        "cardio_sessions_per_week": {
+          "type": "integer",
+          "description": "Target number of cardio sessions per week",
+          "minimum": 0,
+          "maximum": 7
+        },
+        "daily_protein_g": {
+          "type": "integer",
+          "description": "Daily protein target in grams",
+          "minimum": 50,
+          "maximum": 400
+        },
+        "daily_calories": {
+          "type": "integer",
+          "description": "Daily calorie target",
+          "minimum": 1000,
+          "maximum": 5000
+        },
+        "sleep_hours": {
+          "type": "number",
+          "description": "Target sleep duration in hours",
+          "minimum": 4,
+          "maximum": 12
+        },
+        "min_energy_for_training": {
+          "type": "integer",
+          "description": "Minimum energy level (1-10) required for training",
+          "minimum": 1,
+          "maximum": 10
+        }
+      },
+      "additionalProperties": false
+    },
+    "core_lifts": {
+      "type": "array",
+      "description": "List of core compound lifts to prioritize",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "preferences": {
+      "type": "object",
+      "required": ["workout_duration_min", "warmup_sets", "working_sets_range", "progressive_overload_increment_kg", "deload_week_frequency"],
+      "properties": {
+        "workout_duration_min": {
+          "type": "integer",
+          "description": "Target workout duration in minutes",
+          "minimum": 15,
+          "maximum": 180
+        },
+        "warmup_sets": {
+          "type": "integer",
+          "description": "Number of warmup sets per exercise",
+          "minimum": 0,
+          "maximum": 5
+        },
+        "working_sets_range": {
+          "type": "array",
+          "description": "Range of working sets [min, max]",
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "progressive_overload_increment_kg": {
+          "type": "number",
+          "description": "Weight increment for progressive overload in kg",
+          "minimum": 0.5,
+          "maximum": 10
+        },
+        "deload_week_frequency": {
+          "type": "integer",
+          "description": "Number of weeks between deload weeks",
+          "minimum": 3,
+          "maximum": 12
+        }
+      },
+      "additionalProperties": false
+    },
+    "constraints": {
+      "type": "object",
+      "required": ["avoid_exercises", "injury_restrictions"],
+      "properties": {
+        "avoid_exercises": {
+          "type": "array",
+          "description": "List of exercises to avoid",
+          "items": {
+            "type": "string"
+          }
+        },
+        "injury_restrictions": {
+          "type": "array",
+          "description": "Current injury restrictions",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
