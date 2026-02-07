@@ -91,6 +91,7 @@ def init_database(db_path: Path | str) -> duckdb.DuckDBPyConnection:
             category VARCHAR,
             priority INTEGER,
             source_file VARCHAR,
+            deadline DATE,
             extracted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
@@ -118,6 +119,12 @@ def init_database(db_path: Path | str) -> duckdb.DuckDBPyConnection:
         conn.execute("SELECT deadline FROM kanban_tasks LIMIT 0")
     except duckdb.BinderException:
         conn.execute("ALTER TABLE kanban_tasks ADD COLUMN deadline DATE")
+
+    # Migration: add deadline column to personal tasks if missing
+    try:
+        conn.execute("SELECT deadline FROM tasks LIMIT 0")
+    except duckdb.BinderException:
+        conn.execute("ALTER TABLE tasks ADD COLUMN deadline DATE")
 
     # Migration: normalize task statuses to new kanban values
     conn.execute("UPDATE tasks SET status = 'backlog' WHERE status IN ('pending', 'todo')")

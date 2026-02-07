@@ -1,0 +1,240 @@
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { X, FileText, ArrowRight, Pencil, Check, Clock } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
+import type { Task } from './PersonalTaskCard'
+
+interface PersonalTaskModalProps {
+  task: Task
+  apiUrl: string
+  onClose: () => void
+  onMove: (taskId: string, newStatus: string) => void
+  onOpenNote?: (path: string) => void
+  onTaskUpdated?: (updated: Task) => void
+}
+
+const statusButtons = [
+  { status: 'backlog', label: 'Backlog', color: 'text-blue-400' },
+  { status: 'in_progress', label: 'In Progress', color: 'text-amber-400' },
+  { status: 'done', label: 'Done', color: 'text-green-400' },
+  { status: 'cancelled', label: 'Cancelled', color: 'text-zinc-400' },
+]
+
+const priorityConfig: Record<number, { label: string; className: string }> = {
+  1: { label: 'High', className: 'bg-red-500/20 text-red-400 border-red-500/30' },
+  2: { label: 'Medium', className: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
+  3: { label: 'Low', className: 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30' },
+}
+
+const categoryColors: Record<string, string> = {
+  work: 'bg-blue-500/20 text-blue-400',
+  personal: 'bg-purple-500/20 text-purple-400',
+  health: 'bg-green-500/20 text-green-400',
+  finance: 'bg-yellow-500/20 text-yellow-400',
+  learning: 'bg-cyan-500/20 text-cyan-400',
+}
+
+export function PersonalTaskModal({
+  task,
+  apiUrl,
+  onClose,
+  onMove,
+  onOpenNote,
+  onTaskUpdated,
+}: PersonalTaskModalProps) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(task.description)
+  const [saving, setSaving] = useState(false)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
+
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !editing) onClose()
+    },
+    [onClose, editing]
+  )
+
+  useEffect(() => {
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [handleKeyDown])
+
+  useEffect(() => {
+    if (editing) inputRef.current?.focus()
+  }, [editing])
+
+  const saveDescription = async () => {
+    const trimmed = draft.trim()
+    if (!trimmed || trimmed === task.description) {
+      setEditing(false)
+      setDraft(task.description)
+      return
+    }
+    setSaving(true)
+    try {
+      const res = await fetch(`${apiUrl}/tasks/${task.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description: trimmed }),
+      })
+      if (res.ok) {
+        const updated: Task = await res.json()
+        onTaskUpdated?.(updated)
+      }
+    } catch (err) {
+      console.error('Failed to update description:', err)
+    } finally {
+      setSaving(false)
+      setEditing(false)
+    }
+  }
+
+  const priority = task.priority != null ? priorityConfig[task.priority] : null
+  const categoryClass = task.category
+    ? categoryColors[task.category.toLowerCase()] || 'bg-zinc-500/20 text-zinc-400'
+    : null
+
+  const effectiveStatus = task.status || 'backlog'
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div
+        className="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-lg overflow-hidden flex flex-col text-zinc-100"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between p-4 border-b border-zinc-700">
+          <div className="flex-1 pr-4">
+            {editing ? (
+              <div className="flex gap-2 items-start">
+                <textarea
+                  ref={inputRef}
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      saveDescription()
+                    }
+                    if (e.key === 'Escape') {
+                      setEditing(false)
+                      setDraft(task.description)
+                    }
+                  }}
+                  rows={2}
+                  className="flex-1 bg-zinc-800 border border-zinc-600 rounded px-2 py-1 text-sm text-zinc-100 resize-none focus:outline-none focus:ring-1 focus:ring-teal-500"
+                />
+                <button
+                  onClick={saveDescription}
+                  disabled={saving}
+                  className="p-1 hover:bg-zinc-800 rounded text-teal-400"
+                >
+                  <Check className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="group flex items-start gap-2">
+                <p className="text-base font-semibold text-zinc-100 leading-snug flex-1">
+                  {task.description}
+                </p>
+                <button
+                  onClick={() => setEditing(true)}
+                  className="p-1 hover:bg-zinc-800 rounded text-zinc-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Edit description"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+            <div className="flex items-center gap-2 mt-2 flex-wrap">
+              {task.category && categoryClass && (
+                <span className={cn('text-xs px-2 py-0.5 rounded', categoryClass)}>
+                  {task.category}
+                </span>
+              )}
+              {priority && (
+                <span className={cn('text-xs px-2 py-0.5 rounded border', priority.className)}>
+                  {priority.label}
+                </span>
+              )}
+              <span className="text-xs bg-zinc-700 text-zinc-300 px-2 py-0.5 rounded">
+                {effectiveStatus.replace('_', ' ')}
+              </span>
+              {task.deadline && (
+                <span className="flex items-center gap-1 text-xs bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded">
+                  <Clock className="w-3 h-3" />
+                  {new Date(task.deadline + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                </span>
+              )}
+              <span className="text-xs text-zinc-500">{task.date}</span>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1 hover:bg-zinc-800 rounded transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Deadline */}
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-700">
+          <span className="text-sm text-zinc-400">Deadline:</span>
+          <input
+            type="date"
+            value={task.deadline || ''}
+            onChange={async (e) => {
+              const val = e.target.value || null
+              try {
+                const res = await fetch(`${apiUrl}/tasks/${task.id}`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ deadline: val }),
+                })
+                if (res.ok) {
+                  const updated: Task = await res.json()
+                  onTaskUpdated?.(updated)
+                }
+              } catch (err) {
+                console.error('Failed to update deadline:', err)
+              }
+            }}
+            className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-sm text-zinc-100 focus:outline-none focus:ring-1 focus:ring-teal-500"
+          />
+        </div>
+
+        {/* Move-to buttons */}
+        <div className="flex items-center gap-2 p-4 border-b border-zinc-700 bg-zinc-800/50 flex-wrap">
+          <span className="text-sm text-zinc-400 mr-1">Move to:</span>
+          {statusButtons.map(({ status, label, color }) => (
+            <Button
+              key={status}
+              variant={effectiveStatus === status ? 'secondary' : 'outline'}
+              size="sm"
+              onClick={() => onMove(task.id, status)}
+              disabled={effectiveStatus === status}
+              className="gap-1.5"
+            >
+              <ArrowRight className={cn('w-3.5 h-3.5', color)} />
+              {label}
+            </Button>
+          ))}
+        </div>
+
+        {/* Source file link */}
+        {onOpenNote && (
+          <div className="p-4">
+            <button
+              onClick={() => {
+                const [year, month] = task.date.split('-')
+                const notePath = `Daily-Notes/${year}-${month}/${task.date}.md`
+                onOpenNote(notePath)
+              }}
+              className="flex items-center gap-2 text-sm text-teal-400 hover:text-teal-300 transition-colors"
+            >
+              <FileText className="w-4 h-4" />
+              Open in Daily Note
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
