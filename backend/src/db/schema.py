@@ -127,7 +127,6 @@ def init_database(db_path: Path | str) -> duckdb.DuckDBPyConnection:
     conn.execute("""
         UPDATE tasks SET completed_at = CAST(date AS TIMESTAMP)
         WHERE status IN ('done', 'cancelled')
-          AND (completed_at IS NULL OR CAST(completed_at AS DATE) != date)
     """)
 
     # Kanban task updates / notes timeline
