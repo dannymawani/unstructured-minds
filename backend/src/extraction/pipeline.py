@@ -371,6 +371,16 @@ class ExtractionPipeline:
 
         records = 0
         for task in tasks:
+            description = task.get("description", "")
+
+            # Skip if a task with the same source file and description already exists
+            existing = self.db.execute(
+                "SELECT id FROM tasks WHERE source_file = ? AND description = ?",
+                [source_file, description],
+            ).fetchone()
+            if existing:
+                continue
+
             task_id = self._generate_id()
             raw_status = task.get("status", "todo")
             status = STATUS_MAP.get(raw_status, raw_status)
@@ -385,7 +395,7 @@ class ExtractionPipeline:
                 [
                     task_id,
                     date,
-                    task.get("description", ""),
+                    description,
                     status,
                     completed_at,
                     task.get("category"),
