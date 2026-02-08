@@ -14,6 +14,12 @@ interface DailyNoteWizardProps {
 
 type WorkoutType = 'BJJ' | 'Strength' | 'Cardio' | 'Rest'
 
+interface WorkoutSuggestion {
+  date: string | null
+  exercises: { exercise_name: string; sets: number; reps: number | null; weight_kg: number | null }[]
+  focus: string | null
+}
+
 interface WizardAnswers {
   workout: WorkoutType | null
   sleep: number | null
@@ -22,6 +28,7 @@ interface WizardAnswers {
   workPriorities: string
   personal: string
   adhoc: string
+  workoutSuggestion: WorkoutSuggestion | null
 }
 
 const TOTAL_STEPS = 7
@@ -36,6 +43,7 @@ export function DailyNoteWizard({ isOpen, onClose, onComplete, noteContent, date
     workPriorities: '',
     personal: '',
     adhoc: '',
+    workoutSuggestion: null,
   })
   const [isPopulating, setIsPopulating] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -52,9 +60,26 @@ export function DailyNoteWizard({ isOpen, onClose, onComplete, noteContent, date
         workPriorities: '',
         personal: '',
         adhoc: '',
+        workoutSuggestion: null,
       })
     }
   }, [isOpen])
+
+  // Fetch last strength workout when Strength is selected
+  const fetchWorkoutSuggestion = useCallback(async () => {
+    if (!apiBaseUrl) return
+    try {
+      const res = await fetch(`${apiBaseUrl}/dashboard/last-strength-workout`)
+      if (res.ok) {
+        const data: WorkoutSuggestion = await res.json()
+        if (data.exercises.length > 0) {
+          setAnswers(a => ({ ...a, workoutSuggestion: data }))
+        }
+      }
+    } catch {
+      // Silently fail - suggestion is optional
+    }
+  }, [apiBaseUrl])
 
   // Focus textarea when reaching text steps
   useEffect(() => {
@@ -84,6 +109,7 @@ export function DailyNoteWizard({ isOpen, onClose, onComplete, noteContent, date
               work_priorities: answers.workPriorities,
               personal: answers.personal,
               adhoc: answers.adhoc,
+              workout_suggestion: answers.workoutSuggestion,
             }),
           })
           if (res.ok) {
@@ -165,6 +191,9 @@ export function DailyNoteWizard({ isOpen, onClose, onComplete, noteContent, date
               value={answers.workout}
               onChange={(v) => {
                 setAnswers(a => ({ ...a, workout: v }))
+                if (v === 'Strength') {
+                  fetchWorkoutSuggestion()
+                }
                 // Auto-advance after selection
                 setTimeout(() => setStep(2), 200)
               }}
@@ -383,6 +412,35 @@ function populateNote(content: string, answers: WizardAnswers): string {
     result = replaceLine(result, '- **Type**:', `- **Type**: ${answers.workout}`)
     // Also try the escaped Milkdown variant
     result = replaceLine(result, '* **Type**:', `* **Type**: ${answers.workout}`)
+
+    // Add workout suggestion for strength training
+    if (answers.workout === 'Strength' && answers.workoutSuggestion?.exercises.length) {
+      const suggestion = answers.workoutSuggestion
+      const lines = suggestion.exercises.map(ex => {
+        const parts = [`${ex.exercise_name}:`]
+        if (ex.sets) parts.push(`${ex.sets}x${ex.reps ?? '?'}`)
+        if (ex.weight_kg) parts.push(`@ ${ex.weight_kg}kg`)
+        return `> - ${parts.join(' ')}`
+      })
+      const dateStr = suggestion.date ? ` (${suggestion.date})` : ''
+      const suggestionBlock = [
+        '',
+        `> **Last session${dateStr}** — _edit below to log, or delete if skipping_`,
+        ...lines,
+        '',
+      ].join('\n')
+
+      // Insert after the Focus line in the Workout section
+      const focusIdx = result.indexOf('- **Focus**:')
+      const focusIdxAlt = result.indexOf('* **Focus**:')
+      const insertIdx = focusIdx !== -1 ? focusIdx : focusIdxAlt
+      if (insertIdx !== -1) {
+        const lineEnd = result.indexOf('\n', insertIdx)
+        if (lineEnd !== -1) {
+          result = result.slice(0, lineEnd + 1) + suggestionBlock + result.slice(lineEnd + 1)
+        }
+      }
+    }
   }
 
   // Sleep

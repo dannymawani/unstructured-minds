@@ -1,10 +1,11 @@
 """Dashboard API endpoints."""
 
+import uuid
 from datetime import date, timedelta
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, Query, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ..db import DatabaseManager
 
@@ -86,8 +87,10 @@ class DashboardSummaryResponse(BaseModel):
 
     total_activities: int
     total_exercises: int
+    total_daily_notes: int
     streak_days: int
     last_activity_date: Optional[str] = None
+    last_daily_note_date: Optional[str] = None
     period: Period
 
 
@@ -134,6 +137,43 @@ class CorrelationResponse(BaseModel):
 
     entries: list[CorrelationEntry]
     correlations: Correlations
+
+
+class ExerciseTableEntry(BaseModel):
+    """Single exercise row in the exercise table."""
+
+    exercise_name: str
+    last_trained_date: str
+    last_weight_kg: Optional[float] = None
+    max_weight_kg: Optional[float] = None
+    total_sessions: int
+
+
+class ExerciseTableResponse(BaseModel):
+    """Response for exercise table endpoint."""
+
+    exercises: list[ExerciseTableEntry]
+    total_count: int
+    offset: int
+    limit: int
+
+
+class ExerciseCreate(BaseModel):
+    """Request model for manually adding an exercise."""
+
+    date: date
+    exercise_name: str = Field(..., min_length=1, max_length=200)
+    weight_kg: Optional[float] = None
+    reps: Optional[int] = None
+    set_number: int = 1
+    notes: Optional[str] = None
+
+
+class ExerciseCreateResponse(BaseModel):
+    """Response for exercise creation."""
+
+    id: str
+    message: str
 
 
 def get_db(request: Request) -> DatabaseManager:
@@ -398,10 +438,32 @@ def get_dashboard_summary(
         [period.start_date, period.end_date],
     ))
 
+    # Get daily notes count (distinct dates in daily_metrics within period)
+    daily_notes_count = fetch_scalar(db.execute(
+        """
+        SELECT COUNT(DISTINCT date) FROM daily_metrics
+        WHERE date >= ? AND date <= ?
+        """,
+        [period.start_date, period.end_date],
+    ))
+
     # Get last activity date
     last_activity = fetch_scalar(db.execute(
         "SELECT MAX(date) FROM activities"
     ), default=None)
+
+    # Get last daily note date from extraction_log file paths
+    last_note_row = db.execute(
+        """
+        SELECT file_path FROM extraction_log
+        WHERE file_path LIKE '%Daily-Notes%' AND success = TRUE
+        ORDER BY file_path DESC
+        LIMIT 1
+        """
+    ).fetchone()
+    last_daily_note = None
+    if last_note_row and last_note_row[0]:
+        last_daily_note = last_note_row[0].split('/')[-1].removesuffix('.md')
 
     # Calculate streak (consecutive days with activities ending today or yesterday)
     # Single query: fetch all distinct activity dates in the last year
@@ -427,8 +489,10 @@ def get_dashboard_summary(
     return DashboardSummaryResponse(
         total_activities=activity_count,
         total_exercises=exercise_count,
+        total_daily_notes=daily_notes_count,
         streak_days=streak,
         last_activity_date=str(last_activity) if last_activity else None,
+        last_daily_note_date=str(last_daily_note) if last_daily_note else None,
         period=period,
     )
 
@@ -567,4 +631,241 @@ def get_correlation_data(
     return CorrelationResponse(
         entries=entries,
         correlations=correlations,
+    )
+
+
+@router.get("/exercise-table", response_model=ExerciseTableResponse)
+def get_exercise_table(
+    search: Optional[str] = Query(default=None, description="Search exercises by name"),
+    limit: int = Query(default=10, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    db: DatabaseManager = Depends(get_db),
+) -> ExerciseTableResponse:
+    """Get a summary table of strength exercises the user has logged.
+
+    Filtered to strength-related exercises only (by activity_id or manual entries).
+    Returns one row per exercise with last trained date, recent weight,
+    best weight, and total sessions.
+
+    Args:
+        search: Optional search filter for exercise names
+        limit: Number of exercises to return (default 10)
+        offset: Pagination offset
+        db: Database manager
+
+    Returns:
+        Table of exercise summaries sorted by total sessions descending
+    """
+    where_clauses = ["(activity_id LIKE '%strength%' OR source_file = 'manual_entry')"]
+    params: list[Any] = []
+
+    if search:
+        where_clauses.append("exercise_name ILIKE ?")
+        params.append(f"%{search}%")
+
+    where_sql = " AND ".join(where_clauses)
+
+    # Get total count
+    count_result = db.execute(
+        f"""
+        SELECT COUNT(DISTINCT exercise_name) FROM exercise_log
+        WHERE {where_sql}
+        """,
+        params,
+    ).fetchone()
+    total_count = count_result[0] if count_result else 0
+
+    result = db.execute(
+        f"""
+        WITH filtered AS (
+            SELECT * FROM exercise_log
+            WHERE {where_sql}
+        ),
+        latest_session AS (
+            SELECT
+                exercise_name,
+                date as last_trained_date,
+                weight_kg as last_weight_kg,
+                ROW_NUMBER() OVER (
+                    PARTITION BY exercise_name
+                    ORDER BY date DESC, set_number DESC
+                ) as rn
+            FROM filtered
+        ),
+        exercise_stats AS (
+            SELECT
+                exercise_name,
+                MAX(weight_kg) as max_weight_kg,
+                COUNT(DISTINCT date) as total_sessions
+            FROM filtered
+            GROUP BY exercise_name
+        )
+        SELECT
+            es.exercise_name,
+            ls.last_trained_date,
+            ls.last_weight_kg,
+            es.max_weight_kg,
+            es.total_sessions
+        FROM exercise_stats es
+        JOIN latest_session ls
+            ON es.exercise_name = ls.exercise_name AND ls.rn = 1
+        ORDER BY es.total_sessions DESC, ls.last_trained_date DESC
+        LIMIT ? OFFSET ?
+        """,
+        params + [limit, offset],
+    ).fetchall()
+
+    exercises = [
+        ExerciseTableEntry(
+            exercise_name=row[0],
+            last_trained_date=str(row[1]),
+            last_weight_kg=float(row[2]) if row[2] is not None else None,
+            max_weight_kg=float(row[3]) if row[3] is not None else None,
+            total_sessions=row[4],
+        )
+        for row in result
+    ]
+
+    return ExerciseTableResponse(
+        exercises=exercises,
+        total_count=total_count,
+        offset=offset,
+        limit=limit,
+    )
+
+
+@router.post("/exercises", status_code=201, response_model=ExerciseCreateResponse)
+def create_exercise(
+    exercise: ExerciseCreate,
+    db: DatabaseManager = Depends(get_db),
+) -> ExerciseCreateResponse:
+    """Manually add an exercise entry to the exercise log.
+
+    This allows users to log exercises directly without going through
+    the note extraction pipeline.
+
+    Args:
+        exercise: Exercise data to insert
+        db: Database manager
+
+    Returns:
+        Created exercise ID and confirmation message
+    """
+    exercise_id = str(uuid.uuid4())
+    activity_id = f"manual_{exercise.date}_{exercise_id[:8]}"
+
+    db.execute(
+        """
+        INSERT INTO exercise_log (
+            id, activity_id, date, exercise_name,
+            weight_kg, reps, set_number, notes,
+            source_file, extracted_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'manual_entry', CURRENT_TIMESTAMP)
+        """,
+        [
+            exercise_id,
+            activity_id,
+            str(exercise.date),
+            exercise.exercise_name,
+            exercise.weight_kg,
+            exercise.reps,
+            exercise.set_number,
+            exercise.notes,
+        ],
+    )
+
+    return ExerciseCreateResponse(
+        id=exercise_id,
+        message=f"Exercise '{exercise.exercise_name}' added successfully",
+    )
+
+
+class LastWorkoutExercise(BaseModel):
+    """Single exercise from the last workout."""
+
+    exercise_name: str
+    sets: int
+    reps: Optional[int] = None
+    weight_kg: Optional[float] = None
+
+
+class LastWorkoutResponse(BaseModel):
+    """Response for last strength workout endpoint."""
+
+    date: Optional[str] = None
+    exercises: list[LastWorkoutExercise]
+    focus: Optional[str] = None
+
+
+@router.get("/last-strength-workout", response_model=LastWorkoutResponse)
+def get_last_strength_workout(
+    db: DatabaseManager = Depends(get_db),
+) -> LastWorkoutResponse:
+    """Get the last strength training workout to suggest a template.
+
+    Returns exercises from the most recent strength session so the user
+    can use them as a starting point for their next workout.
+
+    Args:
+        db: Database manager
+
+    Returns:
+        Last workout date, exercises, and focus area
+    """
+    # Find the most recent strength activity date
+    last_date_row = db.execute(
+        """
+        SELECT MAX(date) FROM activities
+        WHERE activity_type = 'strength'
+        """
+    ).fetchone()
+
+    if not last_date_row or not last_date_row[0]:
+        return LastWorkoutResponse(exercises=[])
+
+    last_date = str(last_date_row[0])
+
+    # Get the activity notes (which may contain focus area)
+    activity_row = db.execute(
+        """
+        SELECT notes FROM activities
+        WHERE activity_type = 'strength' AND date = ?
+        LIMIT 1
+        """,
+        [last_date],
+    ).fetchone()
+
+    focus = activity_row[0] if activity_row and activity_row[0] else None
+
+    # Get exercises from that date
+    exercise_rows = db.execute(
+        """
+        SELECT
+            exercise_name,
+            COUNT(*) as sets,
+            MAX(reps) as reps,
+            MAX(weight_kg) as weight_kg
+        FROM exercise_log
+        WHERE date = ? AND exercise_name IS NOT NULL
+        GROUP BY exercise_name
+        ORDER BY MIN(set_number)
+        """,
+        [last_date],
+    ).fetchall()
+
+    exercises = [
+        LastWorkoutExercise(
+            exercise_name=row[0],
+            sets=row[1],
+            reps=int(row[2]) if row[2] is not None else None,
+            weight_kg=float(row[3]) if row[3] is not None else None,
+        )
+        for row in exercise_rows
+    ]
+
+    return LastWorkoutResponse(
+        date=last_date,
+        exercises=exercises,
+        focus=focus,
     )

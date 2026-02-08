@@ -309,7 +309,7 @@ function App() {
       <SearchModal isOpen={ui.isSearchOpen} onClose={() => ui.setIsSearchOpen(false)} onSelect={handleSearchSelect} apiBaseUrl={api.baseUrl} />
       <TemplatePicker isOpen={ui.isTemplatePickerOpen} onClose={() => ui.setIsTemplatePickerOpen(false)} onSelect={handleSearchSelect} apiBaseUrl={api.baseUrl} />
       <QuickCapture isOpen={ui.isQuickCaptureOpen} onClose={() => ui.setIsQuickCaptureOpen(false)} apiBaseUrl={api.baseUrl} />
-      <DailyNoteWizard isOpen={ui.isWizardOpen} onClose={() => ui.setIsWizardOpen(false)} onComplete={handleWizardComplete} noteContent={ui.wizardNoteContent} date={ui.wizardDate} />
+      <DailyNoteWizard isOpen={ui.isWizardOpen} onClose={() => ui.setIsWizardOpen(false)} onComplete={handleWizardComplete} noteContent={ui.wizardNoteContent} date={ui.wizardDate} apiBaseUrl={api.baseUrl} />
     </div>
   )
 }
