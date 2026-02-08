@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Activity, Dumbbell, Flame, Calendar } from 'lucide-react';
+import { Activity, FileText, Flame, Calendar } from 'lucide-react';
 
 interface SummaryData {
   total_activities: number;
   total_exercises: number;
+  total_daily_notes: number;
   streak_days: number;
   last_activity_date: string | null;
+  last_daily_note_date: string | null;
 }
 
 interface DashboardSummaryProps {
@@ -59,9 +61,9 @@ export function DashboardSummary({ apiUrl = 'http://localhost:8000' }: Dashboard
       color: 'text-blue-400',
     },
     {
-      label: 'Exercises',
-      value: data?.total_exercises ?? 0,
-      icon: Dumbbell,
+      label: 'Daily Notes',
+      value: data?.total_daily_notes ?? 0,
+      icon: FileText,
       color: 'text-green-400',
     },
     {
@@ -71,8 +73,8 @@ export function DashboardSummary({ apiUrl = 'http://localhost:8000' }: Dashboard
       color: 'text-orange-400',
     },
     {
-      label: 'Last Activity',
-      value: data?.last_activity_date ?? 'None',
+      label: 'Last Daily Note',
+      value: data?.last_daily_note_date ?? 'None',
       icon: Calendar,
       color: 'text-purple-400',
     },

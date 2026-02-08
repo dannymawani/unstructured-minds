@@ -27,3 +27,10 @@
 * Mood:
 
 * Nutrition:
+
+### 🍽️ Food Log
+
+* **Breakfast**:
+* **Lunch**:
+* **Dinner**:
+* **Snacks**:
