@@ -244,6 +244,25 @@ async def _render_from_vault_template(storage: StorageBackend) -> str | None:
         return None
 
 
+class WorkoutSuggestionExercise(BaseModel):
+    """Single exercise in a workout suggestion."""
+
+    exercise_name: str
+    display_name: str = ""
+    sets: int = 0
+    reps: Optional[int] = None
+    weight_kg: Optional[float] = None
+    suggested_weight_kg: Optional[float] = None
+
+
+class WorkoutSuggestionData(BaseModel):
+    """Workout suggestion from last strength session."""
+
+    date: Optional[str] = None
+    exercises: list[WorkoutSuggestionExercise] = []
+    focus: Optional[str] = None
+
+
 class PopulateDailyNoteRequest(BaseModel):
     """Request to populate a daily note template with wizard answers."""
 
@@ -256,6 +275,7 @@ class PopulateDailyNoteRequest(BaseModel):
     work_priorities: Optional[str] = None
     personal: Optional[str] = None
     adhoc: Optional[str] = None
+    workout_suggestion: Optional[WorkoutSuggestionData] = None
 
 
 class PopulateDailyNoteResponse(BaseModel):
@@ -282,6 +302,7 @@ async def populate_daily_note(
         "work_priorities": request.work_priorities or "",
         "personal": request.personal or "",
         "adhoc": request.adhoc or "",
+        "workout_suggestion": request.workout_suggestion.model_dump() if request.workout_suggestion else None,
     }
 
     if claude.is_configured:
@@ -311,13 +332,39 @@ def _populate_fallback(template: str, answers: dict) -> str:
     if workout:
         if workout == "Rest":
             result = re.sub(
-                r"- \*\*Type\*\*:.*\n- \*\*Focus\*\*:.*",
+                r"[*-] \*\*Type\*\*:.*\n[*-] \*\*Focus\*\*:.*",
                 "- Rest day",
                 result,
             )
         else:
-            result = re.sub(r"^(- \*\*Type\*\*:)\s*$", rf"\1 {workout}", result, flags=re.MULTILINE)
-            result = re.sub(r"^(- \*\*Focus\*\*:)\s*$", rf"\1 {workout}", result, flags=re.MULTILINE)
+            result = re.sub(r"^([*-] \*\*Type\*\*:)\s*$", rf"\1 {workout}", result, flags=re.MULTILINE)
+            result = re.sub(r"^([*-] \*\*Focus\*\*:)\s*$", rf"\1 {workout}", result, flags=re.MULTILINE)
+
+    # Workout suggestion — insert table after Focus line
+    suggestion = answers.get("workout_suggestion")
+    if suggestion and suggestion.get("exercises"):
+        date_str = suggestion.get("date", "")
+        table_lines = [
+            "",
+            f"> **Last session ({date_str})** — edit below to log, or delete if skipping",
+            "> ",
+            "> | Exercise | Last | Suggested | Reps | Sets |",
+            "> |----------|------|-----------|------|------|",
+        ]
+        for ex in suggestion["exercises"]:
+            name = ex.get("display_name") or ex.get("exercise_name", "")
+            last_w = f"{ex['weight_kg']}kg" if ex.get("weight_kg") and ex["weight_kg"] > 0 else "BW"
+            sugg_w = f"{ex['suggested_weight_kg']}kg" if ex.get("suggested_weight_kg") else last_w
+            reps = str(ex.get("reps")) if ex.get("reps") else "-"
+            sets = str(ex.get("sets")) if ex.get("sets") else "-"
+            table_lines.append(f"> | {name} | {last_w} | {sugg_w} | {reps} | {sets} |")
+        table_lines.append("")
+        suggestion_block = "\n".join(table_lines)
+
+        focus_match = re.search(r"^[*-] \*\*Focus\*\*:.*$", result, re.MULTILINE)
+        if focus_match:
+            insert_pos = focus_match.end()
+            result = result[:insert_pos] + "\n" + suggestion_block + result[insert_pos:]
 
     # Metrics
     sleep = answers.get("sleep")
