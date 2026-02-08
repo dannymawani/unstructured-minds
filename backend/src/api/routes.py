@@ -402,8 +402,12 @@ async def quick_capture(
 
             await storage.write(file_path, new_content.encode("utf-8"))
         else:
-            # Create new daily note from shared template, then append quick capture
-            content = render_daily_note(date_str)
+            # Create new daily note from vault template (or hardcoded fallback)
+            try:
+                tpl_bytes = await storage.read("Templates/daily.md")
+                content = tpl_bytes.decode("utf-8")
+            except Exception:
+                content = render_daily_note()
             # Insert quick note entry under the Adhoc Notes section
             adhoc_match = re.search(r"(## .*Adhoc Notes\n)", content)
             if adhoc_match:

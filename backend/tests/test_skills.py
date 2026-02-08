@@ -70,9 +70,8 @@ class TestDailyNoteSkill:
         assert result.file_path == "Daily-Notes/2026-02/2026-02-02.md"
         mock_storage.write.assert_called_once()
         content = mock_storage.write.call_args[0][1].decode("utf-8")
-        assert "date: 2026-02-02" in content
-        assert "[[2026-02-01]]" in content  # Previous day link
-        assert "[[2026-02-03]]" in content  # Next day link
+        assert "## 🎯 Today's Focus" in content
+        assert "## 💼 Work" in content
 
     @pytest.mark.asyncio
     async def test_uses_today_when_no_date(self, mock_storage):

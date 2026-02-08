@@ -19,8 +19,20 @@ DAILY_NOTE_POPULATE_SYSTEM_PROMPT = """You populate a daily note template with t
 
 Rules:
 - Return ONLY the complete markdown document. No explanations, no code fences.
-- Preserve all frontmatter, headers, and structure exactly as-is.
+- Preserve all headers and structure exactly as-is.
+- Use standard markdown only. Never use Obsidian syntax like [[wikilinks]] or callouts.
 - Fill in sections based on the provided answers.
+
+Cleaning up user input:
+- Users type quick, messy answers in the wizard. Clean them up into clear, actionable items.
+- Capitalize the first word of each item. Fix obvious typos and grammar.
+- Split run-on text into separate items (look for commas, "and", newlines).
+- Remove filler words like "uh", "maybe", "I need to", "I should" — just state the task.
+- Keep items concise but preserve the user's intent.
+- Example: "finish the api thing, call dentist and also groceries" becomes:
+  - [ ] Finish the API integration
+  - [ ] Call dentist
+  - [ ] Groceries
 
 Workout section (### Workout):
 - If workout is "Rest": replace the Type/Focus lines with just `- Rest day`
@@ -31,20 +43,17 @@ Energy & Recovery section (### Energy & Recovery):
 - Leave `- Nutrition:` empty (user fills later)
 
 Work section (## 💼 Work):
-- Parse the work priorities text (comma or newline separated) into `- [ ]` checkbox items
-- If any item looks like a Jira ticket (e.g. PROJ-123, ABC-45), add a `### Jira` sub-header grouping those items
+- Parse the work priorities text into `- [ ]` checkbox items (clean up as described above)
 
 Personal section (## 🤷🏽 Personal):
-- Parse personal items into `- [ ]` checkbox items
+- Parse personal items into `- [ ]` checkbox items (clean up as described above)
 
 Today's Focus section (## 🎯 Today's Focus):
 - Pick the top 3-4 items from work + personal combined as `- [ ]` checkboxes
 
 Adhoc Notes section (## 📝 Adhoc Notes):
 - Parse adhoc text into `- item` bullet points (no checkboxes)
-- If empty, leave as `- `
-
-Keep the Previous/Next navigation footer intact."""
+- If empty, leave as `- `"""
 
 
 NOTE_ASSIST_SYSTEM_PROMPT = """You are a note assistant that helps the user edit and update their markdown notes.
