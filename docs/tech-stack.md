@@ -222,8 +222,8 @@ CREATE TABLE meals (
 - Handles authentication and rate limits
 
 **Models Used**:
-- **Claude 3.5 Haiku**: Fast data extraction (exercises, meals, etc.)
-- **Claude 3.5 Sonnet**: Natural language queries over data (slower but smarter)
+- **Claude Haiku 4.5**: Fast data extraction (exercises, meals, etc.)
+- **Claude Sonnet 4.5**: Natural language queries over data (slower but smarter)
 
 **Connection**: Extraction routes send note markdown to Claude. Query routes send natural language questions + DuckDB schema to Claude for SQL generation.
 
