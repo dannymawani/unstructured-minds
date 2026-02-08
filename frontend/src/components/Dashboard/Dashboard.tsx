@@ -3,7 +3,7 @@ import { LayoutDashboard } from 'lucide-react';
 import { DashboardSummary } from './DashboardSummary';
 import { WeeklyActivityChart } from './WeeklyActivityChart';
 import { MetricsTrends } from './MetricsTrends';
-import { ExerciseProgress } from './ExerciseProgress';
+import { ExerciseTable } from './ExerciseTable';
 import { ActivityHeatmap } from './ActivityHeatmap';
 import { SleepTrends } from './SleepTrends';
 import { MoodCorrelation } from './MoodCorrelation';
@@ -16,12 +16,9 @@ interface DashboardProps {
 }
 
 export function Dashboard({ apiUrl = 'http://localhost:8000' }: DashboardProps) {
-  const [trackedExercise, setTrackedExercise] = useState('Squat');
   const [dateRange, setDateRange] = useState(30);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [widgets, setWidgets] = useWidgetConfig();
-
-  const commonExercises = ['Squat', 'Bench Press', 'Deadlift', 'Overhead Press', 'Row'];
 
   // Get visible widgets sorted by order
   const visibleWidgets = useMemo(() => {
@@ -61,16 +58,16 @@ export function Dashboard({ apiUrl = 'http://localhost:8000' }: DashboardProps) 
       </div>
 
       {/* Summary Cards */}
-      {isVisible('summary') && <DashboardSummary apiUrl={apiUrl} />}
+      {isVisible('summary') && <DashboardSummary apiUrl={apiUrl} days={dateRange} />}
 
       {/* AI Insights */}
       {isVisible('insights') && <InsightsCard apiUrl={apiUrl} />}
 
-      {/* Activity Heatmap - Full width */}
+      {/* Activity Heatmap - Full screen width */}
       {isVisible('heatmap') && (
-        <div className="relative">
+        <div className="relative -mx-4 sm:-mx-6">
           {/* Year selector for heatmap */}
-          <div className="absolute top-4 right-4 z-10">
+          <div className="absolute top-4 right-8 sm:right-10 z-10">
             <select
               value={selectedYear}
               onChange={(e) => setSelectedYear(Number(e.target.value))}
@@ -108,26 +105,9 @@ export function Dashboard({ apiUrl = 'http://localhost:8000' }: DashboardProps) 
         {isVisible('moodCorrelation') && <MoodCorrelation apiUrl={apiUrl} days={dateRange} />}
       </div>
 
-      {/* Exercise Progress */}
+      {/* Exercise Table */}
       {isVisible('exerciseProgress') && (
-        <div className="bg-card rounded-md shadow-sm p-3 sm:p-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0 mb-3 sm:mb-4">
-            <h3 className="text-base sm:text-lg font-semibold text-foreground">Track Exercise</h3>
-            <select
-              value={trackedExercise}
-              onChange={(e) => setTrackedExercise(e.target.value)}
-              className="bg-muted text-foreground rounded px-3 py-2 text-sm border-none focus:ring-2 focus:ring-ring min-h-[44px] sm:min-h-0"
-              data-testid="exercise-select"
-            >
-              {commonExercises.map((ex) => (
-                <option key={ex} value={ex}>
-                  {ex}
-                </option>
-              ))}
-            </select>
-          </div>
-          <ExerciseProgress exercise={trackedExercise} apiUrl={apiUrl} days={dateRange} />
-        </div>
+        <ExerciseTable apiUrl={apiUrl} />
       )}
 
       {/* Empty state when no widgets visible */}

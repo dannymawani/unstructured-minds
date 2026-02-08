@@ -8,6 +8,9 @@ import {
   Calendar,
   Trophy,
   AlertTriangle,
+  Sparkles,
+  PenLine,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -118,6 +121,8 @@ export function ProgressReviews({ apiUrl }: ProgressReviewsProps) {
   const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [choosing, setChoosing] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [newReview, setNewReview] = useState(emptyReview());
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
@@ -178,6 +183,39 @@ export function ProgressReviews({ apiUrl }: ProgressReviewsProps) {
     },
     [apiUrl, expandedId]
   );
+
+  const handleGenerate = useCallback(async () => {
+    setGenerating(true);
+    setChoosing(false);
+    setError(null);
+    try {
+      const response = await fetch(`${apiUrl}/profile/reviews/generate`, {
+        method: 'POST',
+      });
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({ detail: 'Failed to generate review' }));
+        throw new Error(errData.detail || 'Failed to generate review');
+      }
+      const data = await response.json();
+      setNewReview({
+        period_start: data.period_start || emptyReview().period_start,
+        period_end: data.period_end || emptyReview().period_end,
+        key_wins: data.key_wins || [],
+        challenges: data.challenges || [],
+        work_highlights: data.work_highlights || '',
+        training_summary: data.training_summary || '',
+        personal_wins: data.personal_wins || [],
+        health_metrics: data.health_metrics || null,
+        goal_progress: data.goal_progress || null,
+        focus_next: data.focus_next || [],
+      });
+      setCreating(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to generate review');
+    } finally {
+      setGenerating(false);
+    }
+  }, [apiUrl]);
 
   const toggleExpand = useCallback((id: string) => {
     setExpandedId((prev) => (prev === id ? null : id));
@@ -321,9 +359,56 @@ export function ProgressReviews({ apiUrl }: ProgressReviewsProps) {
             </Button>
           </div>
         </div>
+      ) : generating ? (
+        <div className="border border-border/50 rounded-md p-6 flex flex-col items-center gap-3">
+          <Loader2 className="w-6 h-6 text-teal-500 animate-spin" />
+          <p className="text-sm text-muted-foreground">Generating review...</p>
+          <p className="text-xs text-muted-foreground/70">
+            Analyzing your activities, exercises, metrics, and tasks
+          </p>
+        </div>
+      ) : choosing ? (
+        <div className="border border-border/50 rounded-md p-4 space-y-3">
+          <h4 className="text-sm font-semibold text-foreground">New Progress Review</h4>
+          <p className="text-xs text-muted-foreground">
+            How would you like to create your review?
+          </p>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button
+              onClick={handleGenerate}
+              size="sm"
+              className="flex-1 bg-teal-600 hover:bg-teal-700 text-white"
+            >
+              <Sparkles className="w-4 h-4 mr-1.5" />
+              Generate with AI
+            </Button>
+            <Button
+              onClick={() => {
+                setChoosing(false);
+                setCreating(true);
+                setNewReview(emptyReview());
+              }}
+              variant="outline"
+              size="sm"
+              className="flex-1"
+            >
+              <PenLine className="w-4 h-4 mr-1.5" />
+              Write Manually
+            </Button>
+          </div>
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => setChoosing(false)}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
       ) : (
         <Button
-          onClick={() => setCreating(true)}
+          onClick={() => setChoosing(true)}
           variant="outline"
           size="sm"
           className="w-full"

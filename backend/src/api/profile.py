@@ -1,8 +1,9 @@
 """Life Profile API endpoints."""
 
 import json
+import logging
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Optional
 
@@ -10,6 +11,8 @@ from fastapi import APIRouter, Body, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from ..config import settings
+
+logger = logging.getLogger(__name__)
 
 
 router = APIRouter(prefix="/profile", tags=["profile"])
@@ -309,3 +312,331 @@ def delete_review(review_id: str, request: Request) -> None:
         raise HTTPException(status_code=404, detail="Review not found")
 
     db.execute("DELETE FROM progress_reviews WHERE id = ?", [review_id])
+
+
+# --- Review Generation ---
+
+
+REVIEW_EXTRACTION_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "key_wins": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "3-5 key accomplishments from the period",
+        },
+        "challenges": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "2-3 challenges faced during the period",
+        },
+        "work_highlights": {
+            "type": "string",
+            "description": "Summary paragraph of work accomplishments",
+        },
+        "training_summary": {
+            "type": "string",
+            "description": "Summary paragraph of training and exercise activity",
+        },
+        "personal_wins": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "2-3 personal wins or positive life events",
+        },
+        "health_metrics": {
+            "type": "object",
+            "properties": {
+                "avg_sleep": {"type": "number", "description": "Average sleep quality (1-10)"},
+                "avg_energy": {"type": "number", "description": "Average energy level (1-10)"},
+                "avg_mood": {"type": "number", "description": "Average mood (1-10)"},
+                "avg_stress": {"type": "number", "description": "Average stress level (1-10)"},
+            },
+            "description": "Averaged health metrics for the period",
+        },
+        "focus_next": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "3-4 focus areas for the next period",
+        },
+    },
+    "required": [
+        "key_wins",
+        "challenges",
+        "work_highlights",
+        "training_summary",
+        "personal_wins",
+        "health_metrics",
+        "focus_next",
+    ],
+}
+
+
+def _gather_review_context(
+    db: Any,
+    period_start: date,
+    period_end: date,
+) -> str:
+    """Query DuckDB for data in the review period and build a context string.
+
+    Args:
+        db: DatabaseManager instance
+        period_start: Start of review period
+        period_end: End of review period
+
+    Returns:
+        Formatted context string for Claude
+    """
+    sections: list[str] = []
+    sections.append(f"Review period: {period_start.isoformat()} to {period_end.isoformat()}")
+
+    # --- Activities ---
+    try:
+        activities = db.execute(
+            """
+            SELECT activity_type, COUNT(*) as cnt,
+                   COALESCE(SUM(duration_minutes), 0) as total_minutes
+            FROM activities
+            WHERE date BETWEEN ? AND ?
+            GROUP BY activity_type
+            ORDER BY cnt DESC
+            """,
+            [period_start, period_end],
+        ).fetchall()
+        if activities:
+            total_sessions = sum(row[1] for row in activities)
+            lines = [f"Total sessions: {total_sessions}"]
+            for row in activities:
+                lines.append(f"  - {row[0]}: {row[1]} sessions, {row[2]} minutes total")
+            sections.append("ACTIVITIES:\n" + "\n".join(lines))
+        else:
+            sections.append("ACTIVITIES: No activities recorded in this period.")
+    except Exception as e:
+        logger.warning("Failed to query activities for review: %s", e)
+        sections.append("ACTIVITIES: Unable to query.")
+
+    # --- Exercise highlights ---
+    try:
+        exercises = db.execute(
+            """
+            SELECT exercise_name,
+                   COUNT(*) as total_sets,
+                   MAX(weight_kg) as max_weight,
+                   MAX(reps) as max_reps
+            FROM exercise_log
+            WHERE date BETWEEN ? AND ?
+            GROUP BY exercise_name
+            ORDER BY total_sets DESC
+            LIMIT 10
+            """,
+            [period_start, period_end],
+        ).fetchall()
+        if exercises:
+            lines = []
+            for row in exercises:
+                name, sets, max_w, max_r = row
+                parts = [f"{name}: {sets} sets"]
+                if max_w:
+                    parts.append(f"max weight {max_w}kg")
+                if max_r:
+                    parts.append(f"max reps {max_r}")
+                lines.append("  - " + ", ".join(parts))
+            sections.append("EXERCISE HIGHLIGHTS (top exercises by volume):\n" + "\n".join(lines))
+        else:
+            sections.append("EXERCISE HIGHLIGHTS: No exercises logged in this period.")
+    except Exception as e:
+        logger.warning("Failed to query exercises for review: %s", e)
+        sections.append("EXERCISE HIGHLIGHTS: Unable to query.")
+
+    # --- Daily metrics averages ---
+    try:
+        metrics = db.execute(
+            """
+            SELECT
+                ROUND(AVG(sleep_quality), 1) as avg_sleep,
+                ROUND(AVG(energy), 1) as avg_energy,
+                ROUND(AVG(mood), 1) as avg_mood,
+                ROUND(AVG(stress), 1) as avg_stress,
+                COUNT(*) as days_tracked
+            FROM daily_metrics
+            WHERE date BETWEEN ? AND ?
+            """,
+            [period_start, period_end],
+        ).fetchone()
+        if metrics and metrics[4] > 0:
+            sections.append(
+                f"DAILY METRICS (averaged over {metrics[4]} days):\n"
+                f"  - Avg sleep quality: {metrics[0]}/10\n"
+                f"  - Avg energy: {metrics[1]}/10\n"
+                f"  - Avg mood: {metrics[2]}/10\n"
+                f"  - Avg stress: {metrics[3]}/10"
+            )
+        else:
+            sections.append("DAILY METRICS: No metrics recorded in this period.")
+    except Exception as e:
+        logger.warning("Failed to query daily metrics for review: %s", e)
+        sections.append("DAILY METRICS: Unable to query.")
+
+    # --- Completed tasks ---
+    try:
+        tasks = db.execute(
+            """
+            SELECT category, COUNT(*) as cnt
+            FROM tasks
+            WHERE date BETWEEN ? AND ?
+              AND status = 'done'
+            GROUP BY category
+            ORDER BY cnt DESC
+            """,
+            [period_start, period_end],
+        ).fetchall()
+        total_done = sum(row[1] for row in tasks) if tasks else 0
+
+        total_tasks = db.execute(
+            """
+            SELECT COUNT(*) FROM tasks
+            WHERE date BETWEEN ? AND ?
+            """,
+            [period_start, period_end],
+        ).fetchone()
+        total_all = total_tasks[0] if total_tasks else 0
+
+        if total_done > 0:
+            lines = [f"Completed {total_done} of {total_all} tasks"]
+            for row in tasks:
+                cat = row[0] or "uncategorized"
+                lines.append(f"  - {cat}: {row[1]} completed")
+            sections.append("TASKS:\n" + "\n".join(lines))
+        else:
+            sections.append(f"TASKS: {total_all} tasks recorded, none marked as done.")
+    except Exception as e:
+        logger.warning("Failed to query tasks for review: %s", e)
+        sections.append("TASKS: Unable to query.")
+
+    # --- Recent task descriptions for richer context ---
+    try:
+        recent_tasks = db.execute(
+            """
+            SELECT description, status, category
+            FROM tasks
+            WHERE date BETWEEN ? AND ?
+              AND status = 'done'
+            ORDER BY date DESC
+            LIMIT 20
+            """,
+            [period_start, period_end],
+        ).fetchall()
+        if recent_tasks:
+            lines = [f"  - {row[0]} [{row[2] or 'general'}]" for row in recent_tasks]
+            sections.append("RECENTLY COMPLETED TASKS:\n" + "\n".join(lines))
+    except Exception:
+        pass  # Non-critical
+
+    return "\n\n".join(sections)
+
+
+@router.post("/reviews/generate")
+async def generate_review(request: Request) -> dict:
+    """Auto-generate a progress review using AI based on data since the last review.
+
+    Queries activities, exercises, daily metrics, and tasks from DuckDB,
+    sends the context to Claude, and returns generated review data.
+    The review is NOT saved -- the user can edit before saving.
+
+    Returns:
+        Generated review data matching ReviewCreateRequest schema.
+    """
+    db = request.app.state.db
+    claude = request.app.state.claude
+
+    if not claude.is_configured:
+        raise HTTPException(
+            status_code=503,
+            detail="Claude API is not configured. Set ANTHROPIC_API_KEY to enable AI features.",
+        )
+
+    # Determine review period
+    today = date.today()
+    try:
+        last_review = db.execute(
+            "SELECT period_end FROM progress_reviews ORDER BY period_end DESC LIMIT 1"
+        ).fetchone()
+    except Exception:
+        last_review = None
+
+    if last_review and last_review[0]:
+        last_end = last_review[0]
+        if isinstance(last_end, str):
+            last_end = date.fromisoformat(last_end)
+        period_start = last_end + timedelta(days=1)
+    else:
+        period_start = today - timedelta(days=30)
+
+    period_end = today
+
+    # Don't generate a review for a nonsensical period
+    if period_start > period_end:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No new period to review. Last review ended {period_start - timedelta(days=1)}, which is today or in the future.",
+        )
+
+    logger.info(
+        "Generating review for period %s to %s",
+        period_start.isoformat(),
+        period_end.isoformat(),
+    )
+
+    # Gather data context from DuckDB
+    context = _gather_review_context(db, period_start, period_end)
+
+    # Load life profile for additional context
+    profile = _load_profile()
+    profile_summary = ""
+    if profile.get("overview", {}).get("name"):
+        profile_summary = f"User: {profile['overview']['name']}"
+        if profile["overview"].get("role"):
+            profile_summary += f", {profile['overview']['role']}"
+        if profile["overview"].get("company"):
+            profile_summary += f" at {profile['overview']['company']}"
+
+    full_context = (
+        f"Generate a progress review for the following period.\n"
+        f"{profile_summary}\n\n"
+        f"{context}\n\n"
+        f"Based on this data, generate a thoughtful progress review. "
+        f"If data is sparse, still provide reasonable observations and focus areas. "
+        f"Be specific and reference actual data points where possible. "
+        f"Keep summaries concise but insightful."
+    )
+
+    try:
+        result = await claude.extract(full_context, REVIEW_EXTRACTION_SCHEMA)
+    except Exception as e:
+        logger.error("Claude extraction failed for review generation: %s", e)
+        raise HTTPException(
+            status_code=502,
+            detail="Failed to generate review with AI. Please try again or write manually.",
+        )
+
+    # Build the response with period dates and generated content
+    generated = {
+        "period_start": period_start.isoformat(),
+        "period_end": period_end.isoformat(),
+        "key_wins": result.get("key_wins", []),
+        "challenges": result.get("challenges", []),
+        "work_highlights": result.get("work_highlights", ""),
+        "training_summary": result.get("training_summary", ""),
+        "personal_wins": result.get("personal_wins", []),
+        "health_metrics": result.get("health_metrics"),
+        "goal_progress": None,
+        "focus_next": result.get("focus_next", []),
+    }
+
+    logger.info(
+        "Review generated successfully: %d wins, %d challenges, %d focus areas",
+        len(generated["key_wins"]),
+        len(generated["challenges"]),
+        len(generated["focus_next"]),
+    )
+
+    return generated

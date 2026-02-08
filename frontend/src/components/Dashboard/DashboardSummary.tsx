@@ -1,18 +1,26 @@
 import { useEffect, useState } from 'react';
-import { Activity, Dumbbell, Flame, Calendar } from 'lucide-react';
+import { Activity, FileText, Flame, Calendar } from 'lucide-react';
 
 interface SummaryData {
   total_activities: number;
   total_exercises: number;
+  total_daily_notes: number;
   streak_days: number;
   last_activity_date: string | null;
+  last_daily_note_date: string | null;
 }
 
 interface DashboardSummaryProps {
   apiUrl?: string;
+  days?: number;
 }
 
-export function DashboardSummary({ apiUrl = 'http://localhost:8000' }: DashboardSummaryProps) {
+function formatNoteDate(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+export function DashboardSummary({ apiUrl = 'http://localhost:8000', days = 30 }: DashboardSummaryProps) {
   const [data, setData] = useState<SummaryData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -20,7 +28,7 @@ export function DashboardSummary({ apiUrl = 'http://localhost:8000' }: Dashboard
   useEffect(() => {
     async function fetchSummary() {
       try {
-        const response = await fetch(`${apiUrl}/dashboard/summary`);
+        const response = await fetch(`${apiUrl}/dashboard/summary?days=${days}`);
         if (!response.ok) throw new Error('Failed to fetch summary');
         const result = await response.json();
         setData(result);
@@ -31,7 +39,7 @@ export function DashboardSummary({ apiUrl = 'http://localhost:8000' }: Dashboard
       }
     }
     fetchSummary();
-  }, [apiUrl]);
+  }, [apiUrl, days]);
 
   if (loading) {
     return (
@@ -59,9 +67,9 @@ export function DashboardSummary({ apiUrl = 'http://localhost:8000' }: Dashboard
       color: 'text-blue-400',
     },
     {
-      label: 'Exercises',
-      value: data?.total_exercises ?? 0,
-      icon: Dumbbell,
+      label: 'Daily Notes',
+      value: data?.total_daily_notes ?? 0,
+      icon: FileText,
       color: 'text-green-400',
     },
     {
@@ -71,8 +79,8 @@ export function DashboardSummary({ apiUrl = 'http://localhost:8000' }: Dashboard
       color: 'text-orange-400',
     },
     {
-      label: 'Last Activity',
-      value: data?.last_activity_date ?? 'None',
+      label: 'Last Daily Note',
+      value: data?.last_daily_note_date ? formatNoteDate(data.last_daily_note_date) : 'None',
       icon: Calendar,
       color: 'text-purple-400',
     },
