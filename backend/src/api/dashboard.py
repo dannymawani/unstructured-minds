@@ -453,10 +453,12 @@ def get_dashboard_summary(
     ), default=None)
 
     # Get last daily note date from extraction_log file paths
+    # Filter to files matching YYYY-MM-DD.md pattern to exclude non-note files
     last_note_row = db.execute(
         """
         SELECT file_path FROM extraction_log
-        WHERE file_path LIKE '%Daily-Notes%' AND success = TRUE
+        WHERE file_path LIKE '%Daily-Notes/%/____-__-__.md'
+          AND success = TRUE
         ORDER BY file_path DESC
         LIMIT 1
         """
