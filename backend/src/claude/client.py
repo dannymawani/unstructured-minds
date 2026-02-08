@@ -237,6 +237,24 @@ class ClaudeClient:
         Returns:
             Fully populated markdown string
         """
+        # Build workout suggestion section if available
+        workout_section = ""
+        suggestion = answers.get("workout_suggestion")
+        if suggestion and suggestion.get("exercises"):
+            lines = [f"\nWorkout suggestion from last session ({suggestion.get('date', '')}):",
+                     "Include this as a blockquote table after the Focus line:"]
+            lines.append("| Exercise | Last | Suggested | Reps | Sets |")
+            lines.append("|----------|------|-----------|------|------|")
+            for ex in suggestion["exercises"]:
+                name = ex.get("display_name") or ex.get("exercise_name", "")
+                last_w = f"{ex['weight_kg']}kg" if ex.get("weight_kg") and ex["weight_kg"] > 0 else "BW"
+                sugg_w = f"{ex['suggested_weight_kg']}kg" if ex.get("suggested_weight_kg") else last_w
+                reps = str(ex.get("reps")) if ex.get("reps") else "-"
+                sets = str(ex.get("sets")) if ex.get("sets") else "-"
+                lines.append(f"| {name} | {last_w} | {sugg_w} | {reps} | {sets} |")
+            lines.append("Wrap the table in a blockquote (> prefix) and add a header explaining it's a suggestion.")
+            workout_section = "\n".join(lines)
+
         user_prompt = f"""Date: {date}
 
 Template:
@@ -252,6 +270,7 @@ Wizard answers:
 - Work priorities: {answers.get('work_priorities', '')}
 - Personal items: {answers.get('personal', '')}
 - Adhoc notes: {answers.get('adhoc', '')}
+{workout_section}
 
 Populate the template with these answers and return only the complete markdown."""
 
