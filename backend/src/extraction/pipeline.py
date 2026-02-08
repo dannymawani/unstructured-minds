@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import re
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -342,6 +343,21 @@ class ExtractionPipeline:
 
         return records
 
+    @staticmethod
+    def _normalize_task_desc(desc: str) -> str:
+        """Normalize a task description for dedup comparison.
+
+        Strips whitespace, lowercases, and removes minor punctuation differences
+        so that Claude re-extracting the same task with slight wording changes
+        still matches the existing record.
+        """
+        desc = desc.strip().lower()
+        # Collapse whitespace
+        desc = re.sub(r"\s+", " ", desc)
+        # Remove trailing punctuation that doesn't change meaning
+        desc = desc.rstrip(".,;:!?")
+        return desc
+
     def _store_tasks(
         self,
         date: str,
@@ -352,9 +368,12 @@ class ExtractionPipeline:
 
         On re-extraction:
         1. Load existing tasks for this source_file
-        2. Skip any task whose description already exists (regardless of status)
+        2. Skip any task whose normalized description already exists
         3. Remove stale backlog tasks from this file that are no longer in the note
         4. Insert genuinely new tasks
+
+        Uses normalized descriptions to prevent duplicates when Claude
+        extracts slightly different wording on re-extraction.
 
         Args:
             date: Date string
@@ -380,25 +399,31 @@ class ExtractionPipeline:
             "SELECT id, description, status FROM tasks WHERE source_file = ?",
             [source_file],
         ).fetchall()
-        existing_by_desc: dict[str, tuple[str, str]] = {
-            row[1]: (row[0], row[2]) for row in existing_rows  # desc -> (id, status)
+        # Build lookup by normalized description -> (id, status, original_desc)
+        existing_by_norm: dict[str, tuple[str, str, str]] = {
+            self._normalize_task_desc(row[1]): (row[0], row[2], row[1])
+            for row in existing_rows
         }
 
-        # Collect descriptions from current extraction
-        new_descriptions = {task.get("description", "") for task in tasks}
+        # Collect normalized descriptions from current extraction
+        new_norm_descriptions = {
+            self._normalize_task_desc(task.get("description", ""))
+            for task in tasks
+        }
 
         # Remove stale backlog tasks that are no longer in the note
         # (keep done/cancelled/in_progress — those were acted on by the user)
-        for desc, (task_id, status) in existing_by_desc.items():
-            if desc not in new_descriptions and status == "backlog":
+        for norm_desc, (task_id, status, _orig) in existing_by_norm.items():
+            if norm_desc not in new_norm_descriptions and status == "backlog":
                 self.db.execute("DELETE FROM tasks WHERE id = ?", [task_id])
 
         records = 0
         for task in tasks:
             description = task.get("description", "")
+            norm_desc = self._normalize_task_desc(description)
 
             # Skip if this task already exists for this source file
-            if description in existing_by_desc:
+            if norm_desc in existing_by_norm:
                 continue
 
             task_id = self._generate_id()
@@ -531,6 +556,29 @@ class ExtractionPipeline:
 
         return 1
 
+    @staticmethod
+    def _strip_suggestions(content: str) -> str:
+        """Remove blockquoted workout suggestions before extraction.
+
+        Strips lines that are part of a suggestion block (lines starting with >
+        that follow a "> **Last session" header) so that suggested workouts
+        are not mistakenly extracted as logged workouts.
+        """
+        lines = content.split("\n")
+        result = []
+        in_suggestion = False
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith("> **Last session"):
+                in_suggestion = True
+                continue
+            if in_suggestion:
+                if stripped.startswith(">"):
+                    continue
+                in_suggestion = False
+            result.append(line)
+        return "\n".join(result)
+
     async def extract(
         self,
         file_path: str,
@@ -582,8 +630,11 @@ class ExtractionPipeline:
                     error=str(e),
                 )
 
+            # Strip suggestion blocks before extraction
+            clean_content = self._strip_suggestions(content)
+
             # Extract data using Claude
-            data = await self.claude.extract(content, schema)
+            data = await self.claude.extract(clean_content, schema)
 
             # Get date from file path first (reliable), then fall back to extracted data
             date = self._extract_date_from_path(file_path) or data.get("date")

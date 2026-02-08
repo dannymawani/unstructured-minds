@@ -54,19 +54,24 @@ export function WeeklyActivityChart({
       .finally(() => setLoading(false));
   }, [apiUrl, days]);
 
+  const totalSessions = useMemo(() => {
+    if (!data) return 0;
+    return data.activities.reduce((sum, a) => sum + a.count, 0);
+  }, [data]);
+
   const items = useMemo(() => {
     if (!data) return [];
-    const maxDuration = Math.max(...data.activities.map((a) => a.total_duration_minutes));
+    const maxCount = Math.max(...data.activities.map((a) => a.count));
     return data.activities.map((a) => ({
       name: a.activity_type.charAt(0).toUpperCase() + a.activity_type.slice(1),
       duration: a.total_duration_minutes,
       count: a.count,
       type: a.activity_type,
-      percentage: (a.total_duration_minutes / data.total_duration_minutes) * 100,
-      barWidth: (a.total_duration_minutes / maxDuration) * 100,
+      percentage: totalSessions > 0 ? (a.count / totalSessions) * 100 : 0,
+      barWidth: maxCount > 0 ? (a.count / maxCount) * 100 : 0,
       color: COLORS[a.activity_type] || COLORS.other,
     }));
-  }, [data]);
+  }, [data, totalSessions]);
 
   // Build conic-gradient for doughnut
   const conicGradient = useMemo(() => {
@@ -103,10 +108,6 @@ export function WeeklyActivityChart({
     );
   }
 
-  const totalHours = Math.floor(data.total_duration_minutes / 60);
-  const totalMinutes = data.total_duration_minutes % 60;
-  const totalTimeStr = totalHours > 0 ? `${totalHours}h ${totalMinutes}m` : `${totalMinutes}m`;
-
   const formatDuration = (mins: number) => {
     const h = Math.floor(mins / 60);
     const m = mins % 60;
@@ -123,7 +124,7 @@ export function WeeklyActivityChart({
           <div>
             <h3 className="text-lg font-semibold text-foreground">Activity Breakdown</h3>
             <p className="text-sm text-muted-foreground">
-              {data.activities.length} types | {totalTimeStr} total
+              {totalSessions} session{totalSessions !== 1 ? 's' : ''} | {data.activities.length} types
             </p>
           </div>
         </div>
@@ -171,7 +172,7 @@ export function WeeklyActivityChart({
                 />
                 {hovered === i && (
                   <span className="absolute inset-0 flex items-center justify-center text-white text-xs font-medium">
-                    {formatDuration(item.duration)} &middot; {item.count} sessions &middot; {item.percentage.toFixed(0)}%
+                    {item.count} session{item.count !== 1 ? 's' : ''} &middot; {formatDuration(item.duration)} &middot; {item.percentage.toFixed(0)}%
                   </span>
                 )}
               </div>
@@ -218,8 +219,7 @@ export function WeeklyActivityChart({
         <div className="flex items-center justify-between mt-3 pt-3 border-t border-border text-xs text-muted-foreground">
           <span>Click a bar to filter</span>
           <span>
-            Avg per session:{' '}
-            {Math.round(data.total_duration_minutes / data.activities.reduce((sum, a) => sum + a.count, 0))} min
+            {totalSessions > 0 ? `Avg ${Math.round(data.total_duration_minutes / totalSessions)} min/session` : ''}
           </span>
         </div>
       )}
