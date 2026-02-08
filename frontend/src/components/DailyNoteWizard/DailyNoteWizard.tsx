@@ -16,7 +16,14 @@ type WorkoutType = 'BJJ' | 'Strength' | 'Cardio' | 'Rest'
 
 interface WorkoutSuggestion {
   date: string | null
-  exercises: { exercise_name: string; sets: number; reps: number | null; weight_kg: number | null }[]
+  exercises: {
+    exercise_name: string
+    display_name: string
+    sets: number
+    reps: number | null
+    weight_kg: number | null
+    suggested_weight_kg: number | null
+  }[]
   focus: string | null
 }
 
@@ -413,22 +420,27 @@ function populateNote(content: string, answers: WizardAnswers): string {
     // Also try the escaped Milkdown variant
     result = replaceLine(result, '* **Type**:', `* **Type**: ${answers.workout}`)
 
-    // Add workout suggestion for strength training
+    // Add workout suggestion table for strength training
     if (answers.workout === 'Strength' && answers.workoutSuggestion?.exercises.length) {
       const suggestion = answers.workoutSuggestion
-      const lines = suggestion.exercises.map(ex => {
-        const parts = [`${ex.exercise_name}:`]
-        if (ex.sets) parts.push(`${ex.sets}x${ex.reps ?? '?'}`)
-        if (ex.weight_kg) parts.push(`@ ${ex.weight_kg}kg`)
-        return `> - ${parts.join(' ')}`
-      })
       const dateStr = suggestion.date ? ` (${suggestion.date})` : ''
-      const suggestionBlock = [
+      const tableLines = [
         '',
-        `> **Last session${dateStr}** — _edit below to log, or delete if skipping_`,
-        ...lines,
-        '',
-      ].join('\n')
+        `> **Last session${dateStr}** — edit below to log, or delete if skipping`,
+        '> ',
+        '> | Exercise | Last | Suggested | Reps | Sets |',
+        '> |----------|------|-----------|------|------|',
+      ]
+      for (const ex of suggestion.exercises) {
+        const name = ex.display_name || ex.exercise_name
+        const lastW = ex.weight_kg && ex.weight_kg > 0 ? `${ex.weight_kg}kg` : 'BW'
+        const suggW = ex.suggested_weight_kg ? `${ex.suggested_weight_kg}kg` : lastW
+        const reps = ex.reps ? String(ex.reps) : '-'
+        const sets = ex.sets ? String(ex.sets) : '-'
+        tableLines.push(`> | ${name} | ${lastW} | ${suggW} | ${reps} | ${sets} |`)
+      }
+      tableLines.push('')
+      const suggestionBlock = tableLines.join('\n')
 
       // Insert after the Focus line in the Workout section
       const focusIdx = result.indexOf('- **Focus**:')

@@ -7,10 +7,13 @@ from typing import Any, Optional
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
 
+from ..config import settings
 from ..db import DatabaseManager
-
+from ..extraction.exercise_matcher import ExerciseMatcher
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
+
+_exercise_matcher = ExerciseMatcher(settings.data_path / "exercise_definitions.json")
 
 
 class Period(BaseModel):
@@ -755,6 +758,7 @@ def create_exercise(
     """
     exercise_id = str(uuid.uuid4())
     activity_id = f"manual_{exercise.date}_{exercise_id[:8]}"
+    canonical_name = _exercise_matcher.match(exercise.exercise_name)[0]
 
     db.execute(
         """
@@ -769,7 +773,7 @@ def create_exercise(
             exercise_id,
             activity_id,
             str(exercise.date),
-            exercise.exercise_name,
+            canonical_name,
             exercise.weight_kg,
             exercise.reps,
             exercise.set_number,
@@ -779,7 +783,7 @@ def create_exercise(
 
     return ExerciseCreateResponse(
         id=exercise_id,
-        message=f"Exercise '{exercise.exercise_name}' added successfully",
+        message=f"Exercise '{canonical_name}' added successfully",
     )
 
 
@@ -787,9 +791,11 @@ class LastWorkoutExercise(BaseModel):
     """Single exercise from the last workout."""
 
     exercise_name: str
+    display_name: str
     sets: int
     reps: Optional[int] = None
     weight_kg: Optional[float] = None
+    suggested_weight_kg: Optional[float] = None
 
 
 class LastWorkoutResponse(BaseModel):
@@ -800,26 +806,51 @@ class LastWorkoutResponse(BaseModel):
     focus: Optional[str] = None
 
 
+def _load_json_config(filename: str) -> dict:
+    """Load a JSON config file from the data directory."""
+    import json
+    from pathlib import Path
+
+    config_path = Path(__file__).resolve().parents[3] / "data" / filename
+    if config_path.exists():
+        return json.loads(config_path.read_text())
+    return {}
+
+
+def _format_display_name(name: str) -> str:
+    """Convert snake_case to Title Case."""
+    return name.replace("_", " ").title()
+
+
 @router.get("/last-strength-workout", response_model=LastWorkoutResponse)
 def get_last_strength_workout(
     db: DatabaseManager = Depends(get_db),
 ) -> LastWorkoutResponse:
-    """Get the last strength training workout to suggest a template.
+    """Get the last strength training workout with progressive overload suggestions.
 
-    Returns exercises from the most recent strength session so the user
-    can use them as a starting point for their next workout.
+    Returns exercises from the most recent strength session with suggested
+    weights (+1.5kg) so the user can plan their next workout.
 
     Args:
         db: Database manager
 
     Returns:
-        Last workout date, exercises, and focus area
+        Last workout date, exercises with suggested weights, and focus area
     """
-    # Find the most recent strength activity date
+    # Load config for progressive overload increment and exercise display names
+    training_config = _load_json_config("training_config.json")
+    exercise_defs = _load_json_config("exercise_definitions.json")
+    increment = training_config.get("preferences", {}).get(
+        "progressive_overload_increment_kg", 1.5
+    )
+
+    # Find the most recent date with both a strength activity AND logged exercises
     last_date_row = db.execute(
         """
-        SELECT MAX(date) FROM activities
-        WHERE activity_type = 'strength'
+        SELECT MAX(el.date)
+        FROM exercise_log el
+        INNER JOIN activities a ON el.date = a.date AND a.activity_type = 'strength'
+        WHERE el.exercise_name IS NOT NULL
         """
     ).fetchone()
 
@@ -856,15 +887,25 @@ def get_last_strength_workout(
         [last_date],
     ).fetchall()
 
-    exercises = [
-        LastWorkoutExercise(
-            exercise_name=row[0],
-            sets=row[1],
-            reps=int(row[2]) if row[2] is not None else None,
-            weight_kg=float(row[3]) if row[3] is not None else None,
+    exercises = []
+    for row in exercise_rows:
+        name = row[0]
+        weight = float(row[3]) if row[3] is not None else None
+        # Progressive overload: +increment for weighted exercises
+        suggested = round(weight + increment, 1) if weight and weight > 0 else None
+        # Display name from definitions or formatted snake_case
+        display = exercise_defs.get(name, {}).get("display", _format_display_name(name))
+
+        exercises.append(
+            LastWorkoutExercise(
+                exercise_name=name,
+                display_name=display,
+                sets=row[1],
+                reps=int(row[2]) if row[2] is not None else None,
+                weight_kg=weight,
+                suggested_weight_kg=suggested,
+            )
         )
-        for row in exercise_rows
-    ]
 
     return LastWorkoutResponse(
         date=last_date,
