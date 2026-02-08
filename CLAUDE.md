@@ -131,6 +131,11 @@ For visual identity, colors, typography, and component styling, see:
 | PR Summary | `/pr-summary #123` | Summarize a PR for review |
 | Daily Note | `/daily-note` | Create a daily note from template |
 | Design Manual | `/design-manual` | Generate/update DESIGN_MANUAL.md |
+| Excalidraw | `/excalidraw` | Generate architecture diagrams as .excalidraw files |
+| Update Docs | `/update-docs` | Auto-update docs after code changes |
+| Clear Tasks | `/clear-tasks` | Bulk-complete stale kanban tasks |
+| Frontend Design | `/frontend-design` | Generate production-grade frontend interfaces |
+| Keybindings Help | `/keybindings-help` | Customize keyboard shortcuts and keybindings |
 
 ### Background Skills (Auto-loaded by Claude)
 
