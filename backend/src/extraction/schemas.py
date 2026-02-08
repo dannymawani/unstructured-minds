@@ -202,7 +202,7 @@ COMBINED_EXTRACTION_SCHEMA: dict[str, Any] = {
         "tasks": TASKS_SCHEMA["properties"]["tasks"],
         "meals": FOOD_LOG_SCHEMA["properties"]["meals"],
     },
-    "required": ["date"],
+    "required": [],
 }
 
 

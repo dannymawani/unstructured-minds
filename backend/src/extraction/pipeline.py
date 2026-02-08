@@ -585,8 +585,8 @@ class ExtractionPipeline:
             # Extract data using Claude
             data = await self.claude.extract(content, schema)
 
-            # Get date from extracted data or file path
-            date = data.get("date") or self._extract_date_from_path(file_path)
+            # Get date from file path first (reliable), then fall back to extracted data
+            date = self._extract_date_from_path(file_path) or data.get("date")
             if not date:
                 # Use today if no date found
                 date = datetime.now().strftime("%Y-%m-%d")
