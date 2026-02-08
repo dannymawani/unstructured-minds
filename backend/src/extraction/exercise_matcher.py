@@ -21,7 +21,7 @@ class ExerciseMatcher:
     def __init__(self, definitions_path: Path) -> None:
         self._exact_map: dict[str, str] = {}
         self._alias_map: dict[str, str] = {}
-        self._display_names: list[str] = []
+        self._fuzzy_candidates: list[tuple[str, str]] = []  # (lowercase_name, display)
 
         if not definitions_path.exists():
             return
@@ -31,15 +31,18 @@ class ExerciseMatcher:
 
         for key, entry in definitions.items():
             display = entry["display"]
-            self._display_names.append(display)
 
             # Exact: key and display name (lowercased)
             self._exact_map[key.lower()] = display
             self._exact_map[display.lower()] = display
 
+            # Fuzzy candidates: display name + all aliases
+            self._fuzzy_candidates.append((display.lower(), display))
+
             # Aliases
             for alias in entry.get("aliases", []):
                 self._alias_map[alias.lower()] = display
+                self._fuzzy_candidates.append((alias.lower(), display))
 
     def match(self, raw_name: str) -> tuple[str, float]:
         """Match a raw exercise name to a canonical name.
@@ -66,12 +69,12 @@ class ExerciseMatcher:
         if normalized in self._alias_map:
             return (self._alias_map[normalized], 1.0)
 
-        # 3. Fuzzy match against all display names
+        # 3. Fuzzy match against display names and aliases
         best_score = 0.0
         best_match = raw_name
 
-        for display in self._display_names:
-            score = SequenceMatcher(None, normalized, display.lower()).ratio()
+        for candidate_lower, display in self._fuzzy_candidates:
+            score = SequenceMatcher(None, normalized, candidate_lower).ratio()
             if score > best_score:
                 best_score = score
                 best_match = display

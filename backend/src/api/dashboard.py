@@ -649,8 +649,8 @@ def get_exercise_table(
     """Get a summary table of strength exercises the user has logged.
 
     Filtered to strength-related exercises only (by activity_id or manual entries).
-    Returns one row per exercise with last trained date, recent weight,
-    best weight, and total sessions.
+    Exercise names are normalized via fuzzy matching so variants like
+    "Deadlift" / "deadlift" / "Deadlifts" merge into one row.
 
     Args:
         search: Optional search filter for exercise names
@@ -661,30 +661,12 @@ def get_exercise_table(
     Returns:
         Table of exercise summaries sorted by total sessions descending
     """
-    where_clauses = ["(activity_id LIKE '%strength%' OR source_file = 'manual_entry')"]
-    params: list[Any] = []
-
-    if search:
-        where_clauses.append("exercise_name ILIKE ?")
-        params.append(f"%{search}%")
-
-    where_sql = " AND ".join(where_clauses)
-
-    # Get total count
-    count_result = db.execute(
-        f"""
-        SELECT COUNT(DISTINCT exercise_name) FROM exercise_log
-        WHERE {where_sql}
-        """,
-        params,
-    ).fetchone()
-    total_count = count_result[0] if count_result else 0
-
+    # Fetch all strength exercises grouped by raw name
     result = db.execute(
-        f"""
+        """
         WITH filtered AS (
             SELECT * FROM exercise_log
-            WHERE {where_sql}
+            WHERE activity_id LIKE '%strength%' OR source_file = 'manual_entry'
         ),
         latest_session AS (
             SELECT
@@ -714,21 +696,54 @@ def get_exercise_table(
         FROM exercise_stats es
         JOIN latest_session ls
             ON es.exercise_name = ls.exercise_name AND ls.rn = 1
-        ORDER BY es.total_sessions DESC, ls.last_trained_date DESC
-        LIMIT ? OFFSET ?
         """,
-        params + [limit, offset],
     ).fetchall()
+
+    # Normalize names and merge duplicates
+    merged: dict[str, dict[str, Any]] = {}
+    for row in result:
+        raw_name = row[0]
+        canonical, _ = _exercise_matcher.match(raw_name)
+
+        if canonical in merged:
+            entry = merged[canonical]
+            if str(row[1]) > entry["last_trained_date"]:
+                entry["last_trained_date"] = str(row[1])
+                entry["last_weight_kg"] = float(row[2]) if row[2] is not None else entry["last_weight_kg"]
+            if row[3] is not None:
+                if entry["max_weight_kg"] is None or float(row[3]) > entry["max_weight_kg"]:
+                    entry["max_weight_kg"] = float(row[3])
+            entry["total_sessions"] += row[4]
+        else:
+            merged[canonical] = {
+                "exercise_name": canonical,
+                "last_trained_date": str(row[1]),
+                "last_weight_kg": float(row[2]) if row[2] is not None else None,
+                "max_weight_kg": float(row[3]) if row[3] is not None else None,
+                "total_sessions": row[4],
+            }
+
+    # Filter by search on canonical names
+    items = list(merged.values())
+    if search:
+        search_lower = search.lower()
+        items = [e for e in items if search_lower in e["exercise_name"].lower()]
+
+    # Sort by total_sessions desc, then last_trained_date desc
+    items.sort(key=lambda x: (x["total_sessions"], x["last_trained_date"]), reverse=True)
+
+    total_count = len(items)
+    paginated = items[offset:offset + limit]
 
     exercises = [
         ExerciseTableEntry(
-            exercise_name=row[0],
-            last_trained_date=str(row[1]),
-            last_weight_kg=float(row[2]) if row[2] is not None else None,
-            max_weight_kg=float(row[3]) if row[3] is not None else None,
-            total_sessions=row[4],
+            exercise_name=e["exercise_name"],
+            last_trained_date=e["last_trained_date"],
+            last_weight_kg=e["last_weight_kg"],
+            max_weight_kg=e["max_weight_kg"],
+            total_sessions=e["total_sessions"],
         )
-        for row in result
+        for e in paginated
     ]
 
     return ExerciseTableResponse(
@@ -890,15 +905,17 @@ def get_last_strength_workout(
     exercises = []
     for row in exercise_rows:
         name = row[0]
+        # Normalize via fuzzy matcher
+        canonical, _ = _exercise_matcher.match(name)
         weight = float(row[3]) if row[3] is not None else None
         # Progressive overload: +increment for weighted exercises
         suggested = round(weight + increment, 1) if weight and weight > 0 else None
-        # Display name from definitions or formatted snake_case
-        display = exercise_defs.get(name, {}).get("display", _format_display_name(name))
+        # Display name: use canonical name (already the display name from definitions)
+        display = canonical
 
         exercises.append(
             LastWorkoutExercise(
-                exercise_name=name,
+                exercise_name=canonical,
                 display_name=display,
                 sets=row[1],
                 reps=int(row[2]) if row[2] is not None else None,
