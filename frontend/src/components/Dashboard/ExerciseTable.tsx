@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
-import { Dumbbell, Plus, X, Loader2 } from 'lucide-react';
-import { cachedFetch, clearCache } from '../../lib/cachedFetch';
+import { useEffect, useState, useCallback } from 'react';
+import { Dumbbell, Plus, X, Loader2, Search, ChevronDown } from 'lucide-react';
+import { clearCache } from '../../lib/cachedFetch';
 
 interface ExerciseTableEntry {
   exercise_name: string;
@@ -8,13 +8,13 @@ interface ExerciseTableEntry {
   last_weight_kg: number | null;
   max_weight_kg: number | null;
   total_sessions: number;
-  last_reps: number | null;
-  last_sets: number | null;
 }
 
 interface ExerciseTableData {
   exercises: ExerciseTableEntry[];
-  total_exercises: number;
+  total_count: number;
+  offset: number;
+  limit: number;
 }
 
 interface ExerciseTableProps {
@@ -37,13 +37,19 @@ function formatWeight(kg: number | null): string {
   return `${kg} kg`;
 }
 
+const PAGE_SIZE = 10;
+
 export function ExerciseTable({ apiUrl = 'http://localhost:8000' }: ExerciseTableProps) {
-  const [data, setData] = useState<ExerciseTableData | null>(null);
+  const [exercises, setExercises] = useState<ExerciseTableEntry[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
 
   // Form state
   const today = new Date().toISOString().split('T')[0];
@@ -55,17 +61,45 @@ export function ExerciseTable({ apiUrl = 'http://localhost:8000' }: ExerciseTabl
     date: today,
   });
 
-  const fetchData = () => {
-    setLoading(true);
-    cachedFetch<ExerciseTableData>(`${apiUrl}/dashboard/exercise-table`)
-      .then(setData)
-      .catch((err) => setError(err instanceof Error ? err.message : 'Unknown error'))
-      .finally(() => setLoading(false));
-  };
+  const fetchData = useCallback(async (searchTerm: string, offset = 0, append = false) => {
+    if (!append) setLoading(true);
+    else setLoadingMore(true);
+
+    try {
+      const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset) });
+      if (searchTerm) params.set('search', searchTerm);
+
+      const response = await fetch(`${apiUrl}/dashboard/exercise-table?${params}`);
+      if (!response.ok) throw new Error('Failed to fetch exercises');
+      const result: ExerciseTableData = await response.json();
+
+      if (append) {
+        setExercises((prev) => [...prev, ...result.exercises]);
+      } else {
+        setExercises(result.exercises);
+      }
+      setTotalCount(result.total_count);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  }, [apiUrl]);
 
   useEffect(() => {
-    fetchData();
-  }, [apiUrl]);
+    fetchData(search);
+  }, [apiUrl, search, fetchData]);
+
+  // Debounced search
+  useEffect(() => {
+    const timer = setTimeout(() => setSearch(searchInput), 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  const loadMore = () => {
+    fetchData(search, exercises.length, true);
+  };
 
   const resetForm = () => {
     setFormData({
@@ -108,11 +142,10 @@ export function ExerciseTable({ apiUrl = 'http://localhost:8000' }: ExerciseTabl
         throw new Error(errData?.detail || `Failed to add exercise (${response.status})`);
       }
 
-      // Clear the cache and refetch
       clearCache();
       resetForm();
       setShowForm(false);
-      fetchData();
+      fetchData(search);
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Failed to add exercise');
     } finally {
@@ -120,7 +153,7 @@ export function ExerciseTable({ apiUrl = 'http://localhost:8000' }: ExerciseTabl
     }
   };
 
-  if (loading) {
+  if (loading && exercises.length === 0) {
     return (
       <div className="bg-card rounded-md shadow-sm p-4 h-64 animate-pulse" data-testid="exercise-table-loading" />
     );
@@ -134,6 +167,8 @@ export function ExerciseTable({ apiUrl = 'http://localhost:8000' }: ExerciseTabl
     );
   }
 
+  const hasMore = exercises.length < totalCount;
+
   return (
     <div className="bg-card rounded-md shadow-sm p-3 sm:p-4" data-testid="exercise-table">
       {/* Header */}
@@ -145,7 +180,7 @@ export function ExerciseTable({ apiUrl = 'http://localhost:8000' }: ExerciseTabl
           <div>
             <h3 className="text-base sm:text-lg font-semibold text-foreground">Track Exercises</h3>
             <p className="text-sm text-muted-foreground">
-              {data?.total_exercises ?? 0} exercise{(data?.total_exercises ?? 0) !== 1 ? 's' : ''} tracked
+              {totalCount} strength exercise{totalCount !== 1 ? 's' : ''} tracked
             </p>
           </div>
         </div>
@@ -159,6 +194,18 @@ export function ExerciseTable({ apiUrl = 'http://localhost:8000' }: ExerciseTabl
           {showForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
           {showForm ? 'Cancel' : 'Add Exercise'}
         </button>
+      </div>
+
+      {/* Search bar */}
+      <div className="relative mb-3">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <input
+          type="text"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          placeholder="Search exercises..."
+          className="w-full bg-muted text-foreground rounded-lg pl-9 pr-3 py-2 text-sm border-none focus:ring-2 focus:ring-ring"
+        />
       </div>
 
       {/* Inline Add Form */}
@@ -239,67 +286,82 @@ export function ExerciseTable({ apiUrl = 'http://localhost:8000' }: ExerciseTabl
       )}
 
       {/* Table */}
-      {!data || data.exercises.length === 0 ? (
+      {exercises.length === 0 ? (
         <div className="text-center py-8 text-muted-foreground">
           <Dumbbell className="w-8 h-8 mx-auto mb-2 opacity-40" />
-          <p>No exercises tracked yet.</p>
-          <p className="text-sm mt-1">Add your first exercise using the button above.</p>
+          <p>{search ? 'No exercises match your search.' : 'No exercises tracked yet.'}</p>
+          {!search && <p className="text-sm mt-1">Add your first exercise using the button above.</p>}
         </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border text-muted-foreground text-left">
-                <th className="pb-2 pr-4 font-medium">Exercise</th>
-                <th className="pb-2 pr-4 font-medium">Last Trained</th>
-                <th className="pb-2 pr-4 font-medium text-right">Recent Weight</th>
-                <th className="pb-2 pr-4 font-medium text-right">Best Weight</th>
-                <th className="pb-2 font-medium text-right">Sessions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.exercises.map((exercise) => {
-                const isPR =
-                  exercise.last_weight_kg !== null &&
-                  exercise.max_weight_kg !== null &&
-                  exercise.last_weight_kg >= exercise.max_weight_kg;
+        <>
+          <div className="overflow-x-auto max-h-[480px] overflow-y-auto">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-card">
+                <tr className="border-b border-border text-muted-foreground text-left">
+                  <th className="pb-2 pr-4 font-medium">Exercise</th>
+                  <th className="pb-2 pr-4 font-medium">Last Trained</th>
+                  <th className="pb-2 pr-4 font-medium text-right">Recent Weight</th>
+                  <th className="pb-2 pr-4 font-medium text-right">Best Weight</th>
+                  <th className="pb-2 font-medium text-right">Sessions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {exercises.map((exercise) => {
+                  const isPR =
+                    exercise.last_weight_kg !== null &&
+                    exercise.max_weight_kg !== null &&
+                    exercise.last_weight_kg >= exercise.max_weight_kg;
 
-                return (
-                  <tr
-                    key={exercise.exercise_name}
-                    className="border-b border-border/50 hover:bg-secondary/30 transition-colors"
-                  >
-                    <td className="py-2.5 pr-4">
-                      <span className="font-medium text-foreground">
-                        {formatExerciseName(exercise.exercise_name)}
-                      </span>
-                      {exercise.last_reps !== null && exercise.last_sets !== null && (
-                        <span className="text-xs text-muted-foreground ml-2">
-                          {exercise.last_sets}x{exercise.last_reps}
+                  return (
+                    <tr
+                      key={exercise.exercise_name}
+                      className="border-b border-border/50 hover:bg-secondary/30 transition-colors"
+                    >
+                      <td className="py-2.5 pr-4">
+                        <span className="font-medium text-foreground">
+                          {formatExerciseName(exercise.exercise_name)}
                         </span>
-                      )}
-                    </td>
-                    <td className="py-2.5 pr-4 text-muted-foreground">
-                      {formatDate(exercise.last_trained_date)}
-                    </td>
-                    <td className="py-2.5 pr-4 text-right text-foreground">
-                      {formatWeight(exercise.last_weight_kg)}
-                      {isPR && (
-                        <span className="ml-1.5 text-xs text-amber-400 font-medium">PR</span>
-                      )}
-                    </td>
-                    <td className="py-2.5 pr-4 text-right text-teal-400 font-medium">
-                      {formatWeight(exercise.max_weight_kg)}
-                    </td>
-                    <td className="py-2.5 text-right text-muted-foreground">
-                      {exercise.total_sessions}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                      </td>
+                      <td className="py-2.5 pr-4 text-muted-foreground">
+                        {formatDate(exercise.last_trained_date)}
+                      </td>
+                      <td className="py-2.5 pr-4 text-right text-foreground">
+                        {formatWeight(exercise.last_weight_kg)}
+                        {isPR && (
+                          <span className="ml-1.5 text-xs text-amber-400 font-medium">PR</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 pr-4 text-right text-teal-400 font-medium">
+                        {formatWeight(exercise.max_weight_kg)}
+                      </td>
+                      <td className="py-2.5 text-right text-muted-foreground">
+                        {exercise.total_sessions}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Load more */}
+          {hasMore && (
+            <div className="flex justify-center mt-3">
+              <button
+                onClick={loadMore}
+                disabled={loadingMore}
+                className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors px-4 py-2"
+              >
+                {loadingMore ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                )}
+                {loadingMore ? 'Loading...' : `Show more (${exercises.length} of ${totalCount})`}
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

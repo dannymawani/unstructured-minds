@@ -147,15 +147,15 @@ class ExerciseTableEntry(BaseModel):
     last_weight_kg: Optional[float] = None
     max_weight_kg: Optional[float] = None
     total_sessions: int
-    last_reps: Optional[int] = None
-    last_sets: Optional[int] = None
 
 
 class ExerciseTableResponse(BaseModel):
     """Response for exercise table endpoint."""
 
     exercises: list[ExerciseTableEntry]
-    total_exercises: int
+    total_count: int
+    offset: int
+    limit: int
 
 
 class ExerciseCreate(BaseModel):
@@ -438,12 +438,13 @@ def get_dashboard_summary(
         [period.start_date, period.end_date],
     ))
 
-    # Get daily notes count (distinct dates with extraction logs for daily notes)
+    # Get daily notes count (distinct dates in daily_metrics within period)
     daily_notes_count = fetch_scalar(db.execute(
         """
-        SELECT COUNT(DISTINCT file_path) FROM extraction_log
-        WHERE file_path LIKE '%Daily-Notes%' AND success = TRUE
+        SELECT COUNT(DISTINCT date) FROM daily_metrics
+        WHERE date >= ? AND date <= ?
         """,
+        [period.start_date, period.end_date],
     ))
 
     # Get last activity date
@@ -451,12 +452,18 @@ def get_dashboard_summary(
         "SELECT MAX(date) FROM activities"
     ), default=None)
 
-    # Get last daily note date
-    last_daily_note = fetch_scalar(db.execute(
+    # Get last daily note date from extraction_log file paths
+    last_note_row = db.execute(
         """
-        SELECT MAX(date) FROM daily_metrics
-        """,
-    ), default=None)
+        SELECT file_path FROM extraction_log
+        WHERE file_path LIKE '%Daily-Notes%' AND success = TRUE
+        ORDER BY file_path DESC
+        LIMIT 1
+        """
+    ).fetchone()
+    last_daily_note = None
+    if last_note_row and last_note_row[0]:
+        last_daily_note = last_note_row[0].split('/')[-1].removesuffix('.md')
 
     # Calculate streak (consecutive days with activities ending today or yesterday)
     # Single query: fetch all distinct activity dates in the last year
@@ -629,57 +636,68 @@ def get_correlation_data(
 
 @router.get("/exercise-table", response_model=ExerciseTableResponse)
 def get_exercise_table(
+    search: Optional[str] = Query(default=None, description="Search exercises by name"),
+    limit: int = Query(default=10, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     db: DatabaseManager = Depends(get_db),
 ) -> ExerciseTableResponse:
-    """Get a summary table of all exercises the user has logged.
+    """Get a summary table of strength exercises the user has logged.
 
+    Filtered to strength-related exercises only (by activity_id or manual entries).
     Returns one row per exercise with last trained date, recent weight,
-    best weight, total sessions, and recent reps/sets.
+    best weight, and total sessions.
 
     Args:
+        search: Optional search filter for exercise names
+        limit: Number of exercises to return (default 10)
+        offset: Pagination offset
         db: Database manager
 
     Returns:
-        Table of exercise summaries sorted by last trained date descending
+        Table of exercise summaries sorted by total sessions descending
     """
+    where_clauses = ["(activity_id LIKE '%strength%' OR source_file = 'manual_entry')"]
+    params: list[Any] = []
+
+    if search:
+        where_clauses.append("exercise_name ILIKE ?")
+        params.append(f"%{search}%")
+
+    where_sql = " AND ".join(where_clauses)
+
+    # Get total count
+    count_result = db.execute(
+        f"""
+        SELECT COUNT(DISTINCT exercise_name) FROM exercise_log
+        WHERE {where_sql}
+        """,
+        params,
+    ).fetchone()
+    total_count = count_result[0] if count_result else 0
+
     result = db.execute(
-        """
-        WITH latest_session AS (
+        f"""
+        WITH filtered AS (
+            SELECT * FROM exercise_log
+            WHERE {where_sql}
+        ),
+        latest_session AS (
             SELECT
                 exercise_name,
                 date as last_trained_date,
                 weight_kg as last_weight_kg,
-                reps as last_reps,
                 ROW_NUMBER() OVER (
                     PARTITION BY exercise_name
                     ORDER BY date DESC, set_number DESC
                 ) as rn
-            FROM exercise_log
-        ),
-        session_sets AS (
-            SELECT
-                exercise_name,
-                date,
-                COUNT(*) as set_count
-            FROM exercise_log
-            GROUP BY exercise_name, date
-        ),
-        latest_sets AS (
-            SELECT
-                exercise_name,
-                set_count as last_sets,
-                ROW_NUMBER() OVER (
-                    PARTITION BY exercise_name
-                    ORDER BY date DESC
-                ) as rn
-            FROM session_sets
+            FROM filtered
         ),
         exercise_stats AS (
             SELECT
                 exercise_name,
                 MAX(weight_kg) as max_weight_kg,
                 COUNT(DISTINCT date) as total_sessions
-            FROM exercise_log
+            FROM filtered
             GROUP BY exercise_name
         )
         SELECT
@@ -687,16 +705,14 @@ def get_exercise_table(
             ls.last_trained_date,
             ls.last_weight_kg,
             es.max_weight_kg,
-            es.total_sessions,
-            ls.last_reps,
-            lsets.last_sets
+            es.total_sessions
         FROM exercise_stats es
         JOIN latest_session ls
             ON es.exercise_name = ls.exercise_name AND ls.rn = 1
-        LEFT JOIN latest_sets lsets
-            ON es.exercise_name = lsets.exercise_name AND lsets.rn = 1
-        ORDER BY ls.last_trained_date DESC
-        """
+        ORDER BY es.total_sessions DESC, ls.last_trained_date DESC
+        LIMIT ? OFFSET ?
+        """,
+        params + [limit, offset],
     ).fetchall()
 
     exercises = [
@@ -706,15 +722,15 @@ def get_exercise_table(
             last_weight_kg=float(row[2]) if row[2] is not None else None,
             max_weight_kg=float(row[3]) if row[3] is not None else None,
             total_sessions=row[4],
-            last_reps=int(row[5]) if row[5] is not None else None,
-            last_sets=int(row[6]) if row[6] is not None else None,
         )
         for row in result
     ]
 
     return ExerciseTableResponse(
         exercises=exercises,
-        total_exercises=len(exercises),
+        total_count=total_count,
+        offset=offset,
+        limit=limit,
     )
 
 
@@ -736,6 +752,7 @@ def create_exercise(
         Created exercise ID and confirmation message
     """
     exercise_id = str(uuid.uuid4())
+    activity_id = f"manual_{exercise.date}_{exercise_id[:8]}"
 
     db.execute(
         """
@@ -744,10 +761,11 @@ def create_exercise(
             weight_kg, reps, set_number, notes,
             source_file, extracted_at
         )
-        VALUES (?, NULL, ?, ?, ?, ?, ?, ?, 'manual_entry', CURRENT_TIMESTAMP)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'manual_entry', CURRENT_TIMESTAMP)
         """,
         [
             exercise_id,
+            activity_id,
             str(exercise.date),
             exercise.exercise_name,
             exercise.weight_kg,

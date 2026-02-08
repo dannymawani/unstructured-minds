@@ -58,14 +58,14 @@ export function Dashboard({ apiUrl = 'http://localhost:8000' }: DashboardProps) 
       </div>
 
       {/* Summary Cards */}
-      {isVisible('summary') && <DashboardSummary apiUrl={apiUrl} />}
+      {isVisible('summary') && <DashboardSummary apiUrl={apiUrl} days={dateRange} />}
 
       {/* AI Insights */}
       {isVisible('insights') && <InsightsCard apiUrl={apiUrl} />}
 
       {/* Activity Heatmap - Full screen width */}
       {isVisible('heatmap') && (
-        <div className="relative -mx-4 sm:-mx-6 px-4 sm:px-6">
+        <div className="relative -mx-4 sm:-mx-6">
           {/* Year selector for heatmap */}
           <div className="absolute top-4 right-8 sm:right-10 z-10">
             <select
