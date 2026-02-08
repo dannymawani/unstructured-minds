@@ -35,7 +35,17 @@ EXERCISE_SCHEMA: dict[str, Any] = {
                         "items": {
                             "type": "object",
                             "properties": {
-                                "name": {"type": "string", "description": "Exercise name"},
+                                "name": {
+                                    "type": "string",
+                                    "description": (
+                                        "Exercise name. Use standard English names like: "
+                                        "Deadlift, Squat, Bench Press, Military Press, "
+                                        "Leg Press, Leg Curl, Leg Extension, Pulldown, "
+                                        "Barbell Row, Dumbbell Row, Incline Dumbbell Press, "
+                                        "Kettlebell Swing, Triceps Rope Extension, "
+                                        "Biceps Cable Curl, Good Mornings, Cossack Squats"
+                                    ),
+                                },
                                 "weight_kg": {"type": "number", "description": "Weight in kg"},
                                 "reps": {"type": "integer", "description": "Number of reps"},
                                 "sets": {"type": "integer", "description": "Number of sets"},
