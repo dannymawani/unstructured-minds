@@ -66,6 +66,14 @@ data/
 
 > **Note:** Extracted data lives in DuckDB tables. Config/reference files (exercise definitions, training profile, injuries) stay as JSON for easy hand-editing and git tracking.
 
+### DuckDB Notes
+
+DuckDB does not support AUTO_INCREMENT. Use `DEFAULT nextval('sequence_name')` or generate IDs in application code. After any DuckDB schema changes, verify with a test insert and query to confirm persistence.
+
+## CSS/UI Changes
+
+When making CSS or layout changes, make ONE change at a time and verify it doesn't regress other styling. Never batch multiple CSS fixes in a single edit. After each change, describe exactly what changed and what it should look like.
+
 ## Development Workflow
 
 ### Mandatory Process
@@ -89,6 +97,10 @@ Plan → Approve → Implement → Test → Review → Deploy
 - Branch names: `feature/{name}` for features, `fix/{issue}` for bugfixes
 - One feature per branch, rebase on main before merging
 
+### Commit Hygiene
+
+When staging files for commit, only stage files directly related to the current task. Use `git add <specific-files>` rather than `git add .` or broad patterns. Double-check staged files with `git diff --cached --stat` before committing.
+
 ### Pre-Work Checklist
 
 - [ ] Docker is running: `docker compose -f docker-compose.dev.yml up -d`
@@ -100,9 +112,7 @@ Plan → Approve → Implement → Test → Review → Deploy
 
 ## Brand & Design
 
-For visual identity, colors, typography, and component styling, see:
-- **`docs/DESIGN_MANUAL.md`** — Full design system document (generated via `/design-manual`)
-- **`brand-guidelines` skill** — Quick reference for colors, fonts, CSS variables
+For visual identity, colors, typography, and component styling, see the `brand-guidelines` skill.
 
 ### Quick Color Reference
 
@@ -117,70 +127,6 @@ For visual identity, colors, typography, and component styling, see:
 
 ---
 
-## Skills & Agents
+Skills and agents are auto-discovered from `.claude/skills/` and `.claude/agents/`.
 
-### Available Skills (Slash Commands)
-
-| Skill | Command | Description |
-|-------|---------|-------------|
-| Code Review | `/code-review` | Review code for quality, security, and conventions |
-| Commit | `/commit` | Create well-structured git commits |
-| Test | `/test` | Run backend and frontend tests |
-| DuckDB Query | `/duckdb-query` | Query the database for insights |
-| Fix Issue | `/fix-issue #123` | Fix a GitHub issue by number |
-| PR Summary | `/pr-summary #123` | Summarize a PR for review |
-| Daily Note | `/daily-note` | Create a daily note from template |
-| Design Manual | `/design-manual` | Generate/update DESIGN_MANUAL.md |
-| Excalidraw | `/excalidraw` | Generate architecture diagrams as .excalidraw files |
-| Update Docs | `/update-docs` | Auto-update docs after code changes |
-| Clear Tasks | `/clear-tasks` | Bulk-complete stale kanban tasks |
-| Frontend Design | `/frontend-design` | Generate production-grade frontend interfaces |
-| Keybindings Help | `/keybindings-help` | Customize keyboard shortcuts and keybindings |
-
-### Background Skills (Auto-loaded by Claude)
-
-These skills provide context automatically when relevant:
-- `api-conventions` - FastAPI patterns
-- `python-conventions` - Python best practices
-- `frontend-patterns` - React/Milkdown patterns
-- `extract-data` - Data extraction patterns
-- `brand-guidelines` - Project colors, typography, CSS variables, logo concept
-- `data-integration` - Migration from date-partitioned CSVs to flat DuckDB tables
-- `performance-optimization` - Three-tier save model (autosave/Cmd+S/navigation)
-- `editor-ux` - Template discoverability, WYSIWYG toolbar, autosave, raw toggle
-- `task-integration` - Personal task kanban, two-way markdown sync, task API
-- `dev-workflow` - Mandatory plan/approve/test/deploy process, branching rules
-
-### Custom Agents
-
-| Agent | When to Use |
-|-------|-------------|
-| `code-reviewer` | After writing code, before commits (proactive) |
-| `frontend-dev` | React/TypeScript implementation |
-| `backend-dev` | Python/FastAPI implementation |
-| `db-analyst` | DuckDB queries and data analysis |
-| `debugger` | Errors, test failures, unexpected behavior |
-| `test-runner` | After writing code to run tests |
-| `doc-writer` | Technical docs and API documentation |
-
-### Agent Collaboration Patterns
-
-**Development Workflow:**
-1. Write code → `backend-dev` or `frontend-dev`
-2. Review changes → `code-reviewer` (proactive)
-3. Run tests → `test-runner`
-4. Debug failures → `debugger`
-5. Commit → `/commit`
-
-**Code Review Flow:**
-1. Create PR → use `/pr-summary #123`
-2. Review code → `code-reviewer`
-3. Address feedback → appropriate dev agent
-
-**Data Analysis:**
-1. Query data → `/duckdb-query "question"`
-2. Complex analysis → `db-analyst`
-
----
-
-**Last Updated**: 2026-02-07
+**Last Updated**: 2026-02-08
