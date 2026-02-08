@@ -29,6 +29,25 @@ export default defineConfig(async () => {
         '@': path.resolve(__dirname, './src'),
       },
     },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('react-dom') || id.includes('react-router') || id.includes('/react/')) {
+                return 'vendor-react'
+              }
+              if (id.includes('@milkdown') || id.includes('prosemirror')) {
+                return 'vendor-milkdown'
+              }
+              if (id.includes('lucide-react')) {
+                return 'vendor-icons'
+              }
+            }
+          },
+        },
+      },
+    },
     server: {
       port: 5173,
       proxy: {

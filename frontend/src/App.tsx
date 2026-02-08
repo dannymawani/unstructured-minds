@@ -212,7 +212,7 @@ function App() {
 
       <section className="flex-1 flex flex-col min-h-0 overflow-hidden">
         {file.selectedFile ? (
-          <div className="flex-1 overflow-auto p-3 sm:p-6">
+          <div className="flex-1 overflow-auto p-3 sm:p-6 bg-card">
             <MarkdownEditor key={file.selectedFile} content={file.content} onChange={file.handleContentChange} onAutosave={file.handleAutosave} />
           </div>
         ) : (
