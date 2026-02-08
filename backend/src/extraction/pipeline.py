@@ -12,6 +12,7 @@ from typing import Any, Optional
 from ..claude import ClaudeClient
 from ..config import settings
 from ..db import DatabaseManager
+from .exercise_matcher import ExerciseMatcher
 from .schemas import COMBINED_EXTRACTION_SCHEMA, EXTRACTION_SCHEMAS
 
 
@@ -44,6 +45,9 @@ class ExtractionPipeline:
         self.db = db
         self.claude = claude
         self._schemas_dir = settings.data_path / "schemas"
+        self._exercise_matcher = ExerciseMatcher(
+            settings.data_path / "exercise_definitions.json"
+        )
 
     def _load_custom_schema(self, name: str) -> Optional[dict[str, Any]]:
         """Load a custom schema from disk and convert to JSON Schema format.
@@ -318,6 +322,9 @@ class ExtractionPipeline:
             # Insert exercise records
             for j, exercise in enumerate(activity.get("exercises", [])):
                 exercise_id = self._generate_id()
+                exercise_name = self._exercise_matcher.match(
+                    exercise.get("name", "unknown")
+                )[0]
                 self.db.execute(
                     """
                     INSERT OR REPLACE INTO exercise_log
@@ -329,7 +336,7 @@ class ExtractionPipeline:
                         exercise_id,
                         activity_id,
                         date,
-                        exercise.get("name", "unknown"),
+                        exercise_name,
                         exercise.get("weight_kg"),
                         exercise.get("reps"),
                         j + 1,
