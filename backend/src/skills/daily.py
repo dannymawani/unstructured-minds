@@ -1,9 +1,12 @@
 """Daily note skill implementation."""
 
+import logging
 from datetime import datetime
 
 from ..templates.daily_note import render_daily_note
 from .base import Skill, SkillContext, SkillResult
+
+logger = logging.getLogger(__name__)
 
 
 class DailyNoteSkill(Skill):
@@ -55,8 +58,13 @@ class DailyNoteSkill(Skill):
                 file_path=file_path,
             )
 
-        # Render template
-        content = render_daily_note(date_str)
+        # Try vault template first, fall back to hardcoded
+        try:
+            tpl_bytes = await context.storage.read("Templates/daily.md")
+            content = tpl_bytes.decode("utf-8")
+        except Exception:
+            logger.debug("Vault template not found, using hardcoded fallback")
+            content = render_daily_note()
 
         # Write the file
         await context.storage.write(file_path, content.encode("utf-8"))

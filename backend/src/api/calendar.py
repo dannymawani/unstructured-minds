@@ -2,7 +2,7 @@
 
 import logging
 from calendar import monthrange
-from datetime import date, datetime, timedelta
+from datetime import date
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from ..claude import ClaudeClient
 from ..db import DatabaseManager
 from ..storage import StorageBackend
-from ..templates.daily_note import render_daily_note
+from ..templates.daily_note import render_daily_note as render_fallback_template
 
 logger = logging.getLogger(__name__)
 
@@ -220,9 +220,9 @@ async def create_or_get_daily_note(
         return DailyNoteResponse(path=path, created=False, content=content)
 
     # Try reading vault template first, fall back to hardcoded
-    content = await _render_from_vault_template(storage, request.date)
+    content = await _render_from_vault_template(storage)
     if content is None:
-        content = render_daily_note(request.date)
+        content = render_fallback_template()
 
     # Write the new note
     await storage.write(path, content.encode("utf-8"))
@@ -230,36 +230,18 @@ async def create_or_get_daily_note(
     return DailyNoteResponse(path=path, created=True, content=content)
 
 
-async def _render_from_vault_template(storage: StorageBackend, date_str: str) -> str | None:
-    """Try to render a daily note from the vault template.
+async def _render_from_vault_template(storage: StorageBackend) -> str | None:
+    """Try to read the daily note template from the vault.
 
-    Reads Templates/daily.md, wraps it with frontmatter and nav links.
+    Reads Templates/daily.md and returns its content as-is.
     Returns None if the vault template doesn't exist.
     """
     try:
         template_bytes = await storage.read("Templates/daily.md")
-        template_body = template_bytes.decode("utf-8")
+        return template_bytes.decode("utf-8")
     except (FileNotFoundError, Exception):
         logger.debug("Vault template not found, using hardcoded template")
         return None
-
-    dt = datetime.strptime(date_str, "%Y-%m-%d")
-    prev_date = (dt - timedelta(days=1)).strftime("%Y-%m-%d")
-    next_date = (dt + timedelta(days=1)).strftime("%Y-%m-%d")
-
-    return f"""\
----
-date: {date_str}
-type: daily-note
-tags:
-  - daily
-  - journal
----
-
-{template_body}
----
-**Previous**: [[{prev_date}]] | **Next**: [[{next_date}]]
-"""
 
 
 class PopulateDailyNoteRequest(BaseModel):
