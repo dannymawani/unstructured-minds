@@ -1,7 +1,7 @@
 import { memo, useRef } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Clock, FileText } from 'lucide-react'
+import { Clock, FileText, StickyNote } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export interface Task {
@@ -14,6 +14,7 @@ export interface Task {
   priority: number | null
   source_file: string | null
   deadline: string | null
+  notes: string | null
 }
 
 interface PersonalTaskCardProps {
@@ -117,6 +118,11 @@ export const PersonalTaskCard = memo(function PersonalTaskCard({ task, onTaskCli
           <span className="flex items-center gap-1 text-xs bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded">
             <Clock className="w-3 h-3" />
             {new Date(task.deadline + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+          </span>
+        )}
+        {task.notes && (
+          <span className="flex items-center text-xs text-muted-foreground" title="Has notes">
+            <StickyNote className="w-3 h-3" />
           </span>
         )}
       </div>

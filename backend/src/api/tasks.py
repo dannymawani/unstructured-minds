@@ -29,6 +29,7 @@ class TaskOut(BaseModel):
     priority: Optional[int] = None
     source_file: Optional[str] = None
     deadline: Optional[str] = None
+    notes: Optional[str] = None
 
 
 class TaskListResponse(BaseModel):
@@ -42,6 +43,7 @@ class TaskUpdateRequest(BaseModel):
     category: Optional[str] = None
     priority: Optional[int] = Field(None, ge=1, le=3)
     deadline: Optional[date] = None
+    notes: Optional[str] = Field(None, max_length=5000)
 
 
 class TaskCreateRequest(BaseModel):
@@ -49,6 +51,7 @@ class TaskCreateRequest(BaseModel):
     category: Optional[str] = None
     priority: Optional[int] = Field(None, ge=1, le=3)
     deadline: Optional[date] = None
+    notes: Optional[str] = Field(None, max_length=5000)
 
 
 class BulkCompleteRequest(BaseModel):
@@ -93,6 +96,7 @@ def _row_to_task(row: tuple, columns: list[str]) -> TaskOut:
         priority=data.get("priority"),
         source_file=data.get("source_file"),
         deadline=str(data["deadline"]) if data.get("deadline") else None,
+        notes=data.get("notes"),
     )
 
 
@@ -258,6 +262,9 @@ async def update_task(
     if request.deadline is not None:
         updates.append("deadline = ?")
         values.append(request.deadline)
+    if request.notes is not None:
+        updates.append("notes = ?")
+        values.append(request.notes)
 
     if not updates:
         raise HTTPException(status_code=400, detail="No fields to update")
@@ -348,9 +355,9 @@ async def create_task(
 
     # Insert into DuckDB
     db.execute(
-        """INSERT INTO tasks (id, date, description, status, category, priority, source_file, deadline)
-           VALUES (?, ?, ?, 'backlog', ?, ?, ?, ?)""",
-        [task_id, date_str, request.description, request.category, request.priority, daily_note_path, request.deadline],
+        """INSERT INTO tasks (id, date, description, status, category, priority, source_file, deadline, notes)
+           VALUES (?, ?, ?, 'backlog', ?, ?, ?, ?, ?)""",
+        [task_id, date_str, request.description, request.category, request.priority, daily_note_path, request.deadline, request.notes],
     )
 
     # Append to today's daily note

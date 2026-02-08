@@ -129,6 +129,13 @@ class TestGetTask:
         assert data["id"] == "t1"
         assert data["description"] == "Write tests"
 
+    def test_get_includes_notes_field(self, seeded_client):
+        response = seeded_client.get("/tasks/t1")
+        assert response.status_code == 200
+        data = response.json()
+        assert "notes" in data
+        assert data["notes"] is None
+
     def test_get_not_found(self, seeded_client):
         response = seeded_client.get("/tasks/nonexistent")
         assert response.status_code == 404
@@ -165,6 +172,19 @@ class TestUpdateTask:
         response = seeded_client.patch("/tasks/nonexistent", json={"status": "done"})
         assert response.status_code == 404
 
+    def test_update_notes(self, seeded_client):
+        response = seeded_client.patch("/tasks/t1", json={"notes": "Added some notes"})
+        assert response.status_code == 200
+        data = response.json()
+        assert data["notes"] == "Added some notes"
+
+    def test_update_notes_clear(self, seeded_client):
+        seeded_client.patch("/tasks/t1", json={"notes": "Some notes"})
+        response = seeded_client.patch("/tasks/t1", json={"notes": ""})
+        assert response.status_code == 200
+        data = response.json()
+        assert data["notes"] == ""
+
     def test_update_no_fields(self, seeded_client):
         response = seeded_client.patch("/tasks/t1", json={})
         assert response.status_code == 400
@@ -188,6 +208,15 @@ class TestCreateTask:
         data = response.json()
         assert data["category"] == "training"
         assert data["priority"] == 1
+
+    def test_create_task_with_notes(self, client):
+        response = client.post(
+            "/tasks",
+            json={"description": "Task with notes", "notes": "Some detailed notes here"},
+        )
+        assert response.status_code == 201
+        data = response.json()
+        assert data["notes"] == "Some detailed notes here"
 
     def test_create_empty_description(self, client):
         response = client.post("/tasks", json={"description": ""})

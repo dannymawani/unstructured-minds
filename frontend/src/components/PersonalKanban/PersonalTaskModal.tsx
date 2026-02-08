@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { X, FileText, ArrowRight, Pencil, Check, Clock, Trash2 } from 'lucide-react'
+import { X, FileText, ArrowRight, Pencil, Check, Clock, Trash2, StickyNote } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { Task } from './PersonalTaskCard'
@@ -50,6 +50,7 @@ export function PersonalTaskModal({
   const [saving, setSaving] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [notesDraft, setNotesDraft] = useState(task.notes || '')
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   const handleKeyDown = useCallback(
@@ -253,6 +254,38 @@ export function PersonalTaskModal({
               {label}
             </Button>
           ))}
+        </div>
+
+        {/* Notes */}
+        <div className="px-4 py-3 border-b border-border">
+          <div className="flex items-center gap-2 mb-2">
+            <StickyNote className="w-4 h-4 text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">Notes</span>
+          </div>
+          <textarea
+            value={notesDraft}
+            onChange={(e) => setNotesDraft(e.target.value)}
+            onBlur={async () => {
+              const val = notesDraft.trim() || ''
+              if (val === (task.notes || '')) return
+              try {
+                const res = await fetch(`${apiUrl}/tasks/${task.id}`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ notes: val || null }),
+                })
+                if (res.ok) {
+                  const updated: Task = await res.json()
+                  onTaskUpdated?.(updated)
+                }
+              } catch (err) {
+                console.error('Failed to update notes:', err)
+              }
+            }}
+            placeholder="Add notes..."
+            rows={3}
+            className="w-full bg-muted border border-border rounded px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground resize-y focus:outline-none focus:ring-1 focus:ring-ring"
+          />
         </div>
 
         {/* Source file link + Delete */}
