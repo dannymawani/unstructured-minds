@@ -24,7 +24,7 @@ function ToolbarButton({
 }) {
   return (
     <button
-      className="rounded px-2 py-1 text-sm hover:bg-accent cursor-pointer"
+      className="toolbar-btn"
       title={title}
       onMouseDown={(e) => {
         e.preventDefault()
@@ -36,7 +36,7 @@ function ToolbarButton({
 }
 
 function Divider() {
-  return <div className="w-px h-5 bg-border mx-1" />
+  return <div className="toolbar-divider" />
 }
 
 export function EditorToolbar() {
@@ -51,7 +51,7 @@ export function EditorToolbar() {
   }
 
   return (
-    <div className="editor-toolbar flex items-center gap-0.5 border-b bg-background px-2 py-1">
+    <div className="editor-toolbar">
       {/* Inline formatting */}
       <ToolbarButton label="<b>B</b>" title="Bold" onAction={() => runCommand(toggleStrongCommand.key)} />
       <ToolbarButton label="<i>I</i>" title="Italic" onAction={() => runCommand(toggleEmphasisCommand.key)} />
