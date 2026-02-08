@@ -197,7 +197,7 @@ export function ActivityHeatmap({
   const totalDuration = data?.days.reduce((sum, d) => sum + d.duration_minutes, 0) || 0;
 
   return (
-    <div className="bg-card rounded-md shadow-sm p-4" data-testid="activity-heatmap">
+    <div className="bg-card shadow-sm px-3 sm:px-5 py-4 w-full" data-testid="activity-heatmap">
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center gap-2">
           <Grid3x3 className="w-5 h-5 text-green-400" />
@@ -209,42 +209,25 @@ export function ActivityHeatmap({
         </div>
       </div>
 
-      {/* Month labels */}
-      <div className="flex mb-1 ml-8">
-        {monthLabels.map((label, idx) => (
-          <div
-            key={idx}
-            className="text-xs text-muted-foreground"
-            style={{
-              position: 'relative',
-              left: `${label.weekIndex * 14}px`,
-              marginRight: idx < monthLabels.length - 1 ? '-14px' : 0,
-            }}
-          >
-            {label.month}
-          </div>
-        ))}
-      </div>
-
       {/* Heatmap grid */}
-      <div className="flex gap-1 overflow-x-auto pb-2">
+      <div className="flex gap-[2px] w-full">
         {/* Day labels */}
-        <div className="flex flex-col gap-[3px] mr-1 flex-shrink-0">
+        <div className="flex flex-col gap-[2px] mr-1 flex-shrink-0">
           {DAYS.map((day, idx) => (
             <div
               key={day}
-              className="text-xs text-muted-foreground h-[12px] flex items-center"
-              style={{ visibility: idx % 2 === 0 ? 'hidden' : 'visible' }}
+              className="text-[10px] text-muted-foreground flex items-center justify-end pr-1"
+              style={{ height: 'auto', aspectRatio: '2/1', visibility: idx % 2 === 0 ? 'hidden' : 'visible' }}
             >
-              {day.slice(0, 3)}
+              {day.slice(0, 2)}
             </div>
           ))}
         </div>
 
         {/* Weeks */}
-        <div className="flex gap-[3px]">
+        <div className="flex gap-[2px] flex-1 min-w-0">
           {weeks.map((week, weekIdx) => (
-            <div key={weekIdx} className="flex flex-col gap-[3px]">
+            <div key={weekIdx} className="flex flex-col gap-[2px] flex-1 min-w-0">
               {week.map((day, dayIdx) => {
                 const isInYear = day.date.getFullYear() === year;
                 const intensity = isInYear
@@ -257,7 +240,7 @@ export function ActivityHeatmap({
                 return (
                   <div
                     key={dayIdx}
-                    className={`w-[12px] h-[12px] rounded-sm cursor-pointer transition-all hover:ring-1 hover:ring-muted-foreground ${
+                    className={`aspect-square w-full rounded-sm cursor-pointer transition-all hover:ring-1 hover:ring-muted-foreground ${
                       isInYear ? INTENSITY_COLORS[intensity] : 'bg-transparent'
                     }`}
                     onMouseEnter={(e) => handleMouseEnter(e, day)}
@@ -269,6 +252,19 @@ export function ActivityHeatmap({
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Month labels */}
+      <div className="flex mt-1 text-[10px] text-muted-foreground" style={{ paddingLeft: '24px' }}>
+        {monthLabels.map((label, idx) => {
+          const nextWeekIdx = idx < monthLabels.length - 1 ? monthLabels[idx + 1].weekIndex : weeks.length;
+          const span = nextWeekIdx - label.weekIndex;
+          return (
+            <div key={idx} style={{ flex: span, minWidth: 0 }}>
+              {label.month}
+            </div>
+          );
+        })}
       </div>
 
       {/* Legend */}
