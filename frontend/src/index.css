@@ -319,6 +319,188 @@ body {
   font-weight: 600;
 }
 
+/* Table Block — interactive table editing component */
+.milkdown-table-block {
+  position: relative;
+  margin-bottom: 1rem;
+}
+
+.milkdown-table-block .table-wrapper {
+  position: relative;
+  overflow-x: auto;
+}
+
+.milkdown-table-block .children {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.milkdown-table-block .children th,
+.milkdown-table-block .children td {
+  border: 1px solid var(--color-border);
+  padding: 0.5rem 0.875rem;
+  text-align: left;
+  min-width: 80px;
+}
+
+.milkdown-table-block .children th {
+  background-color: var(--color-muted);
+  font-weight: 600;
+}
+
+/* Selected cells */
+.milkdown-table-block .children th.selectedCell,
+.milkdown-table-block .children td.selectedCell {
+  background-color: hsl(174 60% 51% / 0.15);
+  border-color: #14b8a6;
+}
+
+/* Drag handles (row and column) */
+.milkdown-table-block .handle {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  user-select: none;
+  z-index: 2;
+  transition: opacity 0.15s ease;
+}
+
+.milkdown-table-block .handle[data-show="false"] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.milkdown-table-block .handle[data-show="true"] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.milkdown-table-block .cell-handle {
+  background-color: var(--color-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  width: 20px;
+  height: 20px;
+  font-size: 10px;
+  color: var(--color-muted-foreground);
+}
+
+.milkdown-table-block .cell-handle:hover {
+  background-color: #14b8a6;
+  border-color: #14b8a6;
+  color: white;
+}
+
+/* Button group (delete, align options) — appears on handle click */
+.milkdown-table-block .button-group {
+  position: absolute;
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  background-color: var(--color-popover);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 10;
+}
+
+.milkdown-table-block .button-group[data-show="false"] {
+  display: none;
+}
+
+.milkdown-table-block .button-group[data-show="true"] {
+  display: flex;
+}
+
+.milkdown-table-block .button-group button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-foreground);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.1s ease;
+}
+
+.milkdown-table-block .button-group button:hover {
+  background-color: var(--color-accent);
+}
+
+/* Line handles (add row / add column) */
+.milkdown-table-block .line-handle {
+  z-index: 3;
+}
+
+.milkdown-table-block .line-handle[data-show="false"] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.milkdown-table-block .line-handle[data-show="true"] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.milkdown-table-block .add-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: 1px dashed var(--color-border);
+  border-radius: 4px;
+  background: var(--color-card);
+  color: var(--color-muted-foreground);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.milkdown-table-block .add-button:hover {
+  border-color: #14b8a6;
+  background-color: hsl(174 60% 51% / 0.1);
+  color: #14b8a6;
+}
+
+/* Drag preview */
+.milkdown-table-block .drag-preview {
+  position: absolute;
+  pointer-events: none;
+  z-index: 5;
+  opacity: 0.6;
+}
+
+.milkdown-table-block .drag-preview[data-show="false"] {
+  display: none;
+}
+
+.milkdown-table-block .drag-preview[data-show="true"] {
+  display: block;
+}
+
+.milkdown-table-block .drag-preview table {
+  border-collapse: collapse;
+  background-color: hsl(174 60% 51% / 0.1);
+  border: 2px solid #14b8a6;
+  border-radius: 4px;
+}
+
+/* Icon inside handles */
+.milkdown-table-block .milkdown-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
 /* Images */
 .milkdown-editor .ProseMirror img {
   max-width: 100%;
