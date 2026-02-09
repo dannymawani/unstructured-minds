@@ -90,8 +90,19 @@ export function MoodCorrelation({
 
   const chartDataPoints: DataPoint[] = useMemo(() => {
     if (!data) return [];
+    const pair = METRIC_PAIRS.find((p) => p.value === selectedPair)!;
+    // Map pair keys back to entry field names
+    const fieldMap: Record<string, keyof CorrelationEntry> = {
+      sleep: 'sleep_hours',
+      energy: 'energy',
+      mood: 'mood',
+      stress: 'stress',
+      activity: 'activity_minutes',
+    };
+    const xField = fieldMap[pair.xKey];
+    const yField = fieldMap[pair.yKey];
     return data.entries
-      .filter((e) => e.sleep_hours !== null && e.energy !== null && e.mood !== null && e.stress !== null)
+      .filter((e) => e[xField] !== null && e[yField] !== null)
       .map((e) => ({
         date: e.date,
         sleep: e.sleep_hours || 0,
@@ -100,7 +111,7 @@ export function MoodCorrelation({
         stress: e.stress || 0,
         activity: e.activity_minutes || 0,
       }));
-  }, [data]);
+  }, [data, selectedPair]);
 
   const currentPair = METRIC_PAIRS.find((p) => p.value === selectedPair)!;
   const correlation = data?.correlations[selectedPair] ?? null;
@@ -201,8 +212,8 @@ export function MoodCorrelation({
         </span>
       </div>
 
-      <div className="relative h-52">
-        <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full" preserveAspectRatio="none">
+      <div className="relative">
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ aspectRatio: `${W}/${H}` }}>
           {/* Y grid */}
           {[0, 2, 4, 6, 8, 10].map((v) => (
             <line key={v} x1={PAD.l} x2={W - PAD.r} y1={scaleY(v)} y2={scaleY(v)} stroke="#3f3f46" strokeWidth="0.5" />

@@ -140,8 +140,8 @@ export function SleepTrends({
         </div>
       </div>
 
-      <div className="relative h-48">
-        <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full" preserveAspectRatio="none">
+      <div className="relative">
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ aspectRatio: `${W}/${H}` }}>
           {/* Y grid lines */}
           {[0, 4, 8, 12].map((v) => (
             <line key={v} x1={PAD.l} x2={W - PAD.r} y1={sy(v)} y2={sy(v)} stroke="#3f3f46" strokeWidth="0.5" />
