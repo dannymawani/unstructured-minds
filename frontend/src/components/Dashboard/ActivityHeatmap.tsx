@@ -203,9 +203,8 @@ export function ActivityHeatmap({
           <Grid3x3 className="w-5 h-5 text-green-400" />
           <h3 className="text-lg font-semibold text-foreground">Activity Heatmap</h3>
         </div>
-        <div className="flex gap-4 text-sm text-muted-foreground">
+        <div className="text-sm text-muted-foreground">
           <span>{totalActivities} activities</span>
-          <span>{Math.round(totalDuration / 60)} hrs total</span>
         </div>
       </div>
 
