@@ -48,6 +48,7 @@ class ExtractionPipeline:
         self._exercise_matcher = ExerciseMatcher(
             settings.data_path / "exercise_definitions.json"
         )
+        self._exercise_matcher.load_ai_cache(settings.data_path / "ai_exercise_cache.json")
 
     def _load_custom_schema(self, name: str) -> Optional[dict[str, Any]]:
         """Load a custom schema from disk and convert to JSON Schema format.

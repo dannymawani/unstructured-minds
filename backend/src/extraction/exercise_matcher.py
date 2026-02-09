@@ -1,27 +1,37 @@
 """Fuzzy exercise name matching against exercise_definitions.json."""
 
 import json
+import tempfile
 from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any
 
+from ..logging_config import get_logger
+
+logger = get_logger(__name__)
+
 
 class ExerciseMatcher:
-    """Normalizes exercise names using a 3-tier matching strategy.
+    """Normalizes exercise names using a multi-tier matching strategy.
 
     1. Exact match — case-insensitive against keys and display names
     2. Alias match — case-insensitive against all aliases
-    3. Fuzzy match — difflib.SequenceMatcher with threshold >= 0.75
+    3. AI cache  — previously classified names (confidence 0.95)
+    4. Fuzzy match — difflib.SequenceMatcher with threshold >= 0.75
+    5. Title-case fallback — return raw_name.strip().title() to avoid case dupes
 
     The canonical name returned is the `display` value from exercise_definitions.
     """
 
     FUZZY_THRESHOLD = 0.75
+    AI_CACHE_CONFIDENCE = 0.95
 
     def __init__(self, definitions_path: Path) -> None:
         self._exact_map: dict[str, str] = {}
         self._alias_map: dict[str, str] = {}
         self._fuzzy_candidates: list[tuple[str, str]] = []  # (lowercase_name, display)
+        self._ai_cache: dict[str, str] = {}  # lowercased raw → canonical
+        self._canonical_set: set[str] = set()  # all known display names
 
         if not definitions_path.exists():
             return
@@ -31,6 +41,7 @@ class ExerciseMatcher:
 
         for key, entry in definitions.items():
             display = entry["display"]
+            self._canonical_set.add(display)
 
             # Exact: key and display name (lowercased)
             self._exact_map[key.lower()] = display
@@ -44,12 +55,59 @@ class ExerciseMatcher:
                 self._alias_map[alias.lower()] = display
                 self._fuzzy_candidates.append((alias.lower(), display))
 
+    @property
+    def canonical_names(self) -> list[str]:
+        """Return sorted list of all known canonical display names."""
+        return sorted(self._canonical_set)
+
+    def load_ai_cache(self, path: Path) -> None:
+        """Load AI classification cache from disk.
+
+        Args:
+            path: Path to ai_exercise_cache.json
+        """
+        if not path.exists():
+            return
+        try:
+            with open(path) as f:
+                data = json.load(f)
+            self._ai_cache = {k.lower(): v for k, v in data.items()}
+            logger.info("ai_cache_loaded", count=len(self._ai_cache), path=str(path))
+        except (json.JSONDecodeError, IOError) as e:
+            logger.warning("ai_cache_load_failed", error=str(e))
+
+    def update_ai_cache(self, mappings: dict[str, str], path: Path) -> None:
+        """Merge new AI mappings into cache and write atomically.
+
+        Args:
+            mappings: dict of raw_name → canonical_name
+            path: Path to ai_exercise_cache.json
+        """
+        # Merge into in-memory cache (lowercased keys)
+        for raw, canonical in mappings.items():
+            self._ai_cache[raw.lower()] = canonical
+
+        # Write atomically via temp file
+        cache_to_write = {k: v for k, v in self._ai_cache.items()}
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with tempfile.NamedTemporaryFile(
+                mode="w", dir=str(path.parent), suffix=".tmp", delete=False
+            ) as tmp:
+                json.dump(cache_to_write, tmp, indent=2, ensure_ascii=False)
+                tmp_path = Path(tmp.name)
+            tmp_path.rename(path)
+            logger.info("ai_cache_updated", count=len(cache_to_write), path=str(path))
+        except IOError as e:
+            logger.warning("ai_cache_write_failed", error=str(e))
+
     def match(self, raw_name: str) -> tuple[str, float]:
         """Match a raw exercise name to a canonical name.
 
         Returns:
             (canonical_name, confidence) where confidence is 1.0 for
-            exact/alias matches, 0.0-1.0 for fuzzy, and 0.0 if no match.
+            exact/alias matches, 0.95 for AI cache, 0.0-1.0 for fuzzy,
+            and 0.0 if no match (title-cased fallback).
         """
         if not raw_name:
             return (raw_name, 0.0)
@@ -69,7 +127,11 @@ class ExerciseMatcher:
         if normalized in self._alias_map:
             return (self._alias_map[normalized], 1.0)
 
-        # 3. Fuzzy match against display names and aliases
+        # 3. AI cache match
+        if normalized in self._ai_cache:
+            return (self._ai_cache[normalized], self.AI_CACHE_CONFIDENCE)
+
+        # 4. Fuzzy match against display names and aliases
         best_score = 0.0
         best_match = raw_name
 
@@ -82,5 +144,5 @@ class ExerciseMatcher:
         if best_score >= self.FUZZY_THRESHOLD:
             return (best_match, round(best_score, 3))
 
-        # No match — return original name unchanged
-        return (raw_name, 0.0)
+        # 5. Title-case fallback — prevents case-only duplicates
+        return (raw_name.strip().title(), 0.0)
