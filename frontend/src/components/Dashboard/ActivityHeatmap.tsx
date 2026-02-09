@@ -198,7 +198,7 @@ export function ActivityHeatmap({
 
   return (
     <div className="bg-card shadow-sm px-3 sm:px-5 py-4 w-full" data-testid="activity-heatmap">
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex justify-between items-center mb-4 pr-24">
         <div className="flex items-center gap-2">
           <Grid3x3 className="w-5 h-5 text-green-400" />
           <h3 className="text-lg font-semibold text-foreground">Activity Heatmap</h3>
