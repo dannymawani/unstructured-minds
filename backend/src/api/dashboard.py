@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import date, timedelta
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
@@ -648,6 +648,10 @@ def get_exercise_table(
     search: Optional[str] = Query(default=None, description="Search exercises by name"),
     limit: int = Query(default=10, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
+    sort_by: Literal["total_sessions", "last_trained_date", "max_weight_kg", "last_weight_kg", "exercise_name"] = Query(
+        default="total_sessions", description="Column to sort by"
+    ),
+    sort_order: Literal["asc", "desc"] = Query(default="desc", description="Sort direction"),
     db: DatabaseManager = Depends(get_db),
     matcher: ExerciseMatcher = Depends(get_exercise_matcher),
 ) -> ExerciseTableResponse:
@@ -734,8 +738,16 @@ def get_exercise_table(
         search_lower = search.lower()
         items = [e for e in items if search_lower in e["exercise_name"].lower()]
 
-    # Sort by total_sessions desc, then last_trained_date desc
-    items.sort(key=lambda x: (x["total_sessions"], x["last_trained_date"]), reverse=True)
+    # Sort by requested column, with last_trained_date as secondary sort
+    reverse = sort_order == "desc"
+    none_default: Any = "" if sort_by in ("last_trained_date", "exercise_name") else -1
+    items.sort(
+        key=lambda x: (
+            x[sort_by] if x[sort_by] is not None else none_default,
+            x["last_trained_date"],
+        ),
+        reverse=reverse,
+    )
 
     total_count = len(items)
     paginated = items[offset:offset + limit]

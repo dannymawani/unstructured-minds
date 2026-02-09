@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Dumbbell, Plus, X, Loader2, Search, ChevronDown } from 'lucide-react';
+import { Dumbbell, Plus, X, Loader2, Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { clearCache } from '../../lib/cachedFetch';
 
 interface ExerciseTableEntry {
@@ -37,6 +37,9 @@ function formatWeight(kg: number | null): string {
   return `${kg} kg`;
 }
 
+type SortColumn = 'total_sessions' | 'last_trained_date' | 'max_weight_kg' | 'last_weight_kg';
+type SortOrder = 'asc' | 'desc';
+
 const PAGE_SIZE = 10;
 
 export function ExerciseTable({ apiUrl = 'http://localhost:8000' }: ExerciseTableProps) {
@@ -50,6 +53,8 @@ export function ExerciseTable({ apiUrl = 'http://localhost:8000' }: ExerciseTabl
   const [formError, setFormError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
+  const [sortBy, setSortBy] = useState<SortColumn>('total_sessions');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
 
   // Form state
   const today = new Date().toISOString().split('T')[0];
@@ -66,7 +71,12 @@ export function ExerciseTable({ apiUrl = 'http://localhost:8000' }: ExerciseTabl
     else setLoadingMore(true);
 
     try {
-      const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset) });
+      const params = new URLSearchParams({
+        limit: String(PAGE_SIZE),
+        offset: String(offset),
+        sort_by: sortBy,
+        sort_order: sortOrder,
+      });
       if (searchTerm) params.set('search', searchTerm);
 
       const response = await fetch(`${apiUrl}/dashboard/exercise-table?${params}`);
@@ -85,17 +95,26 @@ export function ExerciseTable({ apiUrl = 'http://localhost:8000' }: ExerciseTabl
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [apiUrl]);
+  }, [apiUrl, sortBy, sortOrder]);
 
   useEffect(() => {
     fetchData(search);
-  }, [apiUrl, search, fetchData]);
+  }, [apiUrl, search, sortBy, sortOrder, fetchData]);
 
   // Debounced search
   useEffect(() => {
     const timer = setTimeout(() => setSearch(searchInput), 300);
     return () => clearTimeout(timer);
   }, [searchInput]);
+
+  const handleSort = (column: SortColumn) => {
+    if (column === sortBy) {
+      setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc');
+    } else {
+      setSortBy(column);
+      setSortOrder('desc');
+    }
+  };
 
   const loadMore = () => {
     fetchData(search, exercises.length, true);
@@ -299,10 +318,27 @@ export function ExerciseTable({ apiUrl = 'http://localhost:8000' }: ExerciseTabl
               <thead className="sticky top-0 bg-card">
                 <tr className="border-b border-border text-muted-foreground text-left">
                   <th className="pb-2 pr-4 font-medium">Exercise</th>
-                  <th className="pb-2 pr-4 font-medium">Last Trained</th>
-                  <th className="pb-2 pr-4 font-medium text-right">Recent Weight</th>
-                  <th className="pb-2 pr-4 font-medium text-right">Best Weight</th>
-                  <th className="pb-2 font-medium text-right">Sessions</th>
+                  {([
+                    ['last_trained_date', 'Last Trained', ''],
+                    ['last_weight_kg', 'Recent Weight', 'text-right'],
+                    ['max_weight_kg', 'Best Weight', 'text-right'],
+                    ['total_sessions', 'Sessions', 'text-right'],
+                  ] as [SortColumn, string, string][]).map(([col, label, align]) => (
+                    <th
+                      key={col}
+                      className={`pb-2 pr-4 font-medium ${align} cursor-pointer select-none hover:text-foreground transition-colors`}
+                      onClick={() => handleSort(col)}
+                    >
+                      <span className={`inline-flex items-center gap-0.5 ${align === 'text-right' ? 'justify-end' : ''}`}>
+                        {label}
+                        {sortBy === col && (
+                          sortOrder === 'desc'
+                            ? <ChevronDown className="w-3.5 h-3.5" />
+                            : <ChevronUp className="w-3.5 h-3.5" />
+                        )}
+                      </span>
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
