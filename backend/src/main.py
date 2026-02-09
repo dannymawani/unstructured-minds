@@ -30,6 +30,8 @@ from .api.note_assist import router as note_assist_router
 from .api.profile import router as profile_router
 from .claude import ClaudeClient
 from .db import DatabaseManager
+from .extraction.exercise_matcher import ExerciseMatcher
+from .extraction.exercise_normalizer import normalize_exercises
 from .middleware import limiter, SecurityHeadersMiddleware, RequestLoggingMiddleware
 from .storage import get_storage_backend
 
@@ -70,6 +72,19 @@ async def lifespan(app: FastAPI):
     claude = ClaudeClient()
     app.state.claude = claude
     logger.info("claude_client_initialized", configured=claude.is_configured)
+
+    # Initialize exercise matcher and run normalization
+    exercise_matcher = ExerciseMatcher(settings.data_path / "exercise_definitions.json")
+    app.state.exercise_matcher = exercise_matcher
+    try:
+        await normalize_exercises(
+            db=db,
+            matcher=exercise_matcher,
+            claude=claude,
+            cache_path=settings.data_path / "ai_exercise_cache.json",
+        )
+    except Exception as e:
+        logger.warning("exercise_normalization_startup_failed", error=str(e))
 
     logger.info("application_ready")
 

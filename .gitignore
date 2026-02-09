@@ -58,6 +58,7 @@ frontend/build/
 data/*.duckdb
 data/*.duckdb.wal
 data/*.csv
+data/ai_exercise_cache.json
 !data/.gitkeep
 
 # Backend runtime data
