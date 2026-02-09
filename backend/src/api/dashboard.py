@@ -10,10 +10,9 @@ from pydantic import BaseModel, Field
 from ..config import settings
 from ..db import DatabaseManager
 from ..extraction.exercise_matcher import ExerciseMatcher
+from ..extraction.exercise_normalizer import normalize_exercises
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
-
-_exercise_matcher = ExerciseMatcher(settings.data_path / "exercise_definitions.json")
 
 
 class Period(BaseModel):
@@ -182,6 +181,11 @@ class ExerciseCreateResponse(BaseModel):
 def get_db(request: Request) -> DatabaseManager:
     """Get database manager from app state."""
     return request.app.state.db
+
+
+def get_exercise_matcher(request: Request) -> ExerciseMatcher:
+    """Get exercise matcher from app state."""
+    return request.app.state.exercise_matcher
 
 
 def get_period(days: int) -> Period:
@@ -645,6 +649,7 @@ def get_exercise_table(
     limit: int = Query(default=10, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     db: DatabaseManager = Depends(get_db),
+    matcher: ExerciseMatcher = Depends(get_exercise_matcher),
 ) -> ExerciseTableResponse:
     """Get a summary table of strength exercises the user has logged.
 
@@ -703,7 +708,7 @@ def get_exercise_table(
     merged: dict[str, dict[str, Any]] = {}
     for row in result:
         raw_name = row[0]
-        canonical, _ = _exercise_matcher.match(raw_name)
+        canonical, _ = matcher.match(raw_name)
 
         if canonical in merged:
             entry = merged[canonical]
@@ -758,6 +763,7 @@ def get_exercise_table(
 def create_exercise(
     exercise: ExerciseCreate,
     db: DatabaseManager = Depends(get_db),
+    matcher: ExerciseMatcher = Depends(get_exercise_matcher),
 ) -> ExerciseCreateResponse:
     """Manually add an exercise entry to the exercise log.
 
@@ -773,7 +779,7 @@ def create_exercise(
     """
     exercise_id = str(uuid.uuid4())
     activity_id = f"manual_{exercise.date}_{exercise_id[:8]}"
-    canonical_name = _exercise_matcher.match(exercise.exercise_name)[0]
+    canonical_name = matcher.match(exercise.exercise_name)[0]
 
     db.execute(
         """
@@ -840,6 +846,7 @@ def _format_display_name(name: str) -> str:
 @router.get("/last-strength-workout", response_model=LastWorkoutResponse)
 def get_last_strength_workout(
     db: DatabaseManager = Depends(get_db),
+    matcher: ExerciseMatcher = Depends(get_exercise_matcher),
 ) -> LastWorkoutResponse:
     """Get the last strength training workout with progressive overload suggestions.
 
@@ -906,7 +913,7 @@ def get_last_strength_workout(
     for row in exercise_rows:
         name = row[0]
         # Normalize via fuzzy matcher
-        canonical, _ = _exercise_matcher.match(name)
+        canonical, _ = matcher.match(name)
         weight = float(row[3]) if row[3] is not None else None
         # Progressive overload: +increment for weighted exercises
         suggested = round(weight + increment, 1) if weight and weight > 0 else None
@@ -928,4 +935,47 @@ def get_last_strength_workout(
         date=last_date,
         exercises=exercises,
         focus=focus,
+    )
+
+
+class NormalizeExercisesResponse(BaseModel):
+    """Response for exercise normalization endpoint."""
+
+    total_names: int
+    already_matched: int
+    ai_classified: int
+    title_cased: int
+    errors: list[str]
+
+
+@router.post("/normalize-exercises", response_model=NormalizeExercisesResponse)
+async def trigger_normalize_exercises(
+    request: Request,
+    db: DatabaseManager = Depends(get_db),
+    matcher: ExerciseMatcher = Depends(get_exercise_matcher),
+) -> NormalizeExercisesResponse:
+    """Manually trigger exercise name normalization.
+
+    Runs the full normalization pipeline: loads AI cache, queries DB,
+    matches names, classifies unmatched via Claude, and saves cache.
+
+    Returns:
+        Normalization statistics
+    """
+    claude = request.app.state.claude
+    cache_path = settings.data_path / "ai_exercise_cache.json"
+
+    stats = await normalize_exercises(
+        db=db,
+        matcher=matcher,
+        claude=claude,
+        cache_path=cache_path,
+    )
+
+    return NormalizeExercisesResponse(
+        total_names=stats.total_names,
+        already_matched=stats.already_matched,
+        ai_classified=stats.ai_classified,
+        title_cased=stats.title_cased,
+        errors=stats.errors or [],
     )

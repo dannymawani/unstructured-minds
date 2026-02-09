@@ -304,6 +304,95 @@ Populate the template with these answers and return only the complete markdown."
 
         return response.content[0].text
 
+    async def classify_exercises(
+        self,
+        unmatched_names: list[str],
+        known_canonical_names: list[str],
+    ) -> dict[str, str]:
+        """Classify unmatched exercise names into canonical categories using AI.
+
+        Uses tool use for structured output. Each unmatched name is mapped to
+        either an existing canonical name or a new title-cased canonical name.
+
+        Args:
+            unmatched_names: Raw exercise names that couldn't be matched
+            known_canonical_names: List of known canonical exercise names
+
+        Returns:
+            Dict mapping raw_name → canonical_name
+        """
+        if not unmatched_names:
+            return {}
+
+        tool = {
+            "name": "classify_exercises",
+            "description": "Classify exercise names into canonical categories",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "classifications": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "raw_name": {
+                                    "type": "string",
+                                    "description": "The original exercise name",
+                                },
+                                "canonical_name": {
+                                    "type": "string",
+                                    "description": "The canonical name to map to (use an existing name if it's semantically the same exercise, otherwise create a clean title-cased name)",
+                                },
+                                "reasoning": {
+                                    "type": "string",
+                                    "description": "Brief explanation of the classification",
+                                },
+                            },
+                            "required": ["raw_name", "canonical_name", "reasoning"],
+                        },
+                    },
+                },
+                "required": ["classifications"],
+            },
+        }
+
+        known_list = "\n".join(f"- {n}" for n in known_canonical_names) if known_canonical_names else "(none)"
+        unmatched_list = "\n".join(f"- {n}" for n in unmatched_names)
+
+        prompt = f"""Classify these exercise names. For each one, decide if it's a variant of an existing canonical exercise or a new exercise.
+
+Rules:
+- If it's semantically the same as a known exercise (e.g. "Triceps" = "Tricep Exercises" = "Triceps Exercises"), map to the existing canonical name.
+- Generic entries like "Biceps exercises", "Chest exercises" should map to the base form (e.g. "Biceps", "Chest").
+- If it's genuinely new, create a clean Title Case canonical name.
+- Strip trailing words like "exercises", "workout", "training" when they add no specificity.
+
+Known canonical exercises:
+{known_list}
+
+Unmatched exercise names to classify:
+{unmatched_list}
+
+Use the classify_exercises tool to return your classifications."""
+
+        response = await self._call_with_retry(
+            model=self.model_fast,
+            max_tokens=4096,
+            tools=[tool],
+            messages=[{"role": "user", "content": prompt}],
+        )
+
+        # Parse tool response
+        for block in response.content:
+            if block.type == "tool_use" and block.name == "classify_exercises":
+                classifications = block.input.get("classifications", [])
+                return {
+                    c["raw_name"]: c["canonical_name"]
+                    for c in classifications
+                }
+
+        return {}
+
     async def _call_with_retry(
         self, max_retries: int = 3, **kwargs
     ) -> Any:
