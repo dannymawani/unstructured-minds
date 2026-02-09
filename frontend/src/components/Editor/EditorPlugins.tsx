@@ -10,6 +10,7 @@ import {
   createCodeBlockCommand,
   insertHrCommand,
 } from '@milkdown/kit/preset/commonmark'
+import { insertTableCommand } from '@milkdown/kit/preset/gfm'
 import { keymap } from '@milkdown/prose/keymap'
 import { TextSelection } from '@milkdown/prose/state'
 import type { EditorView } from '@milkdown/prose/view'
@@ -91,6 +92,7 @@ function createSlashMenuElement(getEditor: () => any, hide: () => void): HTMLEle
     { label: 'Quote', icon: '❞', commandFn: () => callCommand(wrapInBlockquoteCommand.key) },
     { label: 'Code Block', icon: '<>', commandFn: () => callCommand(createCodeBlockCommand.key) },
     { label: 'Divider', icon: '—', commandFn: () => callCommand(insertHrCommand.key) },
+    { label: 'Table', icon: '⊞', commandFn: () => callCommand(insertTableCommand.key, { row: 3, col: 3 }) },
   ]
 
   items.forEach((item) => {
