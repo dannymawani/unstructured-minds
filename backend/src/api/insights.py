@@ -269,6 +269,7 @@ Generate 2-3 actionable insights based on the provided data. Focus on:
 4. Follow-ups (e.g., "3 incomplete tasks from yesterday")
 
 Keep insights brief, positive, and actionable. Use specific numbers when available.
+IMPORTANT: Only generate insights based on data that is actually present. If a data category is empty (empty array []), do NOT fabricate or assume data for it. Only reference data you can see.
 Return ONLY a JSON array of insights, no explanation.
 
 Each insight should have:
@@ -296,6 +297,27 @@ async def get_daily_insights(
     if not claude.is_configured:
         return DailyInsightsResponse(
             insights=_generate_fallback_insights(context),
+            generated_at=context["today"],
+        )
+
+    # Guard: skip AI call if there's no meaningful data to analyze
+    has_data = (
+        context.get("activities")
+        or context.get("metrics")
+        or context.get("incomplete_tasks")
+        or context.get("activity_patterns")
+    )
+    if not has_data:
+        return DailyInsightsResponse(
+            insights=[
+                Insight(
+                    id="insight_0",
+                    type="reminder",
+                    title="No Data Yet",
+                    message="Start logging activities, meals, or daily metrics to get personalized insights.",
+                    priority=3,
+                )
+            ],
             generated_at=context["today"],
         )
 
