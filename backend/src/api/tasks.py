@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from ..db import DatabaseManager
 from ..storage import StorageBackend
+from .dependencies import get_db as _dep_get_db
 from .settings import resolve_daily_note_path
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
@@ -77,8 +78,8 @@ class BulkCompleteResponse(BaseModel):
 # =============================================================================
 
 
-def get_db(request: Request) -> DatabaseManager:
-    return request.app.state.db
+def get_db(request: Request):
+    return _dep_get_db(request)
 
 
 def get_storage(request: Request) -> StorageBackend:

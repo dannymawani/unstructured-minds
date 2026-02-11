@@ -101,6 +101,37 @@ class ExerciseMatcher:
         except IOError as e:
             logger.warning("ai_cache_write_failed", error=str(e))
 
+    def load_ai_cache_from_settings(self, settings_store) -> None:
+        """Load AI classification cache from Postgres user_settings.
+
+        Args:
+            settings_store: UserSettingsStore instance
+        """
+        try:
+            data = settings_store.get("ai_exercise_cache")
+            if data:
+                self._ai_cache = {k.lower(): v for k, v in data.items()}
+                logger.info("ai_cache_loaded", count=len(self._ai_cache), source="postgres")
+        except Exception as e:
+            logger.warning("ai_cache_load_from_settings_failed", error=str(e))
+
+    def update_ai_cache_to_settings(self, mappings: dict[str, str], settings_store) -> None:
+        """Merge new AI mappings into cache and write to Postgres user_settings.
+
+        Args:
+            mappings: dict of raw_name → canonical_name
+            settings_store: UserSettingsStore instance
+        """
+        for raw, canonical in mappings.items():
+            self._ai_cache[raw.lower()] = canonical
+
+        cache_to_write = {k: v for k, v in self._ai_cache.items()}
+        try:
+            settings_store.set("ai_exercise_cache", cache_to_write)
+            logger.info("ai_cache_updated", count=len(cache_to_write), source="postgres")
+        except Exception as e:
+            logger.warning("ai_cache_write_to_settings_failed", error=str(e))
+
     def match(self, raw_name: str) -> tuple[str, float]:
         """Match a raw exercise name to a canonical name.
 

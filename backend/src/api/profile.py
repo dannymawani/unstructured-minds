@@ -11,13 +11,21 @@ from fastapi import APIRouter, Body, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from ..config import settings
+from ..db.sql_compat import get_dialect
+from ..db.user_settings import UserSettingsStore
+from ..storage.datastore import DataStore
 
 logger = logging.getLogger(__name__)
 
 
 router = APIRouter(prefix="/profile", tags=["profile"])
 
+PROFILE_PATH = "life_profile.json"
 PROFILE_FILE = settings.data_path / "life_profile.json"
+
+
+def _get_datastore(request: Request) -> DataStore:
+    return request.app.state.datastore
 
 
 # --- Pydantic Models ---
@@ -116,11 +124,11 @@ class ReviewOut(BaseModel):
     updated_at: str
 
 
-# --- Profile JSON helpers ---
+# --- Profile helpers ---
 
 
-def _load_profile() -> dict:
-    """Load profile from JSON file."""
+def _load_profile_sync() -> dict:
+    """Load profile from JSON file (sync fallback for non-request contexts)."""
     if PROFILE_FILE.exists():
         try:
             with open(PROFILE_FILE) as f:
@@ -130,32 +138,62 @@ def _load_profile() -> dict:
     return LifeProfile().model_dump()
 
 
-def _save_profile(data: dict) -> None:
-    """Save profile to JSON file."""
-    PROFILE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with open(PROFILE_FILE, "w") as f:
-        json.dump(data, f, indent=2)
+def _get_user_settings_store(request: Request):
+    """Get UserSettingsStore if running in cloud mode, else None."""
+    db = request.app.state.db
+    if get_dialect(db) == "postgres":
+        return UserSettingsStore(db, settings.default_user_id)
+    return None
+
+
+async def _load_profile(datastore: DataStore, request: Request = None) -> dict:
+    """Load profile from Postgres (cloud) or DataStore (local)."""
+    if request:
+        store = _get_user_settings_store(request)
+        if store:
+            data = store.get("life_profile")
+            if data is not None:
+                return data
+            return LifeProfile().model_dump()
+
+    data = await datastore.read_json(PROFILE_PATH)
+    if data is not None:
+        return data
+    return LifeProfile().model_dump()
+
+
+async def _save_profile(datastore: DataStore, data: dict, request: Request = None) -> None:
+    """Save profile to Postgres (cloud) or DataStore (local)."""
+    if request:
+        store = _get_user_settings_store(request)
+        if store:
+            store.set("life_profile", data)
+            return
+
+    await datastore.write_json(PROFILE_PATH, data)
 
 
 # --- Profile Endpoints ---
 
 
 @router.get("")
-def get_profile() -> dict:
+async def get_profile(request: Request) -> dict:
     """Get full life profile."""
-    return _load_profile()
+    datastore = _get_datastore(request)
+    return await _load_profile(datastore, request)
 
 
 @router.put("")
-def update_profile(profile: LifeProfile) -> dict:
+async def update_profile(profile: LifeProfile, request: Request) -> dict:
     """Update full life profile."""
+    datastore = _get_datastore(request)
     data = profile.model_dump()
-    _save_profile(data)
+    await _save_profile(datastore, data, request)
     return data
 
 
 @router.patch("/{section}")
-def update_section(section: str, request_body: Any = Body(...)) -> dict:
+async def update_section(section: str, request: Request, request_body: Any = Body(...)) -> dict:
     """Update a single profile section."""
     valid_sections = {"overview", "personal", "work", "training", "goals"}
     if section not in valid_sections:
@@ -164,9 +202,10 @@ def update_section(section: str, request_body: Any = Body(...)) -> dict:
             detail=f"Invalid section: {section}. Must be one of: {', '.join(sorted(valid_sections))}",
         )
 
-    profile = _load_profile()
+    datastore = _get_datastore(request)
+    profile = await _load_profile(datastore, request)
     profile[section] = request_body
-    _save_profile(profile)
+    await _save_profile(datastore, profile, request)
     return profile
 
 
@@ -590,7 +629,8 @@ async def generate_review(request: Request) -> dict:
     context = _gather_review_context(db, period_start, period_end)
 
     # Load life profile for additional context
-    profile = _load_profile()
+    datastore = _get_datastore(request)
+    profile = await _load_profile(datastore, request)
     profile_summary = ""
     if profile.get("overview", {}).get("name"):
         profile_summary = f"User: {profile['overview']['name']}"

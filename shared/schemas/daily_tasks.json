@@ -1,0 +1,67 @@
+{
+  "name": "daily_tasks",
+  "description": "Tasks from daily notes with status tracking. Uses append-only pattern - new rows inserted for status changes, task_id links history.",
+  "columns": [
+    {
+      "name": "task_id",
+      "type": "string",
+      "required": true,
+      "description": "Unique ID: {YYYYMMDD}_{hash} - hash based on task text"
+    },
+    {
+      "name": "date",
+      "type": "date",
+      "required": true,
+      "format": "YYYY-MM-DD",
+      "description": "Date this row was created/logged"
+    },
+    {
+      "name": "task",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "status",
+      "type": "string",
+      "required": true,
+      "allowed_values": ["pending", "completed", "cancelled", "rolled_over"]
+    },
+    {
+      "name": "category",
+      "type": "string",
+      "required": false,
+      "allowed_values": ["work", "personal", "training", "other"]
+    },
+    {
+      "name": "priority",
+      "type": "string",
+      "required": false,
+      "allowed_values": ["high", "medium", "low"]
+    },
+    {
+      "name": "due_date",
+      "type": "date",
+      "required": false,
+      "format": "YYYY-MM-DD"
+    },
+    {
+      "name": "created_at",
+      "type": "datetime",
+      "required": false,
+      "format": "YYYY-MM-DD HH:MM",
+      "description": "When task was first created"
+    },
+    {
+      "name": "updated_at",
+      "type": "datetime",
+      "required": false,
+      "format": "YYYY-MM-DD HH:MM",
+      "description": "When this row was written"
+    },
+    {
+      "name": "notes",
+      "type": "string",
+      "required": false
+    }
+  ]
+}

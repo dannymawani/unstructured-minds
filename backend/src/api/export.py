@@ -13,6 +13,8 @@ from pydantic import BaseModel
 
 from ..config import settings
 from ..db import DatabaseManager, get_table_names
+from ..db.sql_compat import get_dialect
+from .dependencies import get_db as _dep_get_db
 from ..middleware import limiter, validate_file_size, FileSizeError
 from ..middleware.rate_limit import RATE_LIMIT_IMPORT
 from ..middleware.validation import MAX_FILE_SIZE_BYTES, sanitize_sql_identifier
@@ -38,9 +40,9 @@ class ImportResponse(BaseModel):
     extraction_triggered: bool
 
 
-def get_db(request: Request) -> DatabaseManager:
+def get_db(request: Request):
     """Get database manager from app state."""
-    return request.app.state.db
+    return _dep_get_db(request)
 
 
 def get_storage(request: Request) -> StorageBackend:
@@ -48,23 +50,22 @@ def get_storage(request: Request) -> StorageBackend:
     return request.app.state.storage
 
 
-def _create_vault_zip(vault_path: Path) -> io.BytesIO:
-    """Create a ZIP archive of the vault directory.
+async def _create_vault_zip(storage: StorageBackend) -> io.BytesIO:
+    """Create a ZIP archive of the vault using StorageBackend.
 
-    Args:
-        vault_path: Path to vault directory
+    Works with both local filesystem and S3 storage.
 
     Returns:
         BytesIO buffer containing ZIP file
     """
     buffer = io.BytesIO()
 
+    files = await storage.list("")
+
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-        for file_path in vault_path.rglob("*"):
-            if file_path.is_file():
-                # Preserve relative path structure
-                arcname = file_path.relative_to(vault_path)
-                zf.write(file_path, arcname)
+        for file_path in files:
+            content = await storage.read(file_path)
+            zf.writestr(file_path, content)
 
     buffer.seek(0)
     return buffer
@@ -150,14 +151,10 @@ async def export_vault(
     """Export vault as a ZIP file.
 
     Returns all markdown files and other content from the vault directory.
+    Works with both local filesystem and S3 storage.
     """
-    vault_path = settings.vault_path
-
-    if not vault_path.exists():
-        raise HTTPException(status_code=404, detail="Vault directory not found")
-
-    # Create ZIP archive
-    zip_buffer = _create_vault_zip(vault_path)
+    # Create ZIP archive using storage backend
+    zip_buffer = await _create_vault_zip(storage)
 
     # Generate filename with timestamp
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -184,11 +181,17 @@ async def export_data(
 
     Returns ZIP containing all tables in the specified format.
     """
-    if not db._conn:
-        raise HTTPException(status_code=500, detail="Database not connected")
-
     # Get all data tables (exclude extraction_log)
-    tables = get_table_names(db._conn)
+    if get_dialect(db) == "postgres":
+        result = db.execute(
+            "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'"
+        )
+        tables = [row[0] for row in result.fetchall()]
+    else:
+        if not db._conn:
+            raise HTTPException(status_code=500, detail="Database not connected")
+        tables = get_table_names(db._conn)
+
     data_tables = [t for t in tables if t != "extraction_log"]
 
     if not data_tables:
@@ -234,10 +237,16 @@ async def list_export_tables(
 
     Returns list of table names that can be exported.
     """
-    if not db._conn:
-        raise HTTPException(status_code=500, detail="Database not connected")
+    if get_dialect(db) == "postgres":
+        result = db.execute(
+            "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'"
+        )
+        tables = [row[0] for row in result.fetchall()]
+    else:
+        if not db._conn:
+            raise HTTPException(status_code=500, detail="Database not connected")
+        tables = get_table_names(db._conn)
 
-    tables = get_table_names(db._conn)
     data_tables = [t for t in tables if t != "extraction_log"]
 
     return ExportDataResponse(
@@ -273,9 +282,6 @@ async def import_vault(
             detail="File must be a ZIP archive",
         )
 
-    vault_path = settings.vault_path
-    vault_path.mkdir(parents=True, exist_ok=True)
-
     files_imported = 0
 
     try:
@@ -293,7 +299,6 @@ async def import_vault(
         with zipfile.ZipFile(zip_buffer, "r") as zf:
             # Security check: ensure no path traversal
             for name in zf.namelist():
-                # Normalize and check for path traversal
                 normalized = Path(name).as_posix()
                 if normalized.startswith("/") or ".." in normalized:
                     raise HTTPException(
@@ -301,17 +306,13 @@ async def import_vault(
                         detail=f"Invalid path in ZIP: {name}",
                     )
 
-            # Extract files
+            # Extract files using storage backend
             for member in zf.infolist():
                 if member.is_dir():
                     continue
 
-                # Extract to vault directory
-                target_path = vault_path / member.filename
-                target_path.parent.mkdir(parents=True, exist_ok=True)
-
                 with zf.open(member) as src:
-                    target_path.write_bytes(src.read())
+                    await storage.write(member.filename, src.read())
                     files_imported += 1
 
     except zipfile.BadZipFile:
@@ -320,7 +321,7 @@ async def import_vault(
             detail="Invalid ZIP file",
         )
     except HTTPException:
-        raise  # Re-raise HTTP exceptions (e.g., path traversal 400)
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=500,

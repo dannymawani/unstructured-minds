@@ -21,17 +21,16 @@ def test_settings(tmp_path: Path):
         mock_settings.debug = False
         mock_settings.anthropic_api_key = "test-key"
         mock_settings.claude_enabled = True
+        mock_settings.database_url = None
+        mock_settings.is_cloud_mode = False
 
         mock_settings.vault_path.mkdir(parents=True, exist_ok=True)
         mock_settings.data_path.mkdir(parents=True, exist_ok=True)
         (mock_settings.data_path / "schemas").mkdir(parents=True, exist_ok=True)
 
-        schemas_dir = mock_settings.data_path / "schemas"
         with (
             patch("src.main.settings", mock_settings),
             patch("src.api.settings.settings", mock_settings),
-            patch("src.api.schemas.settings", mock_settings),
-            patch("src.api.schemas.SCHEMAS_DIR", schemas_dir),
         ):
             yield mock_settings
 

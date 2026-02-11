@@ -1,0 +1,44 @@
+{
+  "name": "food_log",
+  "description": "Meal and nutrition tracking",
+  "columns": [
+    {
+      "name": "date",
+      "type": "date",
+      "required": true,
+      "format": "YYYY-MM-DD"
+    },
+    {
+      "name": "time",
+      "type": "time",
+      "required": false,
+      "format": "HH:MM"
+    },
+    {
+      "name": "meal",
+      "type": "string",
+      "required": true,
+      "allowed_values": ["breakfast", "lunch", "dinner", "snack"]
+    },
+    {
+      "name": "food",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "calories",
+      "type": "integer",
+      "required": false
+    },
+    {
+      "name": "protein_g",
+      "type": "integer",
+      "required": false
+    },
+    {
+      "name": "notes",
+      "type": "string",
+      "required": false
+    }
+  ]
+}

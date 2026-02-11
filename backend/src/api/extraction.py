@@ -11,6 +11,7 @@ from sse_starlette.sse import EventSourceResponse
 from ..claude import ClaudeClient
 from ..db import DatabaseManager
 from ..extraction import ExtractionPipeline
+from .dependencies import get_db as _dep_get_db
 from ..middleware import limiter, validate_file_path, PathValidationError
 from ..middleware.rate_limit import RATE_LIMIT_EXTRACTION
 from ..middleware.validation import MAX_FILE_PATH_LENGTH
@@ -71,9 +72,9 @@ class ExtractBatchResponse(BaseModel):
     results: list[ExtractResponse]
 
 
-def get_db(request: Request) -> DatabaseManager:
+def get_db(request: Request):
     """Get database manager from app state."""
-    return request.app.state.db
+    return _dep_get_db(request)
 
 
 def get_storage(request: Request) -> StorageBackend:
