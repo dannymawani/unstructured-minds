@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from ..claude import ClaudeClient
 from ..db import DatabaseManager
 from ..logging_config import get_logger
+from .dependencies import get_analytics_db
 
 logger = get_logger(__name__)
 
@@ -42,9 +43,9 @@ class WeeklySummaryResponse(BaseModel):
     period_end: str
 
 
-def get_db(request: Request) -> DatabaseManager:
-    """Get database manager from app state."""
-    return request.app.state.db
+def get_db(request: Request):
+    """Get analytics database for insights."""
+    return get_analytics_db(request)
 
 
 def get_claude(request: Request) -> ClaudeClient:

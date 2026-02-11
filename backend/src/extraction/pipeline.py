@@ -12,6 +12,7 @@ from typing import Any, Optional
 from ..claude import ClaudeClient
 from ..config import settings
 from ..db import DatabaseManager
+from ..db.sql_compat import upsert, get_dialect
 from .exercise_matcher import ExerciseMatcher
 from .schemas import COMBINED_EXTRACTION_SCHEMA, EXTRACTION_SCHEMAS
 
@@ -44,10 +45,15 @@ class ExtractionPipeline:
         """
         self.db = db
         self.claude = claude
-        self._schemas_dir = settings.data_path / "schemas"
-        self._exercise_matcher = ExerciseMatcher(
-            settings.data_path / "exercise_definitions.json"
-        )
+        # Try shared/ schemas first (checked into git), fall back to data/schemas/
+        project_root = Path(__file__).resolve().parents[3]
+        shared_schemas = project_root / "shared" / "schemas"
+        self._schemas_dir = shared_schemas if shared_schemas.exists() else settings.data_path / "schemas"
+
+        # Try shared/ exercise defs first
+        shared_defs = project_root / "shared" / "exercise_definitions.json"
+        exercise_defs_path = shared_defs if shared_defs.exists() else settings.data_path / "exercise_definitions.json"
+        self._exercise_matcher = ExerciseMatcher(exercise_defs_path)
         self._exercise_matcher.load_ai_cache(settings.data_path / "ai_exercise_cache.json")
 
     def _load_custom_schema(self, name: str) -> Optional[dict[str, Any]]:
@@ -296,13 +302,16 @@ class ExtractionPipeline:
         if not metrics:
             return 0
 
-        # Use REPLACE to handle updates
+        # Use upsert to handle updates (DuckDB: INSERT OR REPLACE, Postgres: ON CONFLICT)
+        dialect = get_dialect(self.db)
+        sql = upsert(
+            "daily_metrics",
+            ["date", "sleep_hours", "sleep_quality", "energy", "mood", "stress", "notes", "source_file"],
+            ["date"],
+            dialect=dialect,
+        )
         self.db.execute(
-            """
-            INSERT OR REPLACE INTO daily_metrics
-            (date, sleep_hours, sleep_quality, energy, mood, stress, notes, source_file)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """,
+            sql,
             [
                 date,
                 metrics.get("sleep_hours"),
@@ -340,12 +349,15 @@ class ExtractionPipeline:
             activity_id = f"{date.replace('-', '')}_{activity.get('activity_type', 'other')}_{i+1}"
 
             # Insert activity record
+            dialect = get_dialect(self.db)
+            activity_sql = upsert(
+                "activities",
+                ["id", "date", "activity_type", "duration_minutes", "notes", "source_file"],
+                ["id"],
+                dialect=dialect,
+            )
             self.db.execute(
-                """
-                INSERT OR REPLACE INTO activities
-                (id, date, activity_type, duration_minutes, notes, source_file)
-                VALUES (?, ?, ?, ?, ?, ?)
-                """,
+                activity_sql,
                 [
                     activity_id,
                     date,
@@ -362,13 +374,15 @@ class ExtractionPipeline:
                 exercise_name = self._exercise_matcher.match(
                     exercise.get("name", "unknown")
                 )[0]
+                exercise_sql = upsert(
+                    "exercise_log",
+                    ["id", "activity_id", "date", "exercise_name", "weight_kg", "reps", "set_number",
+                     "duration_minutes", "distance_km", "notes", "source_file"],
+                    ["id"],
+                    dialect=dialect,
+                )
                 self.db.execute(
-                    """
-                    INSERT OR REPLACE INTO exercise_log
-                    (id, activity_id, date, exercise_name, weight_kg, reps, set_number,
-                     duration_minutes, distance_km, notes, source_file)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
+                    exercise_sql,
                     [
                         exercise_id,
                         activity_id,

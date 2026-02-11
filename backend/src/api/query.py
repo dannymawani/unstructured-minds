@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from ..claude import ClaudeClient
 from ..db import DatabaseManager
 from ..middleware import limiter
+from .dependencies import get_analytics_db
 from ..middleware.rate_limit import RATE_LIMIT_CLAUDE_API
 from ..middleware.validation import validate_query_length, MAX_QUERY_LENGTH
 
@@ -85,9 +86,9 @@ class QueryResponse(BaseModel):
     error: Optional[str] = None
 
 
-def get_db(request: Request) -> DatabaseManager:
-    """Get database manager from app state."""
-    return request.app.state.db
+def get_db(request: Request):
+    """Get analytics database for NL queries (DuckDB in hybrid mode)."""
+    return get_analytics_db(request)
 
 
 def get_claude(request: Request) -> ClaudeClient:

@@ -1,7 +1,6 @@
 """Settings API endpoints."""
 
 import json
-from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, Request
@@ -12,21 +11,44 @@ from datetime import datetime as dt
 from fastapi import HTTPException
 
 from ..config import settings
+from ..db.sql_compat import get_dialect
+from ..db.user_settings import UserSettingsStore
+from ..storage.datastore import DataStore
 
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
 
-# Settings file path
-SETTINGS_FILE = settings.data_path / "settings.json"
+SETTINGS_PATH = "settings.json"
 
 # Default daily note path template: {YYYY}/{MM}/{YYYY}-{MM}-{DD}-daily-note
 DEFAULT_DAILY_NOTE_TEMPLATE = "{YYYY}/{MM}/{YYYY}-{MM}-{DD}-daily-note"
 
 
+def _get_datastore(request: Request) -> DataStore:
+    return request.app.state.datastore
+
+
+# ---- Sync helpers (used by resolve_daily_note_path which is called synchronously) ----
+
+# Settings file path for sync fallback
+SETTINGS_FILE = settings.data_path / "settings.json"
+
+
+def _load_settings_sync() -> dict:
+    """Load settings from JSON file (sync, for use outside request context)."""
+    if SETTINGS_FILE.exists():
+        try:
+            with open(SETTINGS_FILE) as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            pass
+    return {"theme": "dark"}
+
+
 def get_daily_note_template() -> str:
     """Get the configured daily note path template."""
-    stored = _load_settings()
+    stored = _load_settings_sync()
     return stored.get("daily_note_path_template", DEFAULT_DAILY_NOTE_TEMPLATE)
 
 
@@ -49,22 +71,42 @@ def resolve_daily_note_path(date_str: str, template: Optional[str] = None) -> st
     return path + ".md"
 
 
-def _load_settings() -> dict:
-    """Load settings from JSON file."""
-    if SETTINGS_FILE.exists():
-        try:
-            with open(SETTINGS_FILE) as f:
-                return json.load(f)
-        except (json.JSONDecodeError, IOError):
-            pass
+# ---- Async helpers (used by endpoints) ----
+
+
+def _get_user_settings_store(request: Request):
+    """Get UserSettingsStore if running in cloud mode, else None."""
+    db = request.app.state.db
+    if get_dialect(db) == "postgres":
+        return UserSettingsStore(db, settings.default_user_id)
+    return None
+
+
+async def _load_settings(datastore: DataStore, request: Request = None) -> dict:
+    """Load settings from Postgres (cloud) or DataStore (local)."""
+    if request:
+        store = _get_user_settings_store(request)
+        if store:
+            data = store.get("settings")
+            if data is not None:
+                return data
+            return {"theme": "dark"}
+
+    data = await datastore.read_json(SETTINGS_PATH)
+    if data is not None:
+        return data
     return {"theme": "dark"}
 
 
-def _save_settings(data: dict) -> None:
-    """Save settings to JSON file."""
-    SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with open(SETTINGS_FILE, "w") as f:
-        json.dump(data, f, indent=2)
+async def _save_settings(datastore: DataStore, data: dict, request: Request = None) -> None:
+    """Save settings to Postgres (cloud) or DataStore (local)."""
+    if request:
+        store = _get_user_settings_store(request)
+        if store:
+            store.set("settings", data)
+            return
+
+    await datastore.write_json(SETTINGS_PATH, data)
 
 
 class SettingsResponse(BaseModel):
@@ -96,14 +138,11 @@ class ThemeResponse(BaseModel):
 
 
 @router.get("", response_model=SettingsResponse)
-def get_settings(request: Request) -> SettingsResponse:
-    """Get current application settings.
-
-    Returns:
-        Current settings (sensitive values masked)
-    """
+async def get_settings(request: Request) -> SettingsResponse:
+    """Get current application settings."""
     claude = request.app.state.claude
-    stored = _load_settings()
+    datastore = _get_datastore(request)
+    stored = await _load_settings(datastore, request)
 
     return SettingsResponse(
         vault_path=str(settings.vault_path),
@@ -118,23 +157,16 @@ def get_settings(request: Request) -> SettingsResponse:
 
 
 @router.post("", response_model=SettingsResponse)
-def update_settings(request: Request, update: SettingsUpdateRequest) -> SettingsResponse:
-    """Update application settings.
-
-    Args:
-        update: Settings to update
-
-    Returns:
-        Updated settings
-    """
-    stored = _load_settings()
+async def update_settings(request: Request, update: SettingsUpdateRequest) -> SettingsResponse:
+    """Update application settings."""
+    datastore = _get_datastore(request)
+    stored = await _load_settings(datastore, request)
 
     if update.theme and update.theme in ["dark", "light"]:
         stored["theme"] = update.theme
 
     if update.daily_note_path_template is not None:
         tpl = update.daily_note_path_template
-        # Validate template: must contain date placeholders, no path traversal
         if ".." in tpl or tpl.startswith("/"):
             raise HTTPException(status_code=400, detail="Invalid template: path traversal not allowed")
         if not all(p in tpl for p in ["{YYYY}", "{MM}", "{DD}"]):
@@ -144,7 +176,7 @@ def update_settings(request: Request, update: SettingsUpdateRequest) -> Settings
     if update.show_month_names is not None:
         stored["show_month_names"] = update.show_month_names
 
-    _save_settings(stored)
+    await _save_settings(datastore, stored, request)
 
     claude = request.app.state.claude
     return SettingsResponse(
@@ -160,13 +192,10 @@ def update_settings(request: Request, update: SettingsUpdateRequest) -> Settings
 
 
 @router.get("/theme", response_model=ThemeResponse)
-def get_theme() -> ThemeResponse:
-    """Get current theme settings.
-
-    Returns:
-        Current theme and available options
-    """
-    stored = _load_settings()
+async def get_theme(request: Request) -> ThemeResponse:
+    """Get current theme settings."""
+    datastore = _get_datastore(request)
+    stored = await _load_settings(datastore, request)
     return ThemeResponse(
         theme=stored.get("theme", "dark"),
         available_themes=["dark", "light"],
@@ -174,19 +203,13 @@ def get_theme() -> ThemeResponse:
 
 
 @router.post("/theme", response_model=ThemeResponse)
-def set_theme(theme: str) -> ThemeResponse:
-    """Set theme preference.
-
-    Args:
-        theme: Theme name ("dark" or "light")
-
-    Returns:
-        Updated theme settings
-    """
-    stored = _load_settings()
+async def set_theme(request: Request, theme: str) -> ThemeResponse:
+    """Set theme preference."""
+    datastore = _get_datastore(request)
+    stored = await _load_settings(datastore, request)
     if theme in ["dark", "light"]:
         stored["theme"] = theme
-        _save_settings(stored)
+        await _save_settings(datastore, stored, request)
 
     return ThemeResponse(
         theme=stored.get("theme", "dark"),
@@ -205,20 +228,28 @@ class SystemInfoResponse(BaseModel):
 
 @router.get("/system", response_model=SystemInfoResponse)
 def get_system_info(request: Request) -> SystemInfoResponse:
-    """Get system information.
-
-    Returns:
-        System info for diagnostics
-    """
+    """Get system information."""
     import sys
-    from ..db.schema import get_table_names
 
     db = request.app.state.db
-    tables = get_table_names(db._conn) if db and db._conn else []
+    tables: list[str] = []
+
+    if get_dialect(db) == "postgres":
+        # Postgres: query information_schema for table names
+        try:
+            result = db.execute(
+                "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'"
+            )
+            tables = [row[0] for row in result.fetchall()]
+        except Exception:
+            pass
+    else:
+        from ..db.schema import get_table_names
+        tables = get_table_names(db._conn) if db and getattr(db, "_conn", None) else []
 
     return SystemInfoResponse(
         version="0.1.0",
         python_version=sys.version.split()[0],
         database_tables=tables,
-        storage_type="local",
+        storage_type="postgres" if settings.is_cloud_mode else "local",
     )

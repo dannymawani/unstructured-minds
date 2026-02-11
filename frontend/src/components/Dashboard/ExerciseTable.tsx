@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Dumbbell, Plus, X, Loader2, Search, ChevronDown, ChevronUp } from 'lucide-react';
+import { Dumbbell, Plus, X, Loader2, Search, ChevronDown, ChevronUp, Share2, Check } from 'lucide-react';
 import { clearCache } from '../../lib/cachedFetch';
 
 interface ExerciseTableEntry {
@@ -55,6 +55,11 @@ export function ExerciseTable({ apiUrl = 'http://localhost:8000' }: ExerciseTabl
   const [searchInput, setSearchInput] = useState('');
   const [sortBy, setSortBy] = useState<SortColumn>('total_sessions');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+
+  // Community share prompt state
+  const [sharePrompt, setSharePrompt] = useState<{ name: string } | null>(null);
+  const [sharing, setSharing] = useState(false);
+  const [shareResult, setShareResult] = useState<string | null>(null);
 
   // Form state
   const today = new Date().toISOString().split('T')[0];
@@ -161,14 +166,48 @@ export function ExerciseTable({ apiUrl = 'http://localhost:8000' }: ExerciseTabl
         throw new Error(errData?.detail || `Failed to add exercise (${response.status})`);
       }
 
+      const result = await response.json();
+
       clearCache();
       resetForm();
       setShowForm(false);
       fetchData(search);
+
+      // Show community share prompt for new (unmatched) exercises
+      if (result.is_new && result.canonical_name) {
+        setSharePrompt({ name: result.canonical_name });
+        setShareResult(null);
+      }
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Failed to add exercise');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleShare = async () => {
+    if (!sharePrompt) return;
+    setSharing(true);
+    try {
+      const response = await fetch(`${apiUrl}/exercises/community`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: sharePrompt.name }),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setShareResult(data.message);
+      } else {
+        setShareResult('Failed to share exercise');
+      }
+    } catch {
+      setShareResult('Failed to share exercise');
+    } finally {
+      setSharing(false);
+      setTimeout(() => {
+        setSharePrompt(null);
+        setShareResult(null);
+      }, 3000);
     }
   };
 
@@ -302,6 +341,45 @@ export function ExerciseTable({ apiUrl = 'http://localhost:8000' }: ExerciseTabl
             </button>
           </div>
         </form>
+      )}
+
+      {/* Community share prompt */}
+      {sharePrompt && (
+        <div className="mb-4 p-3 bg-teal-500/10 border border-teal-500/30 rounded-lg flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-sm">
+            <Share2 className="w-4 h-4 text-teal-400 shrink-0" />
+            <span className="text-foreground">
+              {shareResult ? (
+                <span className="flex items-center gap-1.5">
+                  <Check className="w-4 h-4 text-teal-400" />
+                  {shareResult}
+                </span>
+              ) : (
+                <>
+                  <strong>{sharePrompt.name}</strong> is a new exercise. Share it with the community?
+                </>
+              )}
+            </span>
+          </div>
+          {!shareResult && (
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => setSharePrompt(null)}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1"
+              >
+                No thanks
+              </button>
+              <button
+                onClick={handleShare}
+                disabled={sharing}
+                className="flex items-center gap-1.5 bg-teal-500 hover:bg-teal-600 disabled:opacity-50 text-white text-xs px-3 py-1.5 rounded-md transition-colors"
+              >
+                {sharing && <Loader2 className="w-3 h-3 animate-spin" />}
+                {sharing ? 'Sharing...' : 'Share'}
+              </button>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Table */}

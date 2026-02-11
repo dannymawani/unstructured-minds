@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from ..db import DatabaseManager
+from .dependencies import get_db as _dep_get_db
 
 router = APIRouter(prefix="/kanban", tags=["kanban"])
 
@@ -85,8 +86,8 @@ COLUMNS = [
 ]
 
 
-def get_db(request: Request) -> DatabaseManager:
-    return request.app.state.db
+def get_db(request: Request):
+    return _dep_get_db(request)
 
 
 def _row_to_task(row: tuple, columns: list[str]) -> KanbanTask:
@@ -289,18 +290,27 @@ async def add_task_update(
     if not check.fetchone():
         raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
 
-    # Get next ID
-    max_id = db.execute("SELECT COALESCE(MAX(id), 0) FROM kanban_task_updates").fetchone()[0]
-    new_id = max_id + 1
+    # Insert — use COALESCE(MAX) for DuckDB, RETURNING for Postgres
+    from ..db.sql_compat import get_dialect
 
-    db.execute(
-        "INSERT INTO kanban_task_updates (id, task_id, note) VALUES (?, ?, ?)",
-        [new_id, task_id, request.note],
-    )
+    dialect = get_dialect(db)
+    if dialect == "postgres":
+        result = db.execute(
+            "INSERT INTO kanban_task_updates (task_id, note) VALUES (%s, %s) RETURNING id, task_id, note, created_at",
+            [task_id, request.note],
+        )
+        row = result.fetchone()
+    else:
+        max_id = db.execute("SELECT COALESCE(MAX(id), 0) FROM kanban_task_updates").fetchone()[0]
+        new_id = max_id + 1
+        db.execute(
+            "INSERT INTO kanban_task_updates (id, task_id, note) VALUES (?, ?, ?)",
+            [new_id, task_id, request.note],
+        )
+        result = db.execute(
+            "SELECT id, task_id, note, created_at FROM kanban_task_updates WHERE id = ?",
+            [new_id],
+        )
+        row = result.fetchone()
 
-    result = db.execute(
-        "SELECT id, task_id, note, created_at FROM kanban_task_updates WHERE id = ?",
-        [new_id],
-    )
-    row = result.fetchone()
     return TaskNote(id=row[0], task_id=row[1], note=row[2], created_at=str(row[3]))

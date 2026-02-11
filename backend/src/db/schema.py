@@ -190,6 +190,19 @@ def init_database(db_path: Path | str) -> duckdb.DuckDBPyConnection:
         )
     """)
 
+    # Community exercises table (shared anonymous exercise contributions)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS community_exercises (
+            exercise_key VARCHAR PRIMARY KEY,
+            display_name VARCHAR NOT NULL,
+            aliases VARCHAR DEFAULT '[]',
+            muscle_groups VARCHAR DEFAULT '[]',
+            category VARCHAR DEFAULT 'other',
+            recovery_hours INTEGER DEFAULT 48,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
     # File index table for fast file lookups
     conn.execute("""
         CREATE TABLE IF NOT EXISTS file_index (

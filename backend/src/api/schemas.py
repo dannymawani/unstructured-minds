@@ -1,8 +1,6 @@
 """Schema management API endpoints."""
 
-import json
 import logging
-from pathlib import Path
 from typing import Any, Optional
 
 from fastapi import APIRouter, HTTPException, Request
@@ -10,15 +8,18 @@ from pydantic import BaseModel, Field, field_validator
 
 logger = logging.getLogger(__name__)
 
-from ..config import settings
 from ..extraction.schemas import EXTRACTION_SCHEMAS
+from ..storage.datastore import DataStore
 
 
 router = APIRouter(prefix="/schemas", tags=["schemas"])
 
 
-# Schema storage directory
-SCHEMAS_DIR = settings.data_path / "schemas"
+SCHEMAS_PREFIX = "schemas"
+
+
+def _get_datastore(request: Request) -> DataStore:
+    return request.app.state.datastore
 
 
 # =============================================================================
@@ -146,49 +147,39 @@ class SchemaDeleteResponse(BaseModel):
 # =============================================================================
 
 
-def _ensure_schemas_dir() -> None:
-    """Ensure schemas directory exists."""
-    SCHEMAS_DIR.mkdir(parents=True, exist_ok=True)
+def _schema_path(name: str) -> str:
+    """Get the datastore path for a custom schema."""
+    return f"{SCHEMAS_PREFIX}/{name}.json"
 
 
-def _get_custom_schema_path(name: str) -> Path:
-    """Get path to a custom schema file."""
-    return SCHEMAS_DIR / f"{name}.json"
-
-
-def _load_custom_schema(name: str) -> Optional[dict[str, Any]]:
-    """Load a custom schema from disk."""
-    path = _get_custom_schema_path(name)
-    if path.exists():
-        try:
-            with open(path) as f:
-                return json.load(f)
-        except (json.JSONDecodeError, IOError) as e:
-            logger.warning("Failed to load custom schema '%s': %s", name, e)
+async def _load_custom_schema(datastore: DataStore, name: str) -> Optional[dict[str, Any]]:
+    """Load a custom schema from the datastore."""
+    data = await datastore.read_json(_schema_path(name))
+    if data and "name" in data:
+        return data
     return None
 
 
-def _save_custom_schema(schema: SchemaDefinition) -> None:
-    """Save a custom schema to disk."""
-    _ensure_schemas_dir()
-    path = _get_custom_schema_path(schema.name)
-    with open(path, "w") as f:
-        json.dump(schema.model_dump(), f, indent=2)
+async def _save_custom_schema(datastore: DataStore, schema: SchemaDefinition) -> None:
+    """Save a custom schema to the datastore."""
+    await datastore.write_json(_schema_path(schema.name), schema.model_dump())
 
 
-def _delete_custom_schema(name: str) -> bool:
-    """Delete a custom schema from disk."""
-    path = _get_custom_schema_path(name)
-    if path.exists():
-        path.unlink()
-        return True
-    return False
+async def _delete_custom_schema(datastore: DataStore, name: str) -> bool:
+    """Delete a custom schema from the datastore."""
+    return await datastore.delete_file(_schema_path(name))
 
 
-def _list_custom_schemas() -> list[str]:
+async def _list_custom_schemas(datastore: DataStore) -> list[str]:
     """List all custom schema names."""
-    _ensure_schemas_dir()
-    return [p.stem for p in SCHEMAS_DIR.glob("*.json")]
+    files = await datastore.list_files(SCHEMAS_PREFIX)
+    names = []
+    for f in files:
+        # f is like "schemas/foo.json" — extract the stem
+        if f.endswith(".json"):
+            stem = f.rsplit("/", 1)[-1].removesuffix(".json")
+            names.append(stem)
+    return names
 
 
 def _convert_to_json_schema(schema: SchemaDefinition) -> dict[str, Any]:
@@ -277,14 +268,9 @@ def _builtin_to_schema_response(name: str, schema: dict[str, Any]) -> SchemaResp
 
 
 @router.get("", response_model=SchemaListResponse)
-def list_schemas() -> SchemaListResponse:
-    """List all available extraction schemas.
-
-    Returns both built-in schemas and custom user-defined schemas.
-
-    Returns:
-        List of schema summaries
-    """
+async def list_schemas(request: Request) -> SchemaListResponse:
+    """List all available extraction schemas."""
+    datastore = _get_datastore(request)
     schemas = []
 
     # Add built-in schemas
@@ -299,9 +285,9 @@ def list_schemas() -> SchemaListResponse:
             )
         )
 
-    # Add custom schemas (skip files that don't match expected format)
-    for name in _list_custom_schemas():
-        custom_schema = _load_custom_schema(name)
+    # Add custom schemas
+    for name in await _list_custom_schemas(datastore):
+        custom_schema = await _load_custom_schema(datastore, name)
         if custom_schema and "name" in custom_schema:
             schemas.append(
                 SchemaListItem(
@@ -319,24 +305,15 @@ def list_schemas() -> SchemaListResponse:
 
 
 @router.get("/{name}", response_model=SchemaResponse)
-def get_schema(name: str) -> SchemaResponse:
-    """Get a specific schema by name.
-
-    Args:
-        name: Schema name (built-in or custom)
-
-    Returns:
-        Full schema definition
-
-    Raises:
-        404: Schema not found
-    """
+async def get_schema(name: str, request: Request) -> SchemaResponse:
+    """Get a specific schema by name."""
     # Check built-in schemas first
     if name in EXTRACTION_SCHEMAS:
         return _builtin_to_schema_response(name, EXTRACTION_SCHEMAS[name])
 
     # Check custom schemas
-    custom_schema = _load_custom_schema(name)
+    datastore = _get_datastore(request)
+    custom_schema = await _load_custom_schema(datastore, name)
     if custom_schema:
         definition = SchemaDefinition(**custom_schema)
         return SchemaResponse(
@@ -352,26 +329,16 @@ def get_schema(name: str) -> SchemaResponse:
 
 
 @router.post("", response_model=SchemaCreateResponse)
-def create_schema(schema: SchemaDefinition) -> SchemaCreateResponse:
-    """Create a new custom extraction schema.
+async def create_schema(schema: SchemaDefinition, request: Request) -> SchemaCreateResponse:
+    """Create a new custom extraction schema."""
+    datastore = _get_datastore(request)
 
-    Args:
-        schema: Schema definition
-
-    Returns:
-        Success response
-
-    Raises:
-        400: Invalid schema or name conflict
-    """
-    # Check if custom schema already exists
-    if _load_custom_schema(schema.name):
+    if await _load_custom_schema(datastore, schema.name):
         raise HTTPException(
             status_code=400, detail=f"Schema already exists: {schema.name}"
         )
 
-    # Save the schema
-    _save_custom_schema(schema)
+    await _save_custom_schema(datastore, schema)
 
     return SchemaCreateResponse(
         success=True,
@@ -381,36 +348,23 @@ def create_schema(schema: SchemaDefinition) -> SchemaCreateResponse:
 
 
 @router.put("/{name}", response_model=SchemaCreateResponse)
-def update_schema(name: str, schema: SchemaDefinition) -> SchemaCreateResponse:
-    """Update an existing custom schema.
+async def update_schema(name: str, schema: SchemaDefinition, request: Request) -> SchemaCreateResponse:
+    """Update an existing custom schema."""
+    datastore = _get_datastore(request)
 
-    Args:
-        name: Schema name to update
-        schema: Updated schema definition
-
-    Returns:
-        Success response
-
-    Raises:
-        400: Cannot update built-in schema
-        404: Schema not found
-    """
-    # Cannot update built-in schemas
     if name in EXTRACTION_SCHEMAS:
         raise HTTPException(
             status_code=400, detail=f"Cannot update built-in schema: {name}"
         )
 
-    # Check if schema exists
-    if not _load_custom_schema(name):
+    if not await _load_custom_schema(datastore, name):
         raise HTTPException(status_code=404, detail=f"Schema not found: {name}")
 
     # If name is changing, delete old file
     if schema.name != name:
-        _delete_custom_schema(name)
+        await _delete_custom_schema(datastore, name)
 
-    # Save updated schema
-    _save_custom_schema(schema)
+    await _save_custom_schema(datastore, schema)
 
     return SchemaCreateResponse(
         success=True,
@@ -420,27 +374,16 @@ def update_schema(name: str, schema: SchemaDefinition) -> SchemaCreateResponse:
 
 
 @router.delete("/{name}", response_model=SchemaDeleteResponse)
-def delete_schema(name: str) -> SchemaDeleteResponse:
-    """Delete a custom schema.
+async def delete_schema(name: str, request: Request) -> SchemaDeleteResponse:
+    """Delete a custom schema."""
+    datastore = _get_datastore(request)
 
-    Args:
-        name: Schema name to delete
-
-    Returns:
-        Success response
-
-    Raises:
-        400: Cannot delete built-in schema
-        404: Schema not found
-    """
-    # Cannot delete built-in schemas
     if name in EXTRACTION_SCHEMAS:
         raise HTTPException(
             status_code=400, detail=f"Cannot delete built-in schema: {name}"
         )
 
-    # Try to delete
-    if _delete_custom_schema(name):
+    if await _delete_custom_schema(datastore, name):
         return SchemaDeleteResponse(
             success=True,
             name=name,
@@ -451,26 +394,13 @@ def delete_schema(name: str) -> SchemaDeleteResponse:
 
 
 @router.get("/{name}/json-schema")
-def get_json_schema(name: str) -> dict[str, Any]:
-    """Get the JSON Schema format for a schema.
-
-    This is the format used by Claude for extraction.
-
-    Args:
-        name: Schema name
-
-    Returns:
-        JSON Schema object
-
-    Raises:
-        404: Schema not found
-    """
-    # Check built-in schemas
+async def get_json_schema(name: str, request: Request) -> dict[str, Any]:
+    """Get the JSON Schema format for a schema."""
     if name in EXTRACTION_SCHEMAS:
         return EXTRACTION_SCHEMAS[name]
 
-    # Check custom schemas
-    custom_schema = _load_custom_schema(name)
+    datastore = _get_datastore(request)
+    custom_schema = await _load_custom_schema(datastore, name)
     if custom_schema:
         definition = SchemaDefinition(**custom_schema)
         return _convert_to_json_schema(definition)
