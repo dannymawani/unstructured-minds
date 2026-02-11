@@ -2,7 +2,8 @@
 
 Queries all exercise names from DuckDB, matches each via ExerciseMatcher,
 collects unmatched names, and calls Claude for AI classification.
-Results are cached to disk so the AI call only happens once per new name.
+Results are cached to disk (or Postgres user_settings in hybrid mode)
+so the AI call only happens once per new name.
 """
 
 from dataclasses import dataclass
@@ -33,6 +34,7 @@ async def normalize_exercises(
     matcher: ExerciseMatcher,
     claude: Optional[ClaudeClient],
     cache_path: Path,
+    user_settings_store=None,
 ) -> NormalizationStats:
     """Normalize all exercise names in the database.
 
@@ -41,7 +43,7 @@ async def normalize_exercises(
     3. Match each through ExerciseMatcher
     4. Collect names that got no match (confidence 0.0)
     5. Call Claude to classify unmatched names
-    6. Save AI cache to disk
+    6. Save AI cache
 
     Works gracefully without Claude — unmatched names get title-case fallback.
 
@@ -49,15 +51,19 @@ async def normalize_exercises(
         db: Database manager
         matcher: ExerciseMatcher instance (already loaded with definitions)
         claude: Claude client (optional — skips AI if None/unconfigured)
-        cache_path: Path to ai_exercise_cache.json
+        cache_path: Path to ai_exercise_cache.json (used in duckdb mode)
+        user_settings_store: Optional UserSettingsStore for cloud mode
 
     Returns:
         NormalizationStats with counts
     """
     stats = NormalizationStats(errors=[])
 
-    # 1. Load existing AI cache
-    matcher.load_ai_cache(cache_path)
+    # 1. Load existing AI cache (from Postgres or file)
+    if user_settings_store:
+        matcher.load_ai_cache_from_settings(user_settings_store)
+    else:
+        matcher.load_ai_cache(cache_path)
 
     # 2. Query all distinct exercise names
     try:
@@ -93,7 +99,10 @@ async def normalize_exercises(
                 known_canonical_names=matcher.canonical_names,
             )
             if ai_mappings:
-                matcher.update_ai_cache(ai_mappings, cache_path)
+                if user_settings_store:
+                    matcher.update_ai_cache_to_settings(ai_mappings, user_settings_store)
+                else:
+                    matcher.update_ai_cache(ai_mappings, cache_path)
                 stats.ai_classified = len(ai_mappings)
                 logger.info(
                     "ai_exercise_classification_done",

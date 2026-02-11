@@ -12,6 +12,7 @@ from ..config import settings
 from ..db import DatabaseManager
 from ..logging_config import get_logger
 from ..storage import StorageBackend
+from .dependencies import get_db as _dep_get_db
 
 router = APIRouter(tags=["health"])
 logger = get_logger(__name__)
@@ -106,9 +107,9 @@ class DetailedHealthResponse(BaseModel):
 # =============================================================================
 
 
-def get_db(request: Request) -> DatabaseManager:
+def get_db(request: Request):
     """Get database manager from app state."""
-    return request.app.state.db
+    return _dep_get_db(request)
 
 
 def get_storage(request: Request) -> StorageBackend:
@@ -322,17 +323,22 @@ async def _check_database(
         Tuple of (status, latency_ms, message, details)
     """
     try:
+        from ..db.sql_compat import get_dialect
+
         start = time.perf_counter()
         result = db.execute("SELECT COUNT(*) as table_count FROM information_schema.tables")
         table_count = result.fetchone()[0]
         latency_ms = (time.perf_counter() - start) * 1000
+
+        dialect = get_dialect(db)
+        db_path = str(getattr(db, "db_path", "postgres")) if dialect == "duckdb" else "postgres"
 
         return (
             ComponentStatus.UP,
             round(latency_ms, 2),
             None,
             {
-                "path": str(db.db_path),
+                "path": db_path,
                 "table_count": table_count,
             },
         )

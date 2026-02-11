@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from ..claude import ClaudeClient
 from ..db import DatabaseManager
 from ..storage import StorageBackend
+from .dependencies import get_db as _dep_get_db
 from ..templates.daily_note import render_daily_note as render_fallback_template
 
 logger = logging.getLogger(__name__)
@@ -36,9 +37,9 @@ class MonthDataResponse(BaseModel):
     days: list[DayInfo]
 
 
-def get_db(request: Request) -> DatabaseManager:
+def get_db(request: Request):
     """Get database manager from app state."""
-    return request.app.state.db
+    return _dep_get_db(request)
 
 
 def get_storage(request: Request) -> StorageBackend:

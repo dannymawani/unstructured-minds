@@ -29,11 +29,14 @@ from .api.insights import router as insights_router
 from .api.note_assist import router as note_assist_router
 from .api.profile import router as profile_router
 from .claude import ClaudeClient
-from .db import DatabaseManager
+from .db import DatabaseManager, PostgresManager, init_postgres_schema
+from .db.analytics_cache import AnalyticsCacheManager
 from .extraction.exercise_matcher import ExerciseMatcher
 from .extraction.exercise_normalizer import normalize_exercises
 from .middleware import limiter, SecurityHeadersMiddleware, RequestLoggingMiddleware
 from .storage import get_storage_backend
+from .storage.postgres import PostgresStorage
+from .storage.datastore import DataStore
 
 # Configure structured logging
 configure_logging(
@@ -55,18 +58,56 @@ async def lifespan(app: FastAPI):
         data_path=str(settings.data_path),
         claude_enabled=settings.claude_enabled,
         debug=settings.debug,
+        mode="cloud" if settings.is_cloud_mode else "local",
     )
 
-    # Initialize storage
-    storage = get_storage_backend("local", base_path=settings.vault_path)
-    app.state.storage = storage
+    analytics_cache_manager = None
 
-    # Initialize database
-    settings.data_path.mkdir(parents=True, exist_ok=True)
-    db = DatabaseManager(settings.duckdb_path)
-    db.connect()
-    app.state.db = db
-    logger.info("database_initialized", path=str(settings.duckdb_path))
+    if settings.is_cloud_mode:
+        # ── CLOUD MODE ─────────────────────────────────────────────
+        # Postgres is the source of truth for all data.
+        # DuckDB (in-memory) is a disposable analytics cache.
+        # PostgresStorage replaces S3 for vault/data files.
+        pg = PostgresManager(settings.database_url)
+        pg.connect()
+        init_postgres_schema(pg, settings.default_user_id)
+        app.state.db = pg
+
+        # In-memory DuckDB for fast analytics
+        analytics_db = DatabaseManager(":memory:")
+        analytics_db.connect()
+        app.state.analytics_db = analytics_db
+
+        # Populate analytics cache from Postgres
+        analytics_cache_manager = AnalyticsCacheManager(
+            pg, analytics_db, settings.default_user_id
+        )
+        analytics_cache_manager.init_cache_schema()
+        analytics_cache_manager.refresh()
+        analytics_cache_manager.start_background_refresh(interval=60)
+
+        # Storage: vault files in Postgres
+        storage = PostgresStorage(pg, settings.default_user_id)
+        data_storage = PostgresStorage(pg, settings.default_user_id, "_data")
+
+        logger.info("database_initialized", mode="cloud", backend="postgres")
+    else:
+        # ── LOCAL MODE ─────────────────────────────────────────────
+        # DuckDB file + local filesystem. Zero external deps.
+        settings.data_path.mkdir(parents=True, exist_ok=True)
+        db = DatabaseManager(settings.duckdb_path)
+        db.connect()
+        app.state.db = db
+        app.state.analytics_db = db
+
+        storage = get_storage_backend("local", base_path=settings.vault_path)
+        data_storage = get_storage_backend("local", base_path=settings.data_path)
+
+        logger.info("database_initialized", mode="local", path=str(settings.duckdb_path))
+
+    app.state.storage = storage
+    app.state.datastore = DataStore(data_storage)
+    app.state.analytics_cache_manager = analytics_cache_manager
 
     # Initialize Claude client
     claude = ClaudeClient()
@@ -74,14 +115,26 @@ async def lifespan(app: FastAPI):
     logger.info("claude_client_initialized", configured=claude.is_configured)
 
     # Initialize exercise matcher and run normalization
-    exercise_matcher = ExerciseMatcher(settings.data_path / "exercise_definitions.json")
+    from pathlib import Path
+    project_root = Path(__file__).resolve().parents[2]
+    shared_defs = project_root / "shared" / "exercise_definitions.json"
+    exercise_defs_path = shared_defs if shared_defs.exists() else settings.data_path / "exercise_definitions.json"
+    exercise_matcher = ExerciseMatcher(exercise_defs_path)
     app.state.exercise_matcher = exercise_matcher
+
+    # Build user_settings_store for cloud mode
+    user_settings_store = None
+    if settings.is_cloud_mode:
+        from .db.user_settings import UserSettingsStore
+        user_settings_store = UserSettingsStore(app.state.db, settings.default_user_id)
+
     try:
         await normalize_exercises(
-            db=db,
+            db=app.state.db,
             matcher=exercise_matcher,
             claude=claude,
             cache_path=settings.data_path / "ai_exercise_cache.json",
+            user_settings_store=user_settings_store,
         )
     except Exception as e:
         logger.warning("exercise_normalization_startup_failed", error=str(e))
@@ -92,6 +145,17 @@ async def lifespan(app: FastAPI):
 
     # Cleanup
     logger.info("application_shutting_down")
+    if analytics_cache_manager:
+        await analytics_cache_manager.stop()
+        logger.info("analytics_cache_stopped")
+
+    # Close analytics DB if it's a separate instance (cloud mode)
+    if (
+        hasattr(app.state, "analytics_db")
+        and app.state.analytics_db is not app.state.db
+    ):
+        app.state.analytics_db.close()
+        logger.info("analytics_database_closed")
     app.state.db.close()
     logger.info("database_closed")
 
