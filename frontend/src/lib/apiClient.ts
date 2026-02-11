@@ -7,8 +7,24 @@ class ApiError extends Error {
   }
 }
 
+// Auth token getter — set once from App.tsx when Clerk is enabled
+let _getToken: (() => Promise<string | null>) | null = null
+
+export function setTokenGetter(fn: () => Promise<string | null>) {
+  _getToken = fn
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, init)
+  const headers: Record<string, string> = {
+    ...(init?.headers as Record<string, string>),
+  }
+
+  if (_getToken) {
+    const token = await _getToken()
+    if (token) headers['Authorization'] = `Bearer ${token}`
+  }
+
+  const response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers })
   if (!response.ok) {
     throw new ApiError(response.status, `${init?.method || 'GET'} ${path} failed: ${response.status}`)
   }

@@ -16,6 +16,7 @@ from .validation import (
     QueryValidationError,
     FileSizeError,
 )
+from .clerk_auth import verify_clerk_token, clear_jwks_cache
 
 __all__ = [
     # Rate limiting
@@ -35,4 +36,7 @@ __all__ = [
     "PathValidationError",
     "QueryValidationError",
     "FileSizeError",
+    # Auth
+    "verify_clerk_token",
+    "clear_jwks_cache",
 ]
