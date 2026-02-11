@@ -44,6 +44,7 @@ function FileTreeItemComponent({
 }: FileTreeItemProps) {
   const renameInputRef = useRef<HTMLInputElement>(null)
   const [isDragOver, setIsDragOver] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
 
   useEffect(() => {
     if (isRenaming && renameInputRef.current) {
@@ -92,9 +93,14 @@ function FileTreeItemComponent({
       }
       e.dataTransfer.setData('text/plain', node.path)
       e.dataTransfer.effectAllowed = 'move'
+      setIsDragging(true)
     },
     [node.path, node.isVirtual]
   )
+
+  const handleDragEnd = useCallback(() => {
+    setIsDragging(false)
+  }, [])
 
   const handleDragOver = useCallback(
     (e: React.DragEvent) => {
@@ -146,9 +152,10 @@ function FileTreeItemComponent({
         'hover:bg-accent rounded-sm',
         'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1',
         selected && 'bg-accent text-accent-foreground',
-        isDragOver && 'bg-primary/20 ring-1 ring-primary'
+        isDragOver && 'bg-primary/20 ring-1 ring-primary',
+        isDragging && 'opacity-50'
       ),
-    [selected, isDragOver]
+    [selected, isDragOver, isDragging]
   )
 
   return (
@@ -164,6 +171,7 @@ function FileTreeItemComponent({
       onContextMenu={handleContextMenu}
       draggable={!node.isVirtual && !isRenaming}
       onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
