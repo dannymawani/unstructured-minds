@@ -400,6 +400,80 @@ async def rename_file(
 
 
 # =============================================================================
+# Daily Note Migration Endpoint
+# =============================================================================
+
+
+class MigrateResponse(BaseModel):
+    """Response for migration."""
+
+    success: bool
+    moved: int
+    details: list[str]
+
+
+@router.post("/vault/migrate-daily-notes", response_model=MigrateResponse)
+async def migrate_daily_notes(
+    storage: StorageBackend = Depends(get_storage),
+) -> MigrateResponse:
+    """Migrate daily notes from Daily-Notes/YYYY-MM/ to the configured template path.
+
+    Moves files matching YYYY-MM-DD.md from the old structure to the new one.
+    Also moves Life-Profile.md to root if found.
+    """
+    from .settings import get_daily_note_template
+
+    template = get_daily_note_template()
+    details: list[str] = []
+    moved = 0
+
+    try:
+        all_files = await storage.list("Daily-Notes")
+    except Exception:
+        return MigrateResponse(success=True, moved=0, details=["No Daily-Notes directory found"])
+
+    for file_path in all_files:
+        if not file_path.endswith(".md"):
+            continue
+
+        filename = file_path.split("/")[-1]
+        basename = filename.replace(".md", "")
+
+        # Move date-based files to new template path
+        try:
+            datetime.strptime(basename, "%Y-%m-%d")
+        except ValueError:
+            # Non-date file (e.g. Life-Profile.md) — move to root
+            new_path = filename
+            try:
+                if not await storage.exists(new_path):
+                    await storage.rename(file_path, new_path)
+                    details.append(f"{file_path} -> {new_path}")
+                    moved += 1
+            except Exception as e:
+                details.append(f"Error moving {file_path}: {e}")
+            continue
+
+        # Date-based file — compute new path from template
+        new_path = resolve_daily_note_path(basename)
+        if new_path == file_path:
+            continue
+
+        try:
+            if await storage.exists(new_path):
+                details.append(f"Skipped {file_path} (target exists: {new_path})")
+                continue
+            await storage.rename(file_path, new_path)
+            details.append(f"{file_path} -> {new_path}")
+            moved += 1
+        except Exception as e:
+            details.append(f"Error moving {file_path}: {e}")
+
+    invalidate_all()
+    return MigrateResponse(success=True, moved=moved, details=details)
+
+
+# =============================================================================
 # Quick Capture Endpoint
 # =============================================================================
 

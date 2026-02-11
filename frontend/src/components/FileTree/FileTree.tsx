@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react'
 import { createPortal } from 'react-dom'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { Plus, FolderPlus, RefreshCw, FileText, CalendarDays, LayoutTemplate, ChevronDown, Trash2, Pencil } from 'lucide-react'
+import { Plus, FolderPlus, RefreshCw, FileText, CalendarDays, LayoutTemplate, ChevronDown, Trash2, Pencil, CaseSensitive, Hash } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { FileTreeItem, type FileNode } from './FileTreeItem'
 
@@ -32,13 +32,10 @@ const MONTH_NAMES = [
 ]
 
 /**
- * Transform daily note folder structures for human-readable display.
- *
- * Handles two structures:
- * 1. Legacy: Daily-Notes/YYYY-MM/YYYY-MM-DD.md → Daily-Notes > Year > Month
- * 2. New: YYYY/MM/YYYY-MM-DD-daily-note.md → Year > Month (with month names)
+ * Transform daily note folder structures for display.
+ * When showMonthNames is true, renames month folders to human-readable names.
  */
-export function transformDailyNotes(roots: FileNode[]): FileNode[] {
+export function transformDailyNotes(roots: FileNode[], showMonthNames = false): FileNode[] {
   // Handle legacy Daily-Notes/YYYY-MM structure
   const dailyNotes = roots.find(
     (n) => n.path === 'Daily-Notes' && n.isDirectory
@@ -52,11 +49,12 @@ export function transformDailyNotes(roots: FileNode[]): FileNode[] {
       const match = child.name.match(monthPattern)
       if (match && child.isDirectory) {
         const year = match[1]
-        const monthIdx = parseInt(match[2], 10) - 1
-        const displayName = MONTH_NAMES[monthIdx] || child.name
-        const transformed: FileNode = { ...child, displayName }
+        if (showMonthNames) {
+          const monthIdx = parseInt(match[2], 10) - 1
+          child.displayName = MONTH_NAMES[monthIdx] || child.name
+        }
         if (!yearMap.has(year)) yearMap.set(year, [])
-        yearMap.get(year)!.push(transformed)
+        yearMap.get(year)!.push(child)
       } else {
         otherChildren.push(child)
       }
@@ -75,16 +73,18 @@ export function transformDailyNotes(roots: FileNode[]): FileNode[] {
     dailyNotes.children = [...otherChildren, ...yearNodes]
   }
 
-  // Handle new YYYY/MM structure: rename 2-digit month folders under year folders
-  const yearPattern = /^\d{4}$/
-  const monthFolderPattern = /^(\d{2})$/
-  for (const root of roots) {
-    if (root.isDirectory && yearPattern.test(root.name) && root.children) {
-      for (const child of root.children) {
-        const match = child.name.match(monthFolderPattern)
-        if (match && child.isDirectory) {
-          const monthIdx = parseInt(match[1], 10) - 1
-          child.displayName = MONTH_NAMES[monthIdx] || child.name
+  // Handle new YYYY/MM structure: optionally rename month folders
+  if (showMonthNames) {
+    const yearPattern = /^\d{4}$/
+    const monthFolderPattern = /^(\d{2})$/
+    for (const root of roots) {
+      if (root.isDirectory && yearPattern.test(root.name) && root.children) {
+        for (const child of root.children) {
+          const match = child.name.match(monthFolderPattern)
+          if (match && child.isDirectory) {
+            const monthIdx = parseInt(match[1], 10) - 1
+            child.displayName = MONTH_NAMES[monthIdx] || child.name
+          }
         }
       }
     }
@@ -178,6 +178,20 @@ export function FileTree({
   onRenameFile,
 }: FileTreeProps) {
   const [files, setFiles] = useState<FileNode[]>([])
+  const [showMonthNames, setShowMonthNames] = useState(false)
+
+  // Fetch month name preference from settings on mount
+  useEffect(() => {
+    fetch(`${apiBaseUrl}/settings`)
+      .then(r => r.json())
+      .then(data => {
+        if (typeof data.show_month_names === 'boolean') {
+          setShowMonthNames(data.show_month_names)
+        }
+      })
+      .catch(() => {})
+  }, [apiBaseUrl])
+
   const [expanded, setExpanded] = useState<Set<string>>(() => {
     // Auto-expand current year and month folders on first load (both structures)
     const now = new Date()
@@ -208,14 +222,14 @@ export function FileTree({
         throw new Error(`Failed to fetch files: ${response.statusText}`)
       }
       const data = await response.json()
-      const tree = transformDailyNotes(buildTree(data.files))
+      const tree = transformDailyNotes(buildTree(data.files), showMonthNames)
       setFiles(tree)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load files')
     } finally {
       setLoading(false)
     }
-  }, [apiBaseUrl])
+  }, [apiBaseUrl, showMonthNames])
 
   useEffect(() => {
     fetchFiles()
@@ -369,6 +383,21 @@ export function FileTree({
     setRenamingFile(null)
   }, [])
 
+  // Toggle month name display
+  const handleToggleMonthNames = useCallback(async () => {
+    const newVal = !showMonthNames
+    setShowMonthNames(newVal)
+    try {
+      await fetch(`${apiBaseUrl}/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ show_month_names: newVal }),
+      })
+    } catch {
+      // Ignore save errors
+    }
+  }, [showMonthNames, apiBaseUrl])
+
   // Drag and drop: move file to a new folder
   const handleMoveFile = useCallback(
     async (sourcePath: string, targetFolderPath: string) => {
@@ -509,6 +538,15 @@ export function FileTree({
             title="New folder"
           >
             <FolderPlus className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`h-10 w-10 sm:h-6 sm:w-6 ${showMonthNames ? 'text-primary' : ''}`}
+            onClick={handleToggleMonthNames}
+            title={showMonthNames ? 'Show month numbers' : 'Show month names'}
+          >
+            <CaseSensitive className="h-4 w-4" />
           </Button>
           <Button
             variant="ghost"
