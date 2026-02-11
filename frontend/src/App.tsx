@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react'
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router'
+import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/clerk-react'
 import { Button } from '@/components/ui/button'
 import { FileTree } from '@/components/FileTree'
 import { MarkdownEditor } from '@/components/Editor/MarkdownEditor'
@@ -18,7 +19,8 @@ import { useKeyboardShortcuts, type KeyboardShortcut } from '@/hooks/useKeyboard
 import { useTheme } from '@/hooks/useTheme'
 import { useFileManager } from '@/hooks/useFileManager'
 import { useUIState } from '@/hooks/useUIState'
-import { api } from '@/lib/apiClient'
+import { api, setTokenGetter } from '@/lib/apiClient'
+import { useAuth } from '@clerk/clerk-react'
 import {
   LayoutDashboard,
   FileText,
@@ -43,6 +45,30 @@ const Dashboard = lazy(() => import('@/components/Dashboard/Dashboard').then(m =
 const KanbanBoard = lazy(() => import('@/components/Kanban/KanbanBoard').then(m => ({ default: m.KanbanBoard })))
 const CalendarView = lazy(() => import('@/components/Calendar/CalendarView').then(m => ({ default: m.CalendarView })))
 const LifeProfile = lazy(() => import('@/components/LifeProfile/LifeProfile').then(m => ({ default: m.LifeProfile })))
+
+const CLERK_ENABLED = !!import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
+
+function SignInGate() {
+  return (
+    <div className="h-screen flex items-center justify-center bg-background">
+      <div className="text-center space-y-6 max-w-sm mx-auto px-4">
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Unstructured Minds</h1>
+        <p className="text-muted-foreground">Sign in to access your notes and data.</p>
+        <SignInButton mode="modal">
+          <button className="bg-teal-500 hover:bg-teal-600 text-white px-6 py-2.5 rounded-lg font-medium transition-colors">
+            Sign In
+          </button>
+        </SignInButton>
+      </div>
+    </div>
+  )
+}
+
+function AuthTokenSync() {
+  const { getToken } = useAuth()
+  useEffect(() => { setTokenGetter(getToken) }, [getToken])
+  return null
+}
 
 function ViewLoadingFallback() {
   return (
@@ -273,8 +299,9 @@ function App() {
     </>
   )
 
-  return (
+  const appContent = (
     <div className={`h-screen flex flex-col overflow-hidden ${ui.isMobile ? 'pb-16' : ''}`}>
+      {CLERK_ENABLED && <AuthTokenSync />}
       <header className="bg-card border-b border-border/50 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-2 sm:gap-4">
           {(ui.isMobile || ui.isTablet) && view === 'editor' && (
@@ -313,6 +340,7 @@ function App() {
           <Button variant="outline" size="sm" onClick={() => ui.setIsSettingsOpen(true)} className="gap-1 min-h-[44px] sm:min-h-0 sm:h-8">
             <Settings className="w-4 h-4" /><span className="hidden sm:inline">Settings</span>
           </Button>
+          {CLERK_ENABLED && <UserButton afterSignOutUrl="/" />}
         </div>
       </header>
 
@@ -336,6 +364,15 @@ function App() {
       <QuickCapture isOpen={ui.isQuickCaptureOpen} onClose={() => ui.setIsQuickCaptureOpen(false)} apiBaseUrl={api.baseUrl} />
       <DailyNoteWizard isOpen={ui.isWizardOpen} onClose={() => ui.setIsWizardOpen(false)} onComplete={handleWizardComplete} noteContent={ui.wizardNoteContent} date={ui.wizardDate} apiBaseUrl={api.baseUrl} />
     </div>
+  )
+
+  if (!CLERK_ENABLED) return appContent
+
+  return (
+    <>
+      <SignedIn>{appContent}</SignedIn>
+      <SignedOut><SignInGate /></SignedOut>
+    </>
   )
 }
 

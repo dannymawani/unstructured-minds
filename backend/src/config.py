@@ -43,10 +43,19 @@ class Settings(BaseSettings):
     database_url: Optional[str] = None
     default_user_id: str = "00000000-0000-0000-0000-000000000001"
 
+    # Auth (Clerk) — optional, app works without it
+    clerk_secret_key: Optional[str] = None
+    clerk_domain: Optional[str] = None  # e.g. "your-app.clerk.accounts.dev"
+
     @property
     def is_cloud_mode(self) -> bool:
         """True when USE_CLOUD=true and DATABASE_URL is set."""
         return self.use_cloud and self.database_url is not None
+
+    @property
+    def auth_enabled(self) -> bool:
+        """True when Clerk credentials are configured."""
+        return self.clerk_secret_key is not None and self.clerk_domain is not None
 
     @property
     def duckdb_path(self) -> Path:
