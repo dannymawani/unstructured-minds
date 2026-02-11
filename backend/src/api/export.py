@@ -53,7 +53,7 @@ def get_storage(request: Request) -> StorageBackend:
 async def _create_vault_zip(storage: StorageBackend) -> io.BytesIO:
     """Create a ZIP archive of the vault using StorageBackend.
 
-    Works with both local filesystem and S3 storage.
+    Works with both local filesystem and Postgres storage.
 
     Returns:
         BytesIO buffer containing ZIP file
@@ -151,7 +151,7 @@ async def export_vault(
     """Export vault as a ZIP file.
 
     Returns all markdown files and other content from the vault directory.
-    Works with both local filesystem and S3 storage.
+    Works with both local filesystem and Postgres storage.
     """
     # Create ZIP archive using storage backend
     zip_buffer = await _create_vault_zip(storage)

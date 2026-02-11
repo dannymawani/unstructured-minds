@@ -67,7 +67,7 @@ async def lifespan(app: FastAPI):
         # ── CLOUD MODE ─────────────────────────────────────────────
         # Postgres is the source of truth for all data.
         # DuckDB (in-memory) is a disposable analytics cache.
-        # PostgresStorage replaces S3 for vault/data files.
+        # Vault/data files stored in Postgres.
         pg = PostgresManager(settings.database_url)
         pg.connect()
         init_postgres_schema(pg, settings.default_user_id)
