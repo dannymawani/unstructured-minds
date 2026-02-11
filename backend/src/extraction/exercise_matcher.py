@@ -60,6 +60,90 @@ class ExerciseMatcher:
         """Return sorted list of all known canonical display names."""
         return sorted(self._canonical_set)
 
+    def load_community_exercises(self, exercises: list[dict]) -> None:
+        """Inject community exercises into the matcher's lookup maps.
+
+        Community exercises are loaded from the database and treated
+        the same as built-in definitions for matching purposes.
+
+        Args:
+            exercises: List of dicts with keys: exercise_key, display_name,
+                       aliases (list or JSON string), muscle_groups, category,
+                       recovery_hours.
+        """
+        count = 0
+        for entry in exercises:
+            key = entry["exercise_key"]
+            display = entry["display_name"]
+
+            # Skip if already registered (builtins take precedence)
+            if display in self._canonical_set:
+                continue
+
+            self._canonical_set.add(display)
+            self._exact_map[key.lower()] = display
+            self._exact_map[display.lower()] = display
+            self._fuzzy_candidates.append((display.lower(), display))
+
+            # Parse aliases — may be a JSON string (DuckDB) or list (Postgres)
+            aliases = entry.get("aliases", [])
+            if isinstance(aliases, str):
+                try:
+                    aliases = json.loads(aliases)
+                except (json.JSONDecodeError, TypeError):
+                    aliases = []
+
+            for alias in aliases:
+                self._alias_map[alias.lower()] = display
+                self._fuzzy_candidates.append((alias.lower(), display))
+
+            count += 1
+
+        if count:
+            logger.info("community_exercises_loaded", count=count)
+
+    def suggest(self, query: str, limit: int = 10) -> list[dict]:
+        """Suggest exercises matching a query string.
+
+        Uses prefix matching first, then fuzzy matching as fallback.
+
+        Args:
+            query: Partial exercise name to match
+            limit: Maximum number of results
+
+        Returns:
+            List of dicts with name, source ("builtin"/"community" not tracked
+            at this level — caller annotates source).
+        """
+        if not query:
+            return []
+
+        q = query.strip().lower()
+        results: list[tuple[str, float]] = []
+        seen: set[str] = set()
+
+        # Prefix matches (highest priority)
+        for candidate_lower, display in self._fuzzy_candidates:
+            if display in seen:
+                continue
+            if candidate_lower.startswith(q) or q in candidate_lower:
+                results.append((display, 1.0))
+                seen.add(display)
+
+        # Fuzzy matches for remaining
+        if len(results) < limit:
+            for candidate_lower, display in self._fuzzy_candidates:
+                if display in seen:
+                    continue
+                score = SequenceMatcher(None, q, candidate_lower).ratio()
+                if score >= 0.5:
+                    results.append((display, score))
+                    seen.add(display)
+
+        # Sort by score descending, take top N
+        results.sort(key=lambda x: x[1], reverse=True)
+        return [{"name": name} for name, _ in results[:limit]]
+
     def load_ai_cache(self, path: Path) -> None:
         """Load AI classification cache from disk.
 
