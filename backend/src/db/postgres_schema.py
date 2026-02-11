@@ -185,6 +185,19 @@ def init_postgres_schema(pg, default_user_id: str) -> None:
         )
     """)
 
+    # Community exercises table (shared anonymous exercise contributions)
+    pg.execute("""
+        CREATE TABLE IF NOT EXISTS community_exercises (
+            exercise_key VARCHAR PRIMARY KEY,
+            display_name VARCHAR NOT NULL,
+            aliases JSONB DEFAULT '[]',
+            muscle_groups JSONB DEFAULT '[]',
+            category VARCHAR DEFAULT 'other',
+            recovery_hours INTEGER DEFAULT 48,
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    """)
+
     # Custom extractions table
     pg.execute("""
         CREATE TABLE IF NOT EXISTS custom_extractions (

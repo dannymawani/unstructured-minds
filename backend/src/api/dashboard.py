@@ -177,6 +177,8 @@ class ExerciseCreateResponse(BaseModel):
 
     id: str
     message: str
+    is_new: bool = False
+    canonical_name: str | None = None
 
 
 def get_db(request: Request):
@@ -796,7 +798,10 @@ def create_exercise(
     """
     exercise_id = str(uuid.uuid4())
     activity_id = f"manual_{exercise.date}_{exercise_id[:8]}"
-    canonical_name = matcher.match(exercise.exercise_name)[0]
+    canonical_name, confidence = matcher.match(exercise.exercise_name)
+
+    # An exercise is "new" if it didn't match any builtin or community definition
+    is_new = confidence == 0.0
 
     db.execute(
         """
@@ -822,6 +827,8 @@ def create_exercise(
     return ExerciseCreateResponse(
         id=exercise_id,
         message=f"Exercise '{canonical_name}' added successfully",
+        is_new=is_new,
+        canonical_name=canonical_name,
     )
 
 

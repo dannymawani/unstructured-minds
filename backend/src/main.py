@@ -28,6 +28,7 @@ from .api.metrics import router as metrics_router
 from .api.insights import router as insights_router
 from .api.note_assist import router as note_assist_router
 from .api.profile import router as profile_router
+from .api.exercises import router as exercises_router
 from .claude import ClaudeClient
 from .db import DatabaseManager, PostgresManager, init_postgres_schema
 from .db.analytics_cache import AnalyticsCacheManager
@@ -122,6 +123,26 @@ async def lifespan(app: FastAPI):
     exercise_matcher = ExerciseMatcher(exercise_defs_path)
     app.state.exercise_matcher = exercise_matcher
 
+    # Load community exercises into the matcher
+    try:
+        rows = app.state.db.execute(
+            "SELECT exercise_key, display_name, aliases, muscle_groups, category, recovery_hours FROM community_exercises"
+        ).fetchall()
+        community_exercises = [
+            {
+                "exercise_key": r[0],
+                "display_name": r[1],
+                "aliases": r[2],
+                "muscle_groups": r[3],
+                "category": r[4],
+                "recovery_hours": r[5],
+            }
+            for r in rows
+        ]
+        exercise_matcher.load_community_exercises(community_exercises)
+    except Exception as e:
+        logger.warning("community_exercises_load_failed", error=str(e))
+
     # Build user_settings_store for cloud mode
     user_settings_store = None
     if settings.is_cloud_mode:
@@ -215,6 +236,7 @@ app.include_router(tasks_router)
 app.include_router(insights_router)
 app.include_router(note_assist_router)
 app.include_router(profile_router)
+app.include_router(exercises_router)
 
 
 if __name__ == "__main__":
