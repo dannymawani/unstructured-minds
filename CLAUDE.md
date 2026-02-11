@@ -77,10 +77,10 @@ data/                                 # Per-instance, gitignored
 
 | Mode | Trigger | Description |
 |------|---------|-------------|
-| **Local** (default) | No `DATABASE_URL` | DuckDB file + local filesystem. Zero external deps. |
-| **Cloud** | `DATABASE_URL` set | Postgres (source of truth) + in-memory DuckDB (analytics cache) + `vault_files` table (markdown storage) |
+| **Local** (default) | `USE_CLOUD=false` | DuckDB file + local filesystem. Zero external deps. |
+| **Cloud** | `USE_CLOUD=true` + `DATABASE_URL` | Postgres (source of truth) + in-memory DuckDB (analytics cache) + `vault_files` table (markdown storage) |
 
-Configuration is just two env vars: `ANTHROPIC_API_KEY` + `DATABASE_URL`.
+Configuration env vars: `ANTHROPIC_API_KEY` + `USE_CLOUD` + `DATABASE_URL` (when cloud).
 
 ### Cloud Setup & Migration
 

@@ -10,7 +10,7 @@ class DataStore:
     """High-level data access layer on top of a StorageBackend.
 
     Provides JSON read/write helpers and maps data/ file paths to storage operations.
-    Works identically whether the underlying backend is local filesystem or S3.
+    Works identically whether the underlying backend is local filesystem or Postgres.
     """
 
     def __init__(self, storage: StorageBackend) -> None:
