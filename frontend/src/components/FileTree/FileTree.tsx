@@ -32,50 +32,63 @@ const MONTH_NAMES = [
 ]
 
 /**
- * Transform Daily-Notes children from flat YYYY-MM folders
- * into a year > month hierarchy with human-readable month names.
+ * Transform daily note folder structures for human-readable display.
+ *
+ * Handles two structures:
+ * 1. Legacy: Daily-Notes/YYYY-MM/YYYY-MM-DD.md → Daily-Notes > Year > Month
+ * 2. New: YYYY/MM/YYYY-MM-DD-daily-note.md → Year > Month (with month names)
  */
 export function transformDailyNotes(roots: FileNode[]): FileNode[] {
+  // Handle legacy Daily-Notes/YYYY-MM structure
   const dailyNotes = roots.find(
     (n) => n.path === 'Daily-Notes' && n.isDirectory
   )
-  if (!dailyNotes || !dailyNotes.children) return roots
+  if (dailyNotes && dailyNotes.children) {
+    const monthPattern = /^(\d{4})-(\d{2})$/
+    const yearMap = new Map<string, FileNode[]>()
+    const otherChildren: FileNode[] = []
 
-  // Separate month folders (YYYY-MM) from other children (e.g. Life-Profile.md)
-  const monthPattern = /^(\d{4})-(\d{2})$/
-  const yearMap = new Map<string, FileNode[]>()
-  const otherChildren: FileNode[] = []
-
-  for (const child of dailyNotes.children) {
-    const match = child.name.match(monthPattern)
-    if (match && child.isDirectory) {
-      const year = match[1]
-      const monthIdx = parseInt(match[2], 10) - 1
-      const displayName = MONTH_NAMES[monthIdx] || child.name
-      const transformed: FileNode = {
-        ...child,
-        displayName,
+    for (const child of dailyNotes.children) {
+      const match = child.name.match(monthPattern)
+      if (match && child.isDirectory) {
+        const year = match[1]
+        const monthIdx = parseInt(match[2], 10) - 1
+        const displayName = MONTH_NAMES[monthIdx] || child.name
+        const transformed: FileNode = { ...child, displayName }
+        if (!yearMap.has(year)) yearMap.set(year, [])
+        yearMap.get(year)!.push(transformed)
+      } else {
+        otherChildren.push(child)
       }
-      if (!yearMap.has(year)) yearMap.set(year, [])
-      yearMap.get(year)!.push(transformed)
-    } else {
-      otherChildren.push(child)
     }
+
+    const yearNodes: FileNode[] = [...yearMap.entries()]
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([year, months]) => ({
+        path: `Daily-Notes/__year__/${year}`,
+        name: year,
+        isDirectory: true,
+        isVirtual: true,
+        children: months.sort((a, b) => b.path.localeCompare(a.path)),
+      }))
+
+    dailyNotes.children = [...otherChildren, ...yearNodes]
   }
 
-  // Build virtual year nodes, sorted newest first
-  const yearNodes: FileNode[] = [...yearMap.entries()]
-    .sort((a, b) => b[0].localeCompare(a[0]))
-    .map(([year, months]) => ({
-      path: `Daily-Notes/__year__/${year}`,
-      name: year,
-      isDirectory: true,
-      isVirtual: true,
-      children: months.sort((a, b) => b.path.localeCompare(a.path)),
-    }))
-
-  // Non-month children first (files), then year nodes
-  dailyNotes.children = [...otherChildren, ...yearNodes]
+  // Handle new YYYY/MM structure: rename 2-digit month folders under year folders
+  const yearPattern = /^\d{4}$/
+  const monthFolderPattern = /^(\d{2})$/
+  for (const root of roots) {
+    if (root.isDirectory && yearPattern.test(root.name) && root.children) {
+      for (const child of root.children) {
+        const match = child.name.match(monthFolderPattern)
+        if (match && child.isDirectory) {
+          const monthIdx = parseInt(match[1], 10) - 1
+          child.displayName = MONTH_NAMES[monthIdx] || child.name
+        }
+      }
+    }
+  }
 
   return roots
 }
@@ -84,10 +97,17 @@ export function buildTree(files: FileInfo[]): FileNode[] {
   const nodeMap = new Map<string, FileNode>()
   const roots: FileNode[] = []
 
-  // Sort: directories first, then newest first (reverse alpha for date-based names)
+  // Sort: directories first (shallow before deep to ensure parents exist in nodeMap),
+  // then newest first (reverse alpha for date-based names)
   const sortedFiles = [...files].sort((a, b) => {
     if (a.is_directory !== b.is_directory) {
       return a.is_directory ? -1 : 1
+    }
+    // For directories, sort shallow-first so parents are processed before children
+    if (a.is_directory && b.is_directory) {
+      const depthA = a.path.split('/').length
+      const depthB = b.path.split('/').length
+      if (depthA !== depthB) return depthA - depthB
     }
     // Reverse sort so newest dates appear first
     return b.path.localeCompare(a.path)
@@ -159,14 +179,18 @@ export function FileTree({
 }: FileTreeProps) {
   const [files, setFiles] = useState<FileNode[]>([])
   const [expanded, setExpanded] = useState<Set<string>>(() => {
-    // Auto-expand Daily-Notes, current year, and current month folder on first load
+    // Auto-expand current year and month folders on first load (both structures)
     const now = new Date()
     const year = String(now.getFullYear())
-    const month = `${year}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    const monthStr = String(now.getMonth() + 1).padStart(2, '0')
     return new Set([
+      // Legacy Daily-Notes structure
       'Daily-Notes',
       `Daily-Notes/__year__/${year}`,
-      `Daily-Notes/${month}`,
+      `Daily-Notes/${year}-${monthStr}`,
+      // New YYYY/MM structure
+      year,
+      `${year}/${monthStr}`,
     ])
   })
   const [loading, setLoading] = useState(true)
@@ -345,6 +369,34 @@ export function FileTree({
     setRenamingFile(null)
   }, [])
 
+  // Drag and drop: move file to a new folder
+  const handleMoveFile = useCallback(
+    async (sourcePath: string, targetFolderPath: string) => {
+      const fileName = sourcePath.split('/').pop()
+      if (!fileName) return
+
+      const newPath = `${targetFolderPath}/${fileName}`
+      if (newPath === sourcePath) return
+
+      try {
+        const response = await fetch(`${apiBaseUrl}/vault/file`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ old_path: sourcePath, new_path: newPath }),
+        })
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}))
+          throw new Error(data.detail || 'Failed to move file')
+        }
+        await fetchFiles()
+        onRenameFile?.(sourcePath, newPath)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to move file')
+      }
+    },
+    [apiBaseUrl, fetchFiles, onRenameFile]
+  )
+
   // Close context menu on click outside or Escape
   useEffect(() => {
     if (!contextMenu) return
@@ -517,6 +569,7 @@ export function FileTree({
                     onToggle={handleToggle}
                     onSelect={handleSelect}
                     onContextMenu={handleContextMenu}
+                    onMoveFile={handleMoveFile}
                     isRenaming={renamingFile === node.path}
                     renameValue={renamingFile === node.path ? renameValue : undefined}
                     onRenameChange={setRenameValue}

@@ -78,17 +78,23 @@ async def get_month_data(
     # Format month with leading zero
     month_str = str(month).zfill(2)
 
-    # Get all daily note paths for this month
-    daily_notes_prefix = f"Daily-Notes/{year}-{month_str}"
+    # Get all daily note paths for this month via directory listing
+    import re as _re
+    from .settings import resolve_daily_note_path, get_daily_note_template
+    existing_notes: set[str] = set()
     try:
-        all_files = await storage.list(daily_notes_prefix)
-        existing_notes = {
-            f.split("/")[-1].replace(".md", "")
-            for f in all_files
-            if f.endswith(".md")
-        }
+        # Derive the month directory from the template for a fast directory listing
+        sample_path = resolve_daily_note_path(f"{year}-{month_str}-01")
+        month_prefix = "/".join(sample_path.split("/")[:-1])
+        all_files = await storage.list(month_prefix)
+        for f in all_files:
+            if not f.endswith(".md"):
+                continue
+            fname = f.split("/")[-1].removesuffix(".md").removesuffix("-daily-note")
+            if _re.match(r"\d{4}-\d{2}-\d{2}$", fname):
+                existing_notes.add(fname)
     except Exception:
-        existing_notes = set()
+        pass
 
     # Get activity counts from database for the month
     # Count extractions per day
@@ -204,8 +210,9 @@ async def create_or_get_daily_note(
         from fastapi import HTTPException
         raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
 
-    # Build the path
-    path = f"Daily-Notes/{year}-{month}/{request.date}.md"
+    # Build the path using configurable template
+    from .settings import resolve_daily_note_path
+    path = resolve_daily_note_path(request.date)
 
     # Check if the note already exists
     try:

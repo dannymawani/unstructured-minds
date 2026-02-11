@@ -460,19 +460,23 @@ def get_dashboard_summary(
     ), default=None)
 
     # Get last daily note date from extraction_log file paths
-    # Filter to files matching YYYY-MM-DD.md pattern to exclude non-note files
+    # Match both Daily-Notes/YYYY-MM/YYYY-MM-DD.md and YYYY/MM/YYYY-MM-DD-daily-note.md
+    import re as _re
     last_note_row = db.execute(
         """
         SELECT file_path FROM extraction_log
-        WHERE file_path LIKE '%Daily-Notes/%/____-__-__.md'
-          AND success = TRUE
+        WHERE success = TRUE
+          AND (file_path LIKE '%/____-__-__.md'
+               OR file_path LIKE '%/____-__-__-daily-note.md')
         ORDER BY file_path DESC
         LIMIT 1
         """
     ).fetchone()
     last_daily_note = None
     if last_note_row and last_note_row[0]:
-        last_daily_note = last_note_row[0].split('/')[-1].removesuffix('.md')
+        fname = last_note_row[0].split('/')[-1].removesuffix('.md').removesuffix('-daily-note')
+        if _re.match(r'\d{4}-\d{2}-\d{2}$', fname):
+            last_daily_note = fname
 
     # Calculate streak (consecutive days with activities ending today or yesterday)
     # Single query: fetch all distinct activity dates in the last year
