@@ -77,6 +77,7 @@ class SettingsResponse(BaseModel):
     api_key_set: bool
     theme: str
     daily_note_path_template: str
+    show_month_names: bool
 
 
 class SettingsUpdateRequest(BaseModel):
@@ -84,6 +85,7 @@ class SettingsUpdateRequest(BaseModel):
 
     theme: Optional[str] = None
     daily_note_path_template: Optional[str] = None
+    show_month_names: Optional[bool] = None
 
 
 class ThemeResponse(BaseModel):
@@ -111,6 +113,7 @@ def get_settings(request: Request) -> SettingsResponse:
         api_key_set=bool(settings.anthropic_api_key),
         theme=stored.get("theme", "dark"),
         daily_note_path_template=stored.get("daily_note_path_template", DEFAULT_DAILY_NOTE_TEMPLATE),
+        show_month_names=stored.get("show_month_names", False),
     )
 
 
@@ -138,6 +141,9 @@ def update_settings(request: Request, update: SettingsUpdateRequest) -> Settings
             raise HTTPException(status_code=400, detail="Template must contain {YYYY}, {MM}, and {DD}")
         stored["daily_note_path_template"] = tpl
 
+    if update.show_month_names is not None:
+        stored["show_month_names"] = update.show_month_names
+
     _save_settings(stored)
 
     claude = request.app.state.claude
@@ -149,6 +155,7 @@ def update_settings(request: Request, update: SettingsUpdateRequest) -> Settings
         api_key_set=bool(settings.anthropic_api_key),
         theme=stored.get("theme", "dark"),
         daily_note_path_template=stored.get("daily_note_path_template", DEFAULT_DAILY_NOTE_TEMPLATE),
+        show_month_names=stored.get("show_month_names", False),
     )
 
 
