@@ -1,5 +1,6 @@
 """API routes for vault file operations."""
 
+import logging
 import re
 from datetime import datetime
 
@@ -12,6 +13,9 @@ from ..middleware import validate_file_path, PathValidationError
 from ..middleware.validation import MAX_FILE_PATH_LENGTH, MAX_QUERY_LENGTH
 from ..storage import StorageBackend
 from ..templates.daily_note import render_daily_note
+from .settings import resolve_daily_note_path
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -91,6 +95,63 @@ class QuickCaptureResponse(BaseModel):
     success: bool
     path: str
     timestamp: str
+
+
+async def _add_also_worked_on(
+    storage: StorageBackend, file_path: str
+) -> None:
+    """Add a reference to a modified file in today's daily note.
+
+    Appends to an '## Also worked on' section at the bottom of the daily note.
+    Only adds if the file is not already referenced.
+    """
+    now = datetime.now()
+    date_str = now.strftime("%Y-%m-%d")
+    daily_path = resolve_daily_note_path(date_str)
+
+    # Don't add self-references
+    if file_path == daily_path:
+        return
+
+    # Check if daily note exists
+    if not await storage.exists(daily_path):
+        return
+
+    try:
+        content_bytes = await storage.read(daily_path)
+        content = content_bytes.decode("utf-8")
+
+        # Check if file is already referenced as a wikilink
+        if f"[[{file_path}]]" in content:
+            return
+
+        # Find or create "Also worked on" section
+        section_header = "## Also worked on"
+        if section_header in content:
+            # Append to existing section
+            idx = content.index(section_header) + len(section_header)
+            # Find end of line after header
+            newline_idx = content.index("\n", idx) if "\n" in content[idx:] else len(content)
+            entry = f"\n- [[{file_path}]]"
+            content = content[:newline_idx] + entry + content[newline_idx:]
+        else:
+            # Add new section at end
+            content = content.rstrip() + f"\n\n{section_header}\n- [[{file_path}]]\n"
+
+        await storage.write(daily_path, content.encode("utf-8"))
+    except Exception:
+        logger.debug("Failed to update daily note with 'also worked on' reference", exc_info=True)
+
+
+def _is_daily_note_path(file_path: str) -> bool:
+    """Check if a file path looks like a daily note."""
+    filename = file_path.split("/")[-1].replace(".md", "")
+    clean_name = re.sub(r"-daily-note$", "", filename)
+    try:
+        datetime.strptime(clean_name, "%Y-%m-%d")
+        return True
+    except ValueError:
+        return False
 
 
 def get_db(request: Request) -> DatabaseManager:
@@ -251,6 +312,13 @@ async def write_file(
             except Exception:
                 pass  # Extraction failure shouldn't fail the save
 
+            # Add "also worked on" reference for non-daily-note files
+            if not _is_daily_note_path(body.path):
+                try:
+                    await _add_also_worked_on(storage, body.path)
+                except Exception:
+                    pass
+
         return FileWriteResponse(path=body.path, success=True, extracted=did_extract)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -356,10 +424,9 @@ async def quick_capture(
     now = datetime.now()
     date_str = now.strftime("%Y-%m-%d")
     time_str = now.strftime("%H:%M")
-    year_month = now.strftime("%Y-%m")
 
-    # Build the file path: Daily-Notes/YYYY-MM/YYYY-MM-DD.md
-    file_path = f"Daily-Notes/{year_month}/{date_str}.md"
+    # Build the file path using configurable template
+    file_path = resolve_daily_note_path(date_str)
 
     # Format the quick note entry
     quick_note_entry = f"- {time_str} - {request.text}"

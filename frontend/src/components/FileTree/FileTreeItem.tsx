@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo, useRef, useEffect } from 'react'
+import { memo, useCallback, useMemo, useRef, useEffect, useState } from 'react'
 import { ChevronRight, ChevronDown, Folder, FileText } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -19,6 +19,7 @@ interface FileTreeItemProps {
   onToggle: (path: string) => void
   onSelect: (path: string) => void
   onContextMenu?: (e: React.MouseEvent, path: string) => void
+  onMoveFile?: (oldPath: string, newParentPath: string) => void
   isRenaming?: boolean
   renameValue?: string
   onRenameChange?: (value: string) => void
@@ -34,6 +35,7 @@ function FileTreeItemComponent({
   onToggle,
   onSelect,
   onContextMenu,
+  onMoveFile,
   isRenaming,
   renameValue,
   onRenameChange,
@@ -41,15 +43,18 @@ function FileTreeItemComponent({
   onRenameCancel,
 }: FileTreeItemProps) {
   const renameInputRef = useRef<HTMLInputElement>(null)
+  const [isDragOver, setIsDragOver] = useState(false)
 
   useEffect(() => {
     if (isRenaming && renameInputRef.current) {
       renameInputRef.current.focus()
-      // Select filename without extension
+      // Place cursor at end of filename (before extension) without selecting
       const dotIdx = (renameValue ?? '').lastIndexOf('.')
-      renameInputRef.current.setSelectionRange(0, dotIdx > 0 ? dotIdx : (renameValue ?? '').length)
+      const cursorPos = dotIdx > 0 ? dotIdx : (renameValue ?? '').length
+      renameInputRef.current.setSelectionRange(cursorPos, cursorPos)
     }
   }, [isRenaming, renameValue])
+
   const handleClick = useCallback(() => {
     if (node.isDirectory) {
       onToggle(node.path)
@@ -78,6 +83,54 @@ function FileTreeItemComponent({
     [node.isDirectory, node.path, onContextMenu]
   )
 
+  // Drag and drop handlers
+  const handleDragStart = useCallback(
+    (e: React.DragEvent) => {
+      if (node.isVirtual) {
+        e.preventDefault()
+        return
+      }
+      e.dataTransfer.setData('text/plain', node.path)
+      e.dataTransfer.effectAllowed = 'move'
+    },
+    [node.path, node.isVirtual]
+  )
+
+  const handleDragOver = useCallback(
+    (e: React.DragEvent) => {
+      if (!node.isDirectory || node.isVirtual) return
+      e.preventDefault()
+      e.dataTransfer.dropEffect = 'move'
+      setIsDragOver(true)
+    },
+    [node.isDirectory, node.isVirtual]
+  )
+
+  const handleDragLeave = useCallback(() => {
+    setIsDragOver(false)
+  }, [])
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault()
+      setIsDragOver(false)
+      if (!node.isDirectory || node.isVirtual) return
+
+      const sourcePath = e.dataTransfer.getData('text/plain')
+      if (!sourcePath || sourcePath === node.path) return
+
+      // Don't allow dropping into own parent (no-op)
+      const sourceParent = sourcePath.split('/').slice(0, -1).join('/')
+      if (sourceParent === node.path) return
+
+      // Prevent moving a folder into its own subtree
+      if (node.path.startsWith(sourcePath + '/')) return
+
+      onMoveFile?.(sourcePath, node.path)
+    },
+    [node.path, node.isDirectory, node.isVirtual, onMoveFile]
+  )
+
   // Memoize style to avoid object recreation on each render
   const style = useMemo(
     () => ({ paddingLeft: `${depth * 16 + 8}px` }),
@@ -92,9 +145,10 @@ function FileTreeItemComponent({
         'min-h-[44px] sm:min-h-[28px]',
         'hover:bg-accent rounded-sm',
         'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1',
-        selected && 'bg-accent text-accent-foreground'
+        selected && 'bg-accent text-accent-foreground',
+        isDragOver && 'bg-primary/20 ring-1 ring-primary'
       ),
-    [selected]
+    [selected, isDragOver]
   )
 
   return (
@@ -108,6 +162,11 @@ function FileTreeItemComponent({
       onClick={handleClick}
       onKeyDown={handleKeyDown}
       onContextMenu={handleContextMenu}
+      draggable={!node.isVirtual && !isRenaming}
+      onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
     >
       {node.isDirectory ? (
         <>
@@ -165,6 +224,7 @@ export const FileTreeItem = memo(FileTreeItemComponent, (prevProps, nextProps) =
     prevProps.onToggle === nextProps.onToggle &&
     prevProps.onSelect === nextProps.onSelect &&
     prevProps.onContextMenu === nextProps.onContextMenu &&
+    prevProps.onMoveFile === nextProps.onMoveFile &&
     prevProps.isRenaming === nextProps.isRenaming &&
     prevProps.renameValue === nextProps.renameValue
   )

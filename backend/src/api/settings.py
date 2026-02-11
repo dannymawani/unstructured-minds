@@ -7,6 +7,10 @@ from typing import Optional
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
+from datetime import datetime as dt
+
+from fastapi import HTTPException
+
 from ..config import settings
 
 
@@ -15,6 +19,34 @@ router = APIRouter(prefix="/settings", tags=["settings"])
 
 # Settings file path
 SETTINGS_FILE = settings.data_path / "settings.json"
+
+# Default daily note path template: {YYYY}/{MM}/{YYYY}-{MM}-{DD}-daily-note
+DEFAULT_DAILY_NOTE_TEMPLATE = "{YYYY}/{MM}/{YYYY}-{MM}-{DD}-daily-note"
+
+
+def get_daily_note_template() -> str:
+    """Get the configured daily note path template."""
+    stored = _load_settings()
+    return stored.get("daily_note_path_template", DEFAULT_DAILY_NOTE_TEMPLATE)
+
+
+def resolve_daily_note_path(date_str: str, template: Optional[str] = None) -> str:
+    """Resolve a daily note path template for a given date.
+
+    Args:
+        date_str: Date in YYYY-MM-DD format
+        template: Path template (uses stored setting if None)
+
+    Returns:
+        Resolved file path with .md extension
+    """
+    if template is None:
+        template = get_daily_note_template()
+    date = dt.strptime(date_str, "%Y-%m-%d")
+    path = template.replace("{YYYY}", date.strftime("%Y"))
+    path = path.replace("{MM}", date.strftime("%m"))
+    path = path.replace("{DD}", date.strftime("%d"))
+    return path + ".md"
 
 
 def _load_settings() -> dict:
@@ -44,12 +76,14 @@ class SettingsResponse(BaseModel):
     claude_configured: bool
     api_key_set: bool
     theme: str
+    daily_note_path_template: str
 
 
 class SettingsUpdateRequest(BaseModel):
     """Request to update settings."""
 
     theme: Optional[str] = None
+    daily_note_path_template: Optional[str] = None
 
 
 class ThemeResponse(BaseModel):
@@ -76,6 +110,7 @@ def get_settings(request: Request) -> SettingsResponse:
         claude_configured=claude.is_configured if claude else False,
         api_key_set=bool(settings.anthropic_api_key),
         theme=stored.get("theme", "dark"),
+        daily_note_path_template=stored.get("daily_note_path_template", DEFAULT_DAILY_NOTE_TEMPLATE),
     )
 
 
@@ -94,6 +129,15 @@ def update_settings(request: Request, update: SettingsUpdateRequest) -> Settings
     if update.theme and update.theme in ["dark", "light"]:
         stored["theme"] = update.theme
 
+    if update.daily_note_path_template is not None:
+        tpl = update.daily_note_path_template
+        # Validate template: must contain date placeholders, no path traversal
+        if ".." in tpl or tpl.startswith("/"):
+            raise HTTPException(status_code=400, detail="Invalid template: path traversal not allowed")
+        if not all(p in tpl for p in ["{YYYY}", "{MM}", "{DD}"]):
+            raise HTTPException(status_code=400, detail="Template must contain {YYYY}, {MM}, and {DD}")
+        stored["daily_note_path_template"] = tpl
+
     _save_settings(stored)
 
     claude = request.app.state.claude
@@ -104,6 +148,7 @@ def update_settings(request: Request, update: SettingsUpdateRequest) -> Settings
         claude_configured=claude.is_configured if claude else False,
         api_key_set=bool(settings.anthropic_api_key),
         theme=stored.get("theme", "dark"),
+        daily_note_path_template=stored.get("daily_note_path_template", DEFAULT_DAILY_NOTE_TEMPLATE),
     )
 
 

@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from ..db import DatabaseManager
 from ..storage import StorageBackend
+from .settings import resolve_daily_note_path
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -348,10 +349,9 @@ async def create_task(
     """Create a new task. Adds to DuckDB and appends to today's daily note."""
     now = datetime.now()
     date_str = now.strftime("%Y-%m-%d")
-    year_month = now.strftime("%Y-%m")
     task_id = f"{now.strftime('%Y%m%d')}_{uuid.uuid4().hex[:8]}"
 
-    daily_note_path = f"Daily-Notes/{year_month}/{date_str}.md"
+    daily_note_path = resolve_daily_note_path(date_str)
 
     # Insert into DuckDB
     db.execute(

@@ -213,6 +213,7 @@ class ExtractionPipeline:
         """Try to extract date from file path.
 
         Expects format like Daily-Notes/YYYY-MM/YYYY-MM-DD.md
+        or YYYY/MM/YYYY-MM-DD-daily-note.md
 
         Args:
             file_path: Path to the file
@@ -224,14 +225,49 @@ class ExtractionPipeline:
         parts = file_path.replace("\\", "/").split("/")
         filename = parts[-1].replace(".md", "")
 
-        # Check if filename is a date
+        # Strip known suffixes like -daily-note
+        clean_name = re.sub(r"-daily-note$", "", filename)
+
+        # Check if filename (or cleaned name) is a date
+        for name in [filename, clean_name]:
+            try:
+                datetime.strptime(name, "%Y-%m-%d")
+                return name
+            except ValueError:
+                pass
+
+        return None
+
+    def _is_daily_note(self, file_path: str) -> bool:
+        """Check if a file is a daily note based on path patterns.
+
+        Daily notes match patterns like:
+        - Daily-Notes/YYYY-MM/YYYY-MM-DD.md
+        - YYYY/MM/YYYY-MM-DD-daily-note.md
+        - Any file whose name (minus extension and -daily-note suffix) is a valid date
+
+        Args:
+            file_path: Path to the file
+
+        Returns:
+            True if the file is a daily note
+        """
+        parts = file_path.replace("\\", "/").split("/")
+        filename = parts[-1].replace(".md", "")
+
+        # Check known daily note directory prefixes
+        if file_path.startswith("Daily-Notes/"):
+            return True
+
+        # Check if filename contains a date pattern (with optional suffix)
+        clean_name = re.sub(r"-daily-note$", "", filename)
         try:
-            datetime.strptime(filename, "%Y-%m-%d")
-            return filename
+            datetime.strptime(clean_name, "%Y-%m-%d")
+            return True
         except ValueError:
             pass
 
-        return None
+        return False
 
     def _generate_id(self) -> str:
         """Generate a unique ID.
@@ -677,7 +713,7 @@ class ExtractionPipeline:
                         date, data["activities"], file_path
                     )
 
-                if data.get("tasks"):
+                if data.get("tasks") and self._is_daily_note(file_path):
                     records_inserted["tasks"] = self._store_tasks(
                         date, data["tasks"], file_path
                     )
