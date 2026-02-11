@@ -67,7 +67,7 @@ class TestDailyNoteSkill:
         result = await skill.execute(context)
 
         assert result.success
-        assert result.file_path == "Daily-Notes/2026-02/2026-02-02.md"
+        assert result.file_path == "2026/02/2026-02-02-daily-note.md"
         mock_storage.write.assert_called_once()
         content = mock_storage.write.call_args[0][1].decode("utf-8")
         assert "## 🎯 Today's Focus" in content
@@ -186,7 +186,7 @@ class TestSkillsAPI:
         assert response.status_code == 200
         data = response.json()
         assert data["success"]
-        assert "Daily-Notes/2026-02/2026-02-02.md" in data["file_path"]
+        assert "2026/02/2026-02-02-daily-note.md" in data["file_path"]
 
     def test_execute_unknown_skill(self, client):
         """Test error when executing unknown skill."""

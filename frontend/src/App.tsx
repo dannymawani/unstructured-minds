@@ -1,4 +1,4 @@
-import { useCallback, useMemo, lazy, Suspense } from 'react'
+import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react'
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { FileTree } from '@/components/FileTree'
@@ -57,10 +57,34 @@ function ViewLoadingFallback() {
 
 type View = 'editor' | 'dashboard' | 'kanban' | 'calendar' | 'profile'
 
+const DEFAULT_DAILY_NOTE_TEMPLATE = '{YYYY}/{MM}/{YYYY}-{MM}-{DD}-daily-note'
+
+function resolveDailyNotePath(template: string, date: Date): string {
+  const year = date.getFullYear().toString()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return template
+    .replace(/\{YYYY\}/g, year)
+    .replace(/\{MM\}/g, month)
+    .replace(/\{DD\}/g, day) + '.md'
+}
+
 function App() {
   const navigate = useNavigate()
   const location = useLocation()
   const { theme, toggleTheme, setTheme } = useTheme()
+
+  // Fetch daily note path template from settings
+  const [dailyNoteTemplate, setDailyNoteTemplate] = useState(DEFAULT_DAILY_NOTE_TEMPLATE)
+  useEffect(() => {
+    api.get<{ daily_note_path_template: string }>('/settings')
+      .then(data => {
+        if (data.daily_note_path_template) {
+          setDailyNoteTemplate(data.daily_note_path_template)
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   const view: View = useMemo(() => {
     const path = location.pathname.replace(/^\//, '')
@@ -94,7 +118,7 @@ function App() {
     const month = String(today.getMonth() + 1).padStart(2, '0')
     const day = String(today.getDate()).padStart(2, '0')
     const dateStr = `${year}-${month}-${day}`
-    const dailyNotePath = `Daily-Notes/${year}-${month}/${dateStr}.md`
+    const dailyNotePath = resolveDailyNotePath(dailyNoteTemplate, today)
 
     let isNewNote = false
     try {
@@ -115,7 +139,7 @@ function App() {
       navigate(`/editor?file=${encodeURIComponent(dailyNotePath)}`)
       file.setSelectedFile(dailyNotePath)
     }
-  }, [file, navigate, ui])
+  }, [file, navigate, ui, dailyNoteTemplate])
 
   const handleFileSelect = useCallback(async (path: string) => {
     await file.handleFileSelect(path)
@@ -130,8 +154,9 @@ function App() {
   }, [file, navigate])
 
   const handleCalendarDaySelect = useCallback(async (date: string, hasNote: boolean) => {
-    const [year, month] = date.split('-')
-    const dailyNotePath = `Daily-Notes/${year}-${month}/${date}.md`
+    const [yearStr, monthStr, dayStr] = date.split('-')
+    const dateObj = new Date(parseInt(yearStr), parseInt(monthStr) - 1, parseInt(dayStr))
+    const dailyNotePath = resolveDailyNotePath(dailyNoteTemplate, dateObj)
     if (!hasNote) {
       try { await api.post(`/calendar/daily-note`, { date }) } catch (err) { console.error('Error creating daily note:', err) }
     }
@@ -146,7 +171,7 @@ function App() {
       file.setSelectedFile(dailyNotePath)
       navigate(`/editor?file=${encodeURIComponent(dailyNotePath)}`)
     }
-  }, [file, navigate, ui])
+  }, [file, navigate, ui, dailyNoteTemplate])
 
   const commands = useMemo(() => createDefaultCommands({
     onSave: file.handleSave, onToggleSidebar: ui.toggleSidebar, onCreateDailyNote: createDailyNote,

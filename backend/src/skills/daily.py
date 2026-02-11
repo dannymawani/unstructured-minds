@@ -3,6 +3,7 @@
 import logging
 from datetime import datetime
 
+from ..api.settings import resolve_daily_note_path
 from ..templates.daily_note import render_daily_note
 from .base import Skill, SkillContext, SkillResult
 
@@ -46,9 +47,8 @@ class DailyNoteSkill(Skill):
 
         date_str = date.strftime("%Y-%m-%d")
 
-        # Build the file path: Daily-Notes/YYYY-MM/YYYY-MM-DD.md
-        year_month = date.strftime("%Y-%m")
-        file_path = f"Daily-Notes/{year_month}/{date_str}.md"
+        # Build the file path using configurable template
+        file_path = resolve_daily_note_path(date_str)
 
         # Check if file already exists
         if await context.storage.exists(file_path):
