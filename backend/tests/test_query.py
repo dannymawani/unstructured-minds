@@ -150,7 +150,8 @@ class TestQueryEndpoint:
         mock_db.execute = MagicMock(return_value=mock_result)
 
         with patch.object(app.state, "claude", mock_claude), \
-             patch.object(app.state, "db", mock_db):
+             patch.object(app.state, "db", mock_db), \
+             patch.object(app.state, "analytics_db", mock_db):
             response = client.post(
                 "/query/natural",
                 json={"question": "How much sleep did I get?"},

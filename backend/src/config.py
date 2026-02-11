@@ -38,6 +38,16 @@ class Settings(BaseSettings):
     # Claude API (optional)
     anthropic_api_key: Optional[str] = None
 
+    # Cloud mode: explicit flag + Postgres connection string
+    use_cloud: bool = False
+    database_url: Optional[str] = None
+    default_user_id: str = "00000000-0000-0000-0000-000000000001"
+
+    @property
+    def is_cloud_mode(self) -> bool:
+        """True when USE_CLOUD=true and DATABASE_URL is set."""
+        return self.use_cloud and self.database_url is not None
+
     @property
     def duckdb_path(self) -> Path:
         """Path to DuckDB database file."""

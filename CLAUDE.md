@@ -40,7 +40,7 @@ Markdown Note → Claude Extraction → DuckDB → Natural Language Query
 |-----------|------------|
 | Frontend | React 19 + Milkdown (pure web app) |
 | Backend | Python >=3.12 + FastAPI |
-| Database | DuckDB 1.4 |
+| Database | DuckDB 1.4 (local) / Supabase Postgres (hybrid/cloud) |
 | AI | Claude API (Haiku 4.5 for extraction, Sonnet 4.5 for queries) |
 | Deployment | Docker Compose |
 
@@ -55,16 +55,49 @@ Markdown Note → Claude Extraction → DuckDB → Natural Language Query
 
 ### Data Storage Structure
 ```
-data/
-├── unstructured.duckdb           # Main database (all extracted data)
-├── settings.json                 # User preferences
-├── schemas/*.json                # Schema definitions for extraction
-├── exercise_definitions.json     # Exercise name aliases and muscle groups
-├── training_config.json          # Athlete profile, recovery targets
-└── injury_config.json            # Active injuries and constraints
+shared/                               # Checked into git, same for all users
+├── exercise_definitions.json         # Exercise name aliases and muscle groups
+└── schemas/                          # Built-in extraction schemas
+    ├── daily_metrics.json
+    ├── daily_tasks.json
+    ├── exercise_log.json
+    └── food_log.json
+
+data/                                 # Per-instance, gitignored
+├── unstructured.duckdb               # Main database (local/DuckDB mode only)
+├── settings.json                     # User preferences (local mode)
+├── life_profile.json                 # User profile (local mode)
+├── training_config.json              # Athlete profile (local mode)
+└── ai_exercise_cache.json            # AI classification cache (local mode)
 ```
 
-> **Note:** Extracted data lives in DuckDB tables. Config/reference files (exercise definitions, training profile, injuries) stay as JSON for easy hand-editing and git tracking.
+> **Note:** In cloud mode, per-user settings (settings, life_profile, training_config, ai_exercise_cache) are stored in the Postgres `user_settings` table instead of JSON files. Vault files are stored in the `vault_files` table.
+
+### Two-Mode Architecture
+
+| Mode | Trigger | Description |
+|------|---------|-------------|
+| **Local** (default) | `USE_CLOUD=false` | DuckDB file + local filesystem. Zero external deps. |
+| **Cloud** | `USE_CLOUD=true` + `DATABASE_URL` | Postgres (source of truth) + in-memory DuckDB (analytics cache) + `vault_files` table (markdown storage) |
+
+Configuration env vars: `ANTHROPIC_API_KEY` + `USE_CLOUD` + `DATABASE_URL` (when cloud).
+
+### Cloud Setup & Migration
+
+To set up or reset the cloud Postgres database (schemas + all data):
+
+```bash
+# Full setup: schemas + vault + DuckDB data + JSON settings
+cd backend && python3 -m scripts.setup_cloud
+
+# Wipe and rebuild from scratch
+cd backend && python3 -m scripts.setup_cloud --drop-first
+
+# Schemas only (no data)
+cd backend && python3 -m scripts.setup_cloud --skip-seed
+```
+
+Or use the `/setup-cloud` skill.
 
 ### DuckDB Notes
 

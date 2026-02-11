@@ -20,6 +20,8 @@ def test_settings(tmp_path: Path):
         mock_settings.debug = False
         mock_settings.anthropic_api_key = "test-key"
         mock_settings.claude_enabled = True
+        mock_settings.database_url = None
+        mock_settings.is_cloud_mode = False
 
         mock_settings.vault_path.mkdir(parents=True, exist_ok=True)
         mock_settings.data_path.mkdir(parents=True, exist_ok=True)
