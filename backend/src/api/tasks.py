@@ -74,6 +74,32 @@ class BulkCompleteResponse(BaseModel):
     updated: int
 
 
+class RolloverTaskOut(BaseModel):
+    id: str
+    date: str
+    description: str
+    status: str
+    category: Optional[str] = None
+    priority: Optional[int] = None
+    deadline: Optional[str] = None
+    deadline_status: Optional[str] = None  # "overdue" | "due_today" | "upcoming" | None
+    auto_select: bool = False  # True for in_progress + overdue/due_today
+
+
+class RolloverResponse(BaseModel):
+    tasks: list[RolloverTaskOut]
+    total: int
+
+
+class RolloverCommitRequest(BaseModel):
+    task_ids: list[str]
+    new_source_file: str
+
+
+class RolloverCommitResponse(BaseModel):
+    updated: int
+
+
 # =============================================================================
 # Helpers
 # =============================================================================
@@ -276,6 +302,122 @@ async def list_tasks(
 
     tasks = [_row_to_task(row, columns) for row in rows]
     return TaskListResponse(tasks=tasks, total=total)
+
+
+@router.get("/rollover", response_model=RolloverResponse)
+async def get_rollover_tasks(
+    target_date: str = Query(..., description="Target date for the new daily note (YYYY-MM-DD)"),
+    db: DatabaseManager = Depends(get_db),
+    user_id: str = Depends(get_user_id),
+) -> RolloverResponse:
+    """Get incomplete tasks from the last 14 days eligible for rollover."""
+    dialect = get_dialect(db)
+    ph = placeholder(dialect)
+
+    try:
+        target = date.fromisoformat(target_date)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
+
+    window_start = (target - timedelta(days=14)).isoformat()
+
+    conditions: list[str] = [
+        f"status IN ('backlog', 'in_progress')",
+        f"date >= {ph}",
+        f"date < {ph}",
+    ]
+    params: list = [window_start, target_date]
+    user_filter(dialect, user_id, conditions, params)
+    where = " AND ".join(conditions)
+
+    result = db.execute(
+        f"SELECT * FROM tasks WHERE {where} ORDER BY date DESC, id",
+        params,
+    )
+    columns = [desc[0] for desc in result.description]
+    rows = result.fetchall()
+
+    today = target
+    rollover_tasks: list[RolloverTaskOut] = []
+    for row in rows:
+        data = dict(zip(columns, row))
+        deadline_status = None
+        auto_select = False
+
+        if data.get("deadline"):
+            try:
+                dl = date.fromisoformat(str(data["deadline"]))
+                if dl < today:
+                    deadline_status = "overdue"
+                elif dl == today:
+                    deadline_status = "due_today"
+                else:
+                    deadline_status = "upcoming"
+            except ValueError:
+                pass
+
+        if data.get("status") == "in_progress":
+            auto_select = True
+        if deadline_status in ("overdue", "due_today"):
+            auto_select = True
+
+        rollover_tasks.append(RolloverTaskOut(
+            id=data["id"],
+            date=str(data["date"]),
+            description=data["description"],
+            status=data.get("status", "backlog"),
+            category=data.get("category"),
+            priority=data.get("priority"),
+            deadline=str(data["deadline"]) if data.get("deadline") else None,
+            deadline_status=deadline_status,
+            auto_select=auto_select,
+        ))
+
+    # Sort: overdue first, then due_today, then in_progress, then backlog by date desc
+    status_order = {"overdue": 0, "due_today": 1, "upcoming": 3, None: 3}
+
+    def sort_key(t: RolloverTaskOut):
+        dl_order = status_order.get(t.deadline_status, 3)
+        status_boost = 0 if t.status == "in_progress" else 1
+        return (dl_order, status_boost, t.date)
+
+    rollover_tasks.sort(key=sort_key)
+
+    return RolloverResponse(tasks=rollover_tasks, total=len(rollover_tasks))
+
+
+@router.post("/rollover", response_model=RolloverCommitResponse)
+async def commit_rollover_tasks(
+    request: RolloverCommitRequest,
+    db: DatabaseManager = Depends(get_db),
+    user_id: str = Depends(get_user_id),
+) -> RolloverCommitResponse:
+    """Update source_file for rolled-over tasks to point to the new daily note."""
+    if not request.task_ids:
+        return RolloverCommitResponse(updated=0)
+
+    dialect = get_dialect(db)
+    ph = placeholder(dialect)
+
+    id_placeholders = ", ".join(ph for _ in request.task_ids)
+    conditions = [f"id IN ({id_placeholders})"]
+    params: list = list(request.task_ids)
+    user_filter(dialect, user_id, conditions, params)
+    where = " AND ".join(conditions)
+
+    count_result = db.execute(f"SELECT COUNT(*) FROM tasks WHERE {where}", params)
+    count = count_result.fetchone()[0]
+
+    if count > 0:
+        update_params: list = [request.new_source_file] + list(request.task_ids)
+        update_conds = [f"id IN ({id_placeholders})"]
+        user_filter(dialect, user_id, update_conds, update_params)
+        db.execute(
+            f"UPDATE tasks SET source_file = {ph} WHERE {' AND '.join(update_conds)}",
+            update_params,
+        )
+
+    return RolloverCommitResponse(updated=count)
 
 
 @router.get("/{task_id}", response_model=TaskOut)
