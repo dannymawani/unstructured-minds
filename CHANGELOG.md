@@ -7,8 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Dashboard improvements: nutrition tracking, activity heatmap redesign, mood correlations
-- Add task rollover to daily note wizard — carry forward incomplete tasks from last 14 days with deadline-aware formatting
+## [v0.8.0] - 2026-02-13
+
+### Added
+- Add task rollover to daily note wizard — carry forward incomplete tasks from the last 14 days with deadline-aware formatting, auto-select for overdue/in-progress tasks, and immediate source_file sync
+- Add nutrition tracking tile to dashboard with calorie and macro breakdowns
+- Add mood correlation chart comparing mood against sleep, energy, and exercise
+
+### Changed
+- Redesign activity heatmap with improved layout and week number labels
+- Improve weekly activity chart with stacked exercise categories
 
 ## [v0.7.0] - 2026-02-13
 
