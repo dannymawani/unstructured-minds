@@ -15,6 +15,8 @@ Natural language notes → structured, queryable data via Claude + DuckDB/Postgr
 
 ## Architecture
 
+For the full system reference (all endpoints, DB schemas, component inventory, env vars, auth flow, Docker config), see the `system-architecture` skill. The sections below are the essentials.
+
 ### Two Modes
 
 | Mode | Trigger | Storage |
@@ -95,6 +97,33 @@ Stage specific files (`git add <files>`), not `git add .`. Check with `git diff 
 - **macOS zsh**: Always quote URLs with single quotes in `curl` commands. Unquoted `?` and `&` trigger zsh globbing errors: `curl -s 'http://localhost:8000/endpoint?param=value'`
 - Use `python3` not `python` — only `python3` is on `PATH`.
 
+## Build Pipeline
+
+### Dev-time Type Checking
+
+`vite-plugin-checker` runs TypeScript checking in a worker thread during `npm run dev`. TS errors appear as a browser overlay — no more silent accumulation until `npm run build` fails.
+
+- `npm run dev` — dev server with live type checking overlay
+- `npm run typecheck` — standalone TS check (CI/manual use)
+- `npm run build` — runs `tsc -b && vite build` (production)
+
+### Docker Build Args
+
+`VITE_CLERK_PUBLISHABLE_KEY` must be a **build arg** (not runtime env) because Vite bakes `VITE_*` variables into the JS bundle at build time. The Dockerfile warns when it's empty (local mode works without it).
+
+### CSP Configuration
+
+Security headers (including CSP) live in `frontend/nginx/security-headers.conf`. This file is `include`d from `nginx.conf` in both the server block and the `location = /index.html` block (nginx doesn't inherit `add_header` from parent when child uses `add_header`). Update CSP in one place only.
+
+### Logo Assets
+
+| File | Purpose | Served from |
+|------|---------|-------------|
+| `um-icon.svg` | Favicon, PWA icon (brain only) | `frontend/public/` |
+| `um-logo.svg` | In-app branding (full logo) | `frontend/public/` |
+
+Source files in `assets/images/` use kebab-case to match web convention.
+
 ## CSS/UI
 
 One change at a time. Verify no regressions before the next edit.
@@ -102,6 +131,23 @@ One change at a time. Verify no regressions before the next edit.
 ## Brand
 
 See `brand-guidelines` skill. Quick ref: Teal `#14b8a6` (primary), Dark `#0f172a`, Light `#f8fafc`, Amber `#f59e0b`, Indigo `#6366f1` (links), Rose `#f43f5e` (errors).
+
+## Keeping Documentation Current
+
+After making **structural changes** to the codebase, update the `system-architecture` skill (`.claude/skills/system-architecture/skill.md`) to reflect the change. Structural changes include:
+
+- Adding/removing/renaming API endpoints or routers
+- Adding/removing/renaming frontend components, hooks, or views
+- Changing database tables, columns, or indexes
+- Adding/removing environment variables or config fields
+- Changing Docker services, volumes, or build configuration
+- Modifying auth flow, middleware stack, or dependency injection
+- Adding/removing dependencies (backend or frontend)
+- Changing storage backends or data file formats
+
+**How:** Edit the relevant section in the skill file directly. Keep it concise — match the existing style (tables, short descriptions, no prose). Don't rewrite the whole file; just patch the affected section.
+
+**Skip updates for:** Bug fixes, CSS tweaks, copy changes, test additions, or refactors that don't change the public interface.
 
 ---
 

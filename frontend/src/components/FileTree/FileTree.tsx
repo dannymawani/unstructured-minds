@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react'
 import { createPortal } from 'react-dom'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { Plus, FolderPlus, RefreshCw, FileText, CalendarDays, LayoutTemplate, ChevronDown, Trash2, Pencil, CaseSensitive, Hash } from 'lucide-react'
+import { Plus, FolderPlus, RefreshCw, FileText, CalendarDays, LayoutTemplate, ChevronDown, Trash2, Pencil, CaseSensitive } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { FileTreeItem, type FileNode } from './FileTreeItem'
 

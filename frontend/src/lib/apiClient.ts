@@ -2,9 +2,11 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 const CLERK_ENABLED = !!import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
 
 class ApiError extends Error {
-  constructor(public status: number, message: string) {
+  status: number
+  constructor(status: number, message: string) {
     super(message)
     this.name = 'ApiError'
+    this.status = status
   }
 }
 
