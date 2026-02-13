@@ -9,6 +9,7 @@ interface CorrelationEntry {
   mood: number | null;
   stress: number | null;
   activity_minutes: number | null;
+  calories: number | null;
 }
 
 interface CorrelationData {
@@ -19,6 +20,8 @@ interface CorrelationData {
     activity_mood: number | null;
     activity_energy: number | null;
     stress_mood: number | null;
+    calories_mood: number | null;
+    calories_energy: number | null;
   };
 }
 
@@ -27,23 +30,26 @@ interface MoodCorrelationProps {
   days?: number;
 }
 
-type MetricPair = 'sleep_mood' | 'sleep_energy' | 'activity_mood' | 'activity_energy' | 'stress_mood';
+type MetricPair = 'sleep_mood' | 'activity_mood' | 'calories_mood';
 
-const METRIC_PAIRS: { value: MetricPair; label: string; xKey: string; yKey: string; xLabel: string; yLabel: string }[] = [
-  { value: 'sleep_mood', label: 'Sleep vs Mood', xKey: 'sleep', yKey: 'mood', xLabel: 'Sleep (hrs)', yLabel: 'Mood' },
-  { value: 'sleep_energy', label: 'Sleep vs Energy', xKey: 'sleep', yKey: 'energy', xLabel: 'Sleep (hrs)', yLabel: 'Energy' },
-  { value: 'activity_mood', label: 'Activity vs Mood', xKey: 'activity', yKey: 'mood', xLabel: 'Activity (min)', yLabel: 'Mood' },
-  { value: 'activity_energy', label: 'Activity vs Energy', xKey: 'activity', yKey: 'energy', xLabel: 'Activity (min)', yLabel: 'Energy' },
-  { value: 'stress_mood', label: 'Stress vs Mood', xKey: 'stress', yKey: 'mood', xLabel: 'Stress', yLabel: 'Mood' },
+const METRIC_PAIRS: { value: MetricPair; label: string; xKey: string; xLabel: string; correlationKey: keyof CorrelationData['correlations'] }[] = [
+  { value: 'sleep_mood', label: 'Sleep', xKey: 'sleep', xLabel: 'Sleep (hrs)', correlationKey: 'sleep_mood' },
+  { value: 'activity_mood', label: 'Activity', xKey: 'activity', xLabel: 'Activity (min)', correlationKey: 'activity_mood' },
+  { value: 'calories_mood', label: 'Calories', xKey: 'calories', xLabel: 'Calories', correlationKey: 'calories_mood' },
 ];
+
+const FIELD_MAP: Record<string, keyof CorrelationEntry> = {
+  sleep: 'sleep_hours',
+  activity: 'activity_minutes',
+  calories: 'calories',
+};
 
 interface DataPoint {
   date: string;
   sleep: number;
-  energy: number;
   mood: number;
-  stress: number;
   activity: number;
+  calories: number;
 }
 
 function getCorrelationColor(correlation: number | null): string {
@@ -55,7 +61,7 @@ function getCorrelationColor(correlation: number | null): string {
 }
 
 function getCorrelationLabel(correlation: number | null): string {
-  if (correlation === null) return 'No data';
+  if (correlation === null) return 'Insufficient data';
   const abs = Math.abs(correlation);
   const direction = correlation > 0 ? 'positive' : 'negative';
   if (abs < 0.3) return `Weak ${direction}`;
@@ -83,38 +89,37 @@ export function MoodCorrelation({
 
   useEffect(() => {
     cachedFetch<CorrelationData>(`${apiUrl}/dashboard/correlation?days=${days}`)
-      .then(setData)
+      .then((d) => {
+        setData(d);
+        // Auto-select first pair with enough data points
+        const best = METRIC_PAIRS.find((p) => {
+          const xF = FIELD_MAP[p.xKey];
+          return d.entries.filter((e) => e[xF] !== null && e.mood !== null).length >= 3;
+        });
+        if (best) setSelectedPair(best.value);
+      })
       .catch((err) => setError(err instanceof Error ? err.message : 'Unknown error'))
       .finally(() => setLoading(false));
   }, [apiUrl, days]);
 
+  const currentPair = METRIC_PAIRS.find((p) => p.value === selectedPair) ?? METRIC_PAIRS[0];
+
   const chartDataPoints: DataPoint[] = useMemo(() => {
     if (!data) return [];
-    const pair = METRIC_PAIRS.find((p) => p.value === selectedPair)!;
-    // Map pair keys back to entry field names
-    const fieldMap: Record<string, keyof CorrelationEntry> = {
-      sleep: 'sleep_hours',
-      energy: 'energy',
-      mood: 'mood',
-      stress: 'stress',
-      activity: 'activity_minutes',
-    };
-    const xField = fieldMap[pair.xKey];
-    const yField = fieldMap[pair.yKey];
+    const xField = FIELD_MAP[currentPair.xKey];
     return data.entries
-      .filter((e) => e[xField] !== null && e[yField] !== null)
+      .filter((e) => e[xField] !== null && e.mood !== null)
       .map((e) => ({
         date: e.date,
         sleep: e.sleep_hours || 0,
-        energy: e.energy || 0,
         mood: e.mood || 0,
-        stress: e.stress || 0,
         activity: e.activity_minutes || 0,
+        calories: e.calories || 0,
       }));
-  }, [data, selectedPair]);
+  }, [data, currentPair]);
 
-  const currentPair = METRIC_PAIRS.find((p) => p.value === selectedPair)!;
-  const correlation = data?.correlations[selectedPair] ?? null;
+  const correlation = data?.correlations[currentPair.correlationKey] ?? null;
+  const hasEnoughData = chartDataPoints.length >= 3;
 
   if (loading) {
     return (
@@ -130,31 +135,36 @@ export function MoodCorrelation({
     );
   }
 
-  if (!data || chartDataPoints.length < 3) {
+  if (!data || data.entries.length === 0) {
     return (
       <div className="bg-card rounded-md shadow-sm p-4" data-testid="correlation-empty">
         <div className="flex items-center gap-2 mb-2">
           <Brain className="w-5 h-5 text-purple-400" />
           <h3 className="text-lg font-semibold text-foreground">Mood Correlations</h3>
         </div>
-        <p className="text-muted-foreground">Need at least 3 days of data to show correlations.</p>
+        <p className="text-muted-foreground">No data available yet. Start logging daily metrics to see mood correlations.</p>
       </div>
     );
   }
 
-  const xValues = chartDataPoints.map((d) => d[currentPair.xKey as keyof DataPoint] as number);
-  const yValues = chartDataPoints.map((d) => d[currentPair.yKey as keyof DataPoint] as number);
+  // Compute chart scales — use safe defaults when no data points for selected pair
+  const hasPoints = chartDataPoints.length > 0;
+  const xValues = hasPoints ? chartDataPoints.map((d) => d[currentPair.xKey as keyof DataPoint] as number) : [0];
+  const yValues = hasPoints ? chartDataPoints.map((d) => d.mood) : [0];
   const xMin = Math.min(...xValues);
   const xMax = Math.max(...xValues);
   const xPadding = (xMax - xMin) * 0.1 || 1;
   const scaleXMin = Math.max(0, xMin - xPadding);
   const scaleXMax = xMax + xPadding;
+
   const yMin = 0;
   const yMax = 10;
-  const yAvg = yValues.reduce((a, b) => a + b, 0) / yValues.length;
+  const yAvg = hasPoints ? yValues.reduce((a, b) => a + b, 0) / yValues.length : 5;
 
   function scaleX(val: number) {
-    return PAD.l + ((val - scaleXMin) / (scaleXMax - scaleXMin)) * plotW;
+    const range = scaleXMax - scaleXMin;
+    if (range === 0) return PAD.l + plotW / 2;
+    return PAD.l + ((val - scaleXMin) / range) * plotW;
   }
   function scaleY(val: number) {
     return PAD.t + plotH - ((val - yMin) / (yMax - yMin)) * plotH;
@@ -224,29 +234,40 @@ export function MoodCorrelation({
 
           {/* Y-axis label */}
           <text x="8" y={PAD.t + plotH / 2} fill="#71717a" fontSize="8" textAnchor="middle"
-            transform={`rotate(-90, 8, ${PAD.t + plotH / 2})`}>{currentPair.yLabel}</text>
+            transform={`rotate(-90, 8, ${PAD.t + plotH / 2})`}>Mood</text>
           {/* X-axis label */}
           <text x={PAD.l + plotW / 2} y={H - 2} fill="#71717a" fontSize="8" textAnchor="middle">{currentPair.xLabel}</text>
 
-          {/* Y average reference line */}
-          <line x1={PAD.l} x2={W - PAD.r} y1={scaleY(yAvg)} y2={scaleY(yAvg)}
-            stroke="#8b5cf6" strokeWidth="0.8" strokeDasharray="4 3" />
+          {hasPoints && (
+            <>
+              {/* Y average reference line */}
+              <line x1={PAD.l} x2={W - PAD.r} y1={scaleY(yAvg)} y2={scaleY(yAvg)}
+                stroke="#8b5cf6" strokeWidth="0.8" strokeDasharray="4 3" />
 
-          {/* Scatter dots */}
-          {chartDataPoints.map((d, i) => {
-            const cx = scaleX(d[currentPair.xKey as keyof DataPoint] as number);
-            const cy = scaleY(d[currentPair.yKey as keyof DataPoint] as number);
-            return (
-              <g key={i}>
-                <circle cx={cx} cy={cy} r={hovered === i ? 7 : 5} fill={dotColor(d.mood)}
-                  stroke={hovered === i ? '#fff' : 'none'} strokeWidth="2"
-                  style={{ cursor: 'pointer', transition: 'r 0.15s' }}
-                  onMouseEnter={() => setHovered(i)}
-                  onMouseLeave={() => setHovered(null)}
-                />
-              </g>
-            );
-          })}
+              {/* Scatter dots */}
+              {chartDataPoints.map((d, i) => {
+                const cx = scaleX(d[currentPair.xKey as keyof DataPoint] as number);
+                const cy = scaleY(d.mood);
+                return (
+                  <g key={i}>
+                    <circle cx={cx} cy={cy} r={hovered === i ? 7 : 5} fill={dotColor(d.mood)}
+                      stroke={hovered === i ? '#fff' : 'none'} strokeWidth="2"
+                      style={{ cursor: 'pointer', transition: 'r 0.15s' }}
+                      onMouseEnter={() => setHovered(i)}
+                      onMouseLeave={() => setHovered(null)}
+                    />
+                  </g>
+                );
+              })}
+            </>
+          )}
+
+          {/* Empty chart message */}
+          {!hasPoints && (
+            <text x={PAD.l + plotW / 2} y={PAD.t + plotH / 2} fill="#71717a" fontSize="10" textAnchor="middle">
+              No {currentPair.label.toLowerCase()} data logged yet
+            </text>
+          )}
         </svg>
 
         {/* Tooltip */}
@@ -255,24 +276,26 @@ export function MoodCorrelation({
             className="absolute pointer-events-none bg-popover text-popover-foreground rounded-md shadow-lg border border-border px-3 py-2 text-xs z-10"
             style={{
               left: `${(scaleX(hoveredPoint[currentPair.xKey as keyof DataPoint] as number) / W) * 100}%`,
-              top: `${(scaleY(hoveredPoint[currentPair.yKey as keyof DataPoint] as number) / H) * 100}%`,
+              top: `${(scaleY(hoveredPoint.mood) / H) * 100}%`,
               transform: 'translate(-50%, -120%)',
             }}
           >
             <div className="font-medium text-foreground mb-1">
               {new Date(hoveredPoint.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
             </div>
-            <div className="text-muted-foreground">Sleep: {hoveredPoint.sleep.toFixed(1)} hrs</div>
-            <div className="text-muted-foreground">Energy: {hoveredPoint.energy}/10</div>
             <div className="text-muted-foreground">Mood: {hoveredPoint.mood}/10</div>
-            <div className="text-muted-foreground">Stress: {hoveredPoint.stress}/10</div>
-            {hoveredPoint.activity > 0 && <div className="text-muted-foreground">Activity: {hoveredPoint.activity} min</div>}
+            {currentPair.xKey === 'sleep' && <div className="text-muted-foreground">Sleep: {hoveredPoint.sleep.toFixed(1)} hrs</div>}
+            {currentPair.xKey === 'activity' && <div className="text-muted-foreground">Activity: {hoveredPoint.activity} min</div>}
+            {currentPair.xKey === 'calories' && <div className="text-muted-foreground">Calories: {hoveredPoint.calories}</div>}
           </div>
         )}
       </div>
 
       <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
-        <span>{chartDataPoints.length} data points</span>
+        <span>
+          {chartDataPoints.length} data point{chartDataPoints.length !== 1 ? 's' : ''}
+          {!hasEnoughData && chartDataPoints.length > 0 && ' (need 3+ for correlation)'}
+        </span>
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1">
             <span className="w-2 h-2 rounded-full bg-green-500" /> Good mood

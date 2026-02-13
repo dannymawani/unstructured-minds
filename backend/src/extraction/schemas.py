@@ -152,7 +152,13 @@ FOOD_LOG_SCHEMA: dict[str, Any] = {
     "properties": {
         "meals": {
             "type": "array",
-            "description": "List of meals/food entries",
+            "description": (
+                "List of meals/food entries. For EVERY meal, you MUST estimate "
+                "calories and macronutrients (protein, carbs, fat) based on the "
+                "food description, even if the user did not provide numbers. "
+                "Use your nutritional knowledge to provide reasonable estimates "
+                "for typical serving sizes."
+            ),
             "items": {
                 "type": "object",
                 "properties": {
@@ -167,30 +173,43 @@ FOOD_LOG_SCHEMA: dict[str, Any] = {
                     },
                     "description": {
                         "type": "string",
-                        "description": "What was eaten",
+                        "description": "What was eaten — include all items mentioned",
                     },
                     "calories": {
                         "type": "integer",
-                        "description": "Estimated calories",
+                        "description": (
+                            "Total estimated calories for this meal. "
+                            "ALWAYS provide an estimate even if the user didn't specify — "
+                            "use standard nutritional data for typical serving sizes."
+                        ),
                     },
                     "protein_g": {
                         "type": "integer",
-                        "description": "Protein in grams",
+                        "description": (
+                            "Estimated protein in grams. "
+                            "ALWAYS estimate based on the foods described."
+                        ),
                     },
                     "carbs_g": {
                         "type": "integer",
-                        "description": "Carbohydrates in grams",
+                        "description": (
+                            "Estimated carbohydrates in grams. "
+                            "ALWAYS estimate based on the foods described."
+                        ),
                     },
                     "fat_g": {
                         "type": "integer",
-                        "description": "Fat in grams",
+                        "description": (
+                            "Estimated fat in grams. "
+                            "ALWAYS estimate based on the foods described."
+                        ),
                     },
                     "notes": {
                         "type": "string",
                         "description": "Additional notes",
                     },
                 },
-                "required": ["description"],
+                "required": ["description", "calories", "protein_g", "carbs_g", "fat_g"],
             },
         },
     },

@@ -52,6 +52,9 @@ def get_user_id(request: Request) -> str:
     Cloud mode: verifies Clerk JWT and maps the sub claim to a
     deterministic UUID via uuid5 so it fits Postgres UUID columns.
 
+    On the first authenticated request in cloud mode, seeds the
+    analytics cache so the in-memory DuckDB has data for dashboards.
+
     Results are cached on request.state so that multiple dependencies
     calling this within the same request only verify the JWT once.
     """
@@ -68,5 +71,11 @@ def get_user_id(request: Request) -> str:
             )
         payload = verify_clerk_token(request)
         uid = str(uuid.uuid5(CLERK_NAMESPACE, payload["sub"]))
+
+        # Seed the analytics cache on first login
+        cache_mgr = getattr(request.app.state, "analytics_cache_manager", None)
+        if cache_mgr and cache_mgr._user_id is None:
+            cache_mgr.refresh(user_id=uid)
+
     request.state._user_id = uid
     return uid

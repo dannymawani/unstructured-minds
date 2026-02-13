@@ -13,7 +13,7 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
-import { Plus, Loader2, ListTodo } from 'lucide-react'
+import { Plus, Loader2, ListTodo, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { PersonalTaskCard, type Task } from './PersonalTaskCard'
@@ -124,6 +124,7 @@ export function PersonalKanban({ apiUrl, onFileSelect }: PersonalKanbanProps) {
   const [showNewForm, setShowNewForm] = useState(false)
   const [newTask, setNewTask] = useState<NewTaskForm>(INITIAL_FORM)
   const [submitting, setSubmitting] = useState(false)
+  const [clearing, setClearing] = useState(false)
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -277,6 +278,21 @@ export function PersonalKanban({ apiUrl, onFileSelect }: PersonalKanbanProps) {
     [apiUrl, newTask, fetchTasks]
   )
 
+  const handleClearAll = useCallback(async () => {
+    if (!confirm('Are you sure you want to delete ALL tasks? This cannot be undone.')) return
+    setClearing(true)
+    try {
+      const response = await fetch(`${apiUrl}/tasks/clear-all`, { method: 'DELETE' })
+      if (!response.ok) throw new Error('Failed to clear tasks')
+      setTasks([])
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to clear tasks')
+    } finally {
+      setClearing(false)
+    }
+  }, [apiUrl])
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -302,14 +318,26 @@ export function PersonalKanban({ apiUrl, onFileSelect }: PersonalKanbanProps) {
               {tasks.length} task{tasks.length !== 1 ? 's' : ''} total
             </p>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowNewForm((prev) => !prev)}
-          >
-            <Plus className="w-4 h-4 mr-1" />
-            New Task
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowNewForm((prev) => !prev)}
+            >
+              <Plus className="w-4 h-4 mr-1" />
+              New Task
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleClearAll}
+              disabled={clearing || tasks.length === 0}
+              className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+            >
+              {clearing ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Trash2 className="w-4 h-4 mr-1" />}
+              Clear All
+            </Button>
+          </div>
         </div>
 
         {/* Inline new task form */}

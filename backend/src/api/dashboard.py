@@ -11,7 +11,7 @@ from ..config import settings
 from ..db import DatabaseManager
 from ..extraction.exercise_matcher import ExerciseMatcher
 from ..extraction.exercise_normalizer import normalize_exercises
-from .dependencies import get_db as _get_db, get_analytics_db, get_user_id
+from .dependencies import get_analytics_db, get_user_id
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -103,6 +103,8 @@ class HeatmapDay(BaseModel):
     date: str
     count: int
     duration_minutes: int
+    has_note: bool = False
+    has_workout: bool = False
 
 
 class HeatmapResponse(BaseModel):
@@ -123,6 +125,7 @@ class CorrelationEntry(BaseModel):
     mood: Optional[int] = None
     stress: Optional[int] = None
     activity_minutes: Optional[int] = None
+    calories: Optional[int] = None
 
 
 class Correlations(BaseModel):
@@ -133,6 +136,8 @@ class Correlations(BaseModel):
     activity_mood: Optional[float] = None
     activity_energy: Optional[float] = None
     stress_mood: Optional[float] = None
+    calories_mood: Optional[float] = None
+    calories_energy: Optional[float] = None
 
 
 class CorrelationResponse(BaseModel):
@@ -142,47 +147,45 @@ class CorrelationResponse(BaseModel):
     correlations: Correlations
 
 
-class ExerciseTableEntry(BaseModel):
-    """Single exercise row in the exercise table."""
+class NutritionDayEntry(BaseModel):
+    """Single day of nutrition data."""
 
-    exercise_name: str
-    last_trained_date: str
-    last_weight_kg: Optional[float] = None
-    max_weight_kg: Optional[float] = None
-    total_sessions: int
-
-
-class ExerciseTableResponse(BaseModel):
-    """Response for exercise table endpoint."""
-
-    exercises: list[ExerciseTableEntry]
-    total_count: int
-    offset: int
-    limit: int
+    date: str
+    total_calories: int = 0
+    total_protein_g: int = 0
+    total_carbs_g: int = 0
+    total_fat_g: int = 0
+    meal_count: int = 0
 
 
-class ExerciseCreate(BaseModel):
-    """Request model for manually adding an exercise."""
+class NutritionSummary(BaseModel):
+    """Aggregated nutrition summary."""
 
-    date: date
-    exercise_name: str = Field(..., min_length=1, max_length=200)
-    weight_kg: Optional[float] = None
-    reps: Optional[int] = None
-    set_number: int = 1
-    notes: Optional[str] = None
-
-
-class ExerciseCreateResponse(BaseModel):
-    """Response for exercise creation."""
-
-    id: str
-    message: str
-    is_new: bool = False
-    canonical_name: str | None = None
+    avg_calories: int = 0
+    avg_protein_g: int = 0
+    avg_carbs_g: int = 0
+    avg_fat_g: int = 0
+    total_days_tracked: int = 0
+    total_meals: int = 0
 
 
-def get_db(request: Request):
-    """Get analytics database for dashboard reads."""
+class NutritionResponse(BaseModel):
+    """Response for nutrition/eating habits endpoint."""
+
+    days: list[NutritionDayEntry]
+    summary: NutritionSummary
+    period: Period
+
+
+# ── Dependency helpers (must be above all endpoint definitions) ──────────────
+
+
+def get_db(request: Request, _user_id: str = Depends(get_user_id)):
+    """Get analytics database for dashboard reads.
+
+    Depends on get_user_id to ensure the analytics cache is populated
+    on the first authenticated request (cloud mode).
+    """
     return get_analytics_db(request)
 
 
@@ -226,6 +229,109 @@ def calculate_correlation(x: list[float], y: list[float]) -> Optional[float]:
     # Calculate correlation
     correlation = (n * sum_xy - sum_x * sum_y) / denominator
     return round(correlation, 3)
+
+
+# ── Endpoints ────────────────────────────────────────────────────────────────
+
+
+@router.get("/nutrition", response_model=NutritionResponse)
+def get_nutrition_data(
+    days: int = Query(default=30, ge=1, le=365),
+    db: DatabaseManager = Depends(get_db),
+) -> NutritionResponse:
+    """Get nutrition and eating habits data over a time period.
+
+    Returns daily calorie and macronutrient totals and averages.
+    """
+    period = get_period(days)
+
+    result = db.execute(
+        """
+        SELECT
+            date,
+            COALESCE(SUM(calories), 0) as total_calories,
+            COALESCE(SUM(protein_g), 0) as total_protein,
+            COALESCE(SUM(carbs_g), 0) as total_carbs,
+            COALESCE(SUM(fat_g), 0) as total_fat,
+            COUNT(*) as meal_count
+        FROM food_log
+        WHERE date >= ? AND date <= ?
+        GROUP BY date
+        ORDER BY date ASC
+        """,
+        [period.start_date, period.end_date],
+    ).fetchall()
+
+    day_entries = [
+        NutritionDayEntry(
+            date=str(row[0]),
+            total_calories=int(row[1]),
+            total_protein_g=int(row[2]),
+            total_carbs_g=int(row[3]),
+            total_fat_g=int(row[4]),
+            meal_count=int(row[5]),
+        )
+        for row in result
+    ]
+
+    total_days = len(day_entries)
+    total_meals = sum(d.meal_count for d in day_entries)
+    # Only average over days that have actual calorie data (non-zero)
+    days_with_calories = [d for d in day_entries if d.total_calories > 0]
+    cal_days = len(days_with_calories)
+    summary = NutritionSummary(
+        avg_calories=round(sum(d.total_calories for d in days_with_calories) / cal_days) if cal_days else 0,
+        avg_protein_g=round(sum(d.total_protein_g for d in days_with_calories) / cal_days) if cal_days else 0,
+        avg_carbs_g=round(sum(d.total_carbs_g for d in days_with_calories) / cal_days) if cal_days else 0,
+        avg_fat_g=round(sum(d.total_fat_g for d in days_with_calories) / cal_days) if cal_days else 0,
+        total_days_tracked=total_days,
+        total_meals=total_meals,
+    )
+
+    return NutritionResponse(
+        days=day_entries,
+        summary=summary,
+        period=period,
+    )
+
+
+class ExerciseTableEntry(BaseModel):
+    """Single exercise row in the exercise table."""
+
+    exercise_name: str
+    last_trained_date: str
+    last_weight_kg: Optional[float] = None
+    max_weight_kg: Optional[float] = None
+    total_sessions: int
+
+
+class ExerciseTableResponse(BaseModel):
+    """Response for exercise table endpoint."""
+
+    exercises: list[ExerciseTableEntry]
+    total_count: int
+    offset: int
+    limit: int
+
+
+class ExerciseCreate(BaseModel):
+    """Request model for manually adding an exercise."""
+
+    date: date
+    exercise_name: str = Field(..., min_length=1, max_length=200)
+    weight_kg: Optional[float] = None
+    reps: Optional[int] = None
+    set_number: int = 1
+    notes: Optional[str] = None
+
+
+class ExerciseCreateResponse(BaseModel):
+    """Response for exercise creation."""
+
+    id: str
+    message: str
+    is_new: bool = False
+    canonical_name: str | None = None
 
 
 @router.get("/weekly-activity", response_model=WeeklyActivityResponse)
@@ -461,24 +567,33 @@ def get_dashboard_summary(
         "SELECT MAX(date) FROM activities"
     ), default=None)
 
-    # Get last daily note date from extraction_log file paths
-    # Match both Daily-Notes/YYYY-MM/YYYY-MM-DD.md and YYYY/MM/YYYY-MM-DD-daily-note.md
+    # Get last daily note date — check both extraction_log paths and daily_metrics dates
     import re as _re
-    last_note_row = db.execute(
-        """
-        SELECT file_path FROM extraction_log
-        WHERE success = TRUE
-          AND (file_path LIKE '%/____-__-__.md'
-               OR file_path LIKE '%/____-__-__-daily-note.md')
-        ORDER BY file_path DESC
-        LIMIT 1
-        """
-    ).fetchone()
     last_daily_note = None
-    if last_note_row and last_note_row[0]:
-        fname = last_note_row[0].split('/')[-1].removesuffix('.md').removesuffix('-daily-note')
-        if _re.match(r'\d{4}-\d{2}-\d{2}$', fname):
-            last_daily_note = fname
+
+    # Method 1: most recent date in daily_metrics (most reliable)
+    metrics_date_row = db.execute(
+        "SELECT MAX(date) FROM daily_metrics"
+    ).fetchone()
+    if metrics_date_row and metrics_date_row[0]:
+        last_daily_note = str(metrics_date_row[0])
+
+    # Method 2: extraction_log file paths (fallback if no metrics)
+    if not last_daily_note:
+        last_note_row = db.execute(
+            """
+            SELECT file_path FROM extraction_log
+            WHERE success = TRUE
+              AND (file_path LIKE '%/____-__-__.md'
+                   OR file_path LIKE '%/____-__-__-daily-note.md')
+            ORDER BY file_path DESC
+            LIMIT 1
+            """
+        ).fetchone()
+        if last_note_row and last_note_row[0]:
+            fname = last_note_row[0].split('/')[-1].removesuffix('.md').removesuffix('-daily-note')
+            if _re.match(r'\d{4}-\d{2}-\d{2}$', fname):
+                last_daily_note = fname
 
     # Calculate streak (consecutive days with activities ending today or yesterday)
     # Single query: fetch all distinct activity dates in the last year
@@ -534,7 +649,8 @@ def get_heatmap_data(
     start_date = f"{year}-01-01"
     end_date = f"{year}-12-31"
 
-    result = db.execute(
+    # Get activity data
+    activity_result = db.execute(
         """
         SELECT
             date,
@@ -547,15 +663,32 @@ def get_heatmap_data(
         """,
         [start_date, end_date],
     ).fetchall()
+    activity_map: dict[str, tuple[int, int]] = {
+        str(row[0]): (row[1], int(row[2])) for row in activity_result
+    }
 
-    days = [
-        HeatmapDay(
-            date=str(row[0]),
-            count=row[1],
-            duration_minutes=int(row[2]),
-        )
-        for row in result
-    ]
+    # Get daily note dates (from daily_metrics)
+    note_dates_result = db.execute(
+        """
+        SELECT DISTINCT date FROM daily_metrics
+        WHERE date >= ? AND date <= ?
+        """,
+        [start_date, end_date],
+    ).fetchall()
+    note_dates = {str(row[0]) for row in note_dates_result}
+
+    # Merge: all dates that have either activity or note
+    all_dates = set(activity_map.keys()) | note_dates
+    days = []
+    for d in sorted(all_dates):
+        count, duration = activity_map.get(d, (0, 0))
+        days.append(HeatmapDay(
+            date=d,
+            count=count,
+            duration_minutes=duration,
+            has_note=d in note_dates,
+            has_workout=d in activity_map,
+        ))
 
     max_count = max((d.count for d in days), default=0)
     max_duration = max((d.duration_minutes for d in days), default=0)
@@ -586,7 +719,7 @@ def get_correlation_data(
     """
     period = get_period(days)
 
-    # Get metrics with activity data joined
+    # Get metrics with activity and food data joined
     result = db.execute(
         """
         SELECT
@@ -595,13 +728,19 @@ def get_correlation_data(
             m.energy,
             m.mood,
             m.stress,
-            COALESCE(a.total_minutes, 0) as activity_minutes
+            COALESCE(a.total_minutes, 0) as activity_minutes,
+            f.total_calories
         FROM daily_metrics m
         LEFT JOIN (
             SELECT date, SUM(duration_minutes) as total_minutes
             FROM activities
             GROUP BY date
         ) a ON m.date = a.date
+        LEFT JOIN (
+            SELECT date, SUM(calories) as total_calories
+            FROM food_log
+            GROUP BY date
+        ) f ON m.date = f.date
         WHERE m.date >= ? AND m.date <= ?
         ORDER BY m.date ASC
         """,
@@ -616,36 +755,133 @@ def get_correlation_data(
             mood=row[3],
             stress=row[4],
             activity_minutes=row[5],
+            calories=int(row[6]) if row[6] is not None else None,
         )
         for row in result
     ]
 
-    # Calculate correlations using entries with complete data
-    sleep_values = []
-    energy_values = []
-    mood_values = []
-    stress_values = []
-    activity_values = []
+    # Calculate correlations per-pair (only require the two relevant metrics)
+    def pair_values(
+        field_a: str, field_b: str,
+    ) -> tuple[list[float], list[float]]:
+        xs, ys = [], []
+        for e in entries:
+            a = getattr(e, field_a)
+            b = getattr(e, field_b)
+            if a is not None and b is not None:
+                xs.append(float(a))
+                ys.append(float(b))
+        return xs, ys
 
-    for e in entries:
-        if e.sleep_hours is not None and e.energy is not None and e.mood is not None and e.stress is not None:
-            sleep_values.append(e.sleep_hours)
-            energy_values.append(float(e.energy))
-            mood_values.append(float(e.mood))
-            stress_values.append(float(e.stress))
-            activity_values.append(float(e.activity_minutes or 0))
+    sleep_m, mood_m = pair_values("sleep_hours", "mood")
+    sleep_e, energy_e = pair_values("sleep_hours", "energy")
+    act_m, mood_a = pair_values("activity_minutes", "mood")
+    act_e, energy_a = pair_values("activity_minutes", "energy")
+    stress_v, mood_s = pair_values("stress", "mood")
+    cal_m, mood_c = pair_values("calories", "mood")
+    cal_e, energy_c = pair_values("calories", "energy")
 
     correlations = Correlations(
-        sleep_mood=calculate_correlation(sleep_values, mood_values),
-        sleep_energy=calculate_correlation(sleep_values, energy_values),
-        activity_mood=calculate_correlation(activity_values, mood_values),
-        activity_energy=calculate_correlation(activity_values, energy_values),
-        stress_mood=calculate_correlation(stress_values, mood_values),
+        sleep_mood=calculate_correlation(sleep_m, mood_m),
+        sleep_energy=calculate_correlation(sleep_e, energy_e),
+        activity_mood=calculate_correlation(act_m, mood_a),
+        activity_energy=calculate_correlation(act_e, energy_a),
+        stress_mood=calculate_correlation(stress_v, mood_s),
+        calories_mood=calculate_correlation(cal_m, mood_c),
+        calories_energy=calculate_correlation(cal_e, energy_c),
     )
 
     return CorrelationResponse(
         entries=entries,
         correlations=correlations,
+    )
+
+
+class ActivityGroupEntry(BaseModel):
+    """A high-level activity group with entry count."""
+
+    group_name: str
+    entry_count: int
+    subtypes: list[str] = []
+
+
+class ActivityGroupResponse(BaseModel):
+    """Response for activity groups endpoint."""
+
+    groups: list[ActivityGroupEntry]
+    total_entries: int
+    period: Period
+
+
+# Mapping from raw activity_type to high-level group
+_ACTIVITY_GROUP_MAP: dict[str, str] = {
+    "strength": "Strength Training",
+    "bjj": "BJJ / Martial Arts",
+    "cardio": "Running / Cardio",
+    "running": "Running / Cardio",
+    "cycling": "Cycling",
+    "swimming": "Swimming",
+    "yoga": "Yoga / Mobility",
+    "stretching": "Yoga / Mobility",
+    "recovery": "Recovery",
+    "walk": "Walking",
+    "hiit": "HIIT",
+    "other": "Other",
+}
+
+
+def _group_activity(activity_type: str) -> str:
+    """Map an activity_type to its high-level group name."""
+    return _ACTIVITY_GROUP_MAP.get(activity_type.lower(), activity_type.title())
+
+
+@router.get("/activity-groups", response_model=ActivityGroupResponse)
+def get_activity_groups(
+    days: int = Query(default=30, ge=1, le=365),
+    db: DatabaseManager = Depends(get_db),
+) -> ActivityGroupResponse:
+    """Get activities grouped at a high level with entry counts (not duration).
+
+    Groups similar activity types together (e.g. cardio + running = Running / Cardio).
+    Uses entry counts instead of time estimates for accuracy.
+    """
+    period = get_period(days)
+
+    result = db.execute(
+        """
+        SELECT activity_type, COUNT(*) as count
+        FROM activities
+        WHERE date >= ? AND date <= ?
+        GROUP BY activity_type
+        ORDER BY count DESC
+        """,
+        [period.start_date, period.end_date],
+    ).fetchall()
+
+    groups: dict[str, dict] = {}
+    for row in result:
+        raw_type = row[0]
+        count = row[1]
+        group_name = _group_activity(raw_type)
+
+        if group_name in groups:
+            groups[group_name]["entry_count"] += count
+            if raw_type not in groups[group_name]["subtypes"]:
+                groups[group_name]["subtypes"].append(raw_type)
+        else:
+            groups[group_name] = {
+                "group_name": group_name,
+                "entry_count": count,
+                "subtypes": [raw_type],
+            }
+
+    sorted_groups = sorted(groups.values(), key=lambda g: g["entry_count"], reverse=True)
+    total = sum(g["entry_count"] for g in sorted_groups)
+
+    return ActivityGroupResponse(
+        groups=[ActivityGroupEntry(**g) for g in sorted_groups],
+        total_entries=total,
+        period=period,
     )
 
 
