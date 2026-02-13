@@ -47,6 +47,10 @@ services:
       - DEBUG=true
       - PYTHONDONTWRITEBYTECODE=1
       - PYTHONUNBUFFERED=1
+      # Clerk auth keys are loaded from root .env via env_file above.
+      # Cloud mode requires CLERK_SECRET_KEY and CLERK_DOMAIN.
+      # To force local mode in dev, uncomment:
+      # - USE_CLOUD=false
     # Override command for hot reload
     command: ["python", "-m", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     # Expose debug port for remote debugging
@@ -76,6 +80,8 @@ services:
       - VITE_API_URL=${VITE_API_URL:-http://localhost:8000}
       # Server-side proxy target (used by Vite dev server inside the container)
       - VITE_API_PROXY_TARGET=http://backend:8000
+      # Clerk auth (pulled from root .env)
+      - VITE_CLERK_PUBLISHABLE_KEY=${VITE_CLERK_PUBLISHABLE_KEY:-}
     # Override ports: only expose Vite dev server, not nginx port 80
     ports:
       - "5173:5173"

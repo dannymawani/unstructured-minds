@@ -9,6 +9,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
+from src.config import LOCAL_USER_ID
+
 
 @pytest.fixture
 def test_settings(tmp_path: Path):
@@ -25,7 +27,6 @@ def test_settings(tmp_path: Path):
         mock_settings.claude_enabled = True
         mock_settings.database_url = None
         mock_settings.is_cloud_mode = False
-        mock_settings.default_user_id = "00000000-0000-0000-0000-000000000001"
         mock_settings.cors_origins = "http://localhost:3000"
 
         mock_settings.vault_path.mkdir(parents=True, exist_ok=True)

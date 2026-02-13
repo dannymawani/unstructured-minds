@@ -5,7 +5,7 @@ from ..logging_config import get_logger
 logger = get_logger(__name__)
 
 
-def init_postgres_schema(pg, default_user_id: str) -> None:
+def init_postgres_schema(pg) -> None:
     """Create all tables in Postgres.
 
     Every table gets a user_id UUID column. Composite primary keys
@@ -13,7 +13,6 @@ def init_postgres_schema(pg, default_user_id: str) -> None:
 
     Args:
         pg: PostgresManager instance
-        default_user_id: UUID string for the default user
     """
     # Activities table
     pg.execute("""

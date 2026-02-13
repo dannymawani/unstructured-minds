@@ -169,11 +169,15 @@ _PG_SELECT_COLUMNS = {
 class AnalyticsCacheManager:
     """Refreshes an in-memory DuckDB from Postgres for analytics queries."""
 
-    def __init__(self, pg, duckdb: DatabaseManager, user_id: str) -> None:
+    def __init__(self, pg, duckdb: DatabaseManager) -> None:
         self._pg = pg
         self._duckdb = duckdb
-        self._user_id = user_id
+        self._user_id: Optional[str] = None
         self._refresh_task: Optional[asyncio.Task] = None
+
+    def set_user(self, user_id: str) -> None:
+        """Set the active user for cache refresh."""
+        self._user_id = user_id
 
     def init_cache_schema(self) -> None:
         """Create DuckDB tables for the analytics cache."""
@@ -183,11 +187,17 @@ class AnalyticsCacheManager:
                 if stmt:
                     self._duckdb.execute(stmt)
 
-    def refresh(self) -> None:
+    def refresh(self, user_id: str | None = None) -> None:
         """Full refresh: read from Postgres, write to DuckDB.
 
         Clears and repopulates each cached table.
+        If user_id is passed, updates the stored user. Skips if no user set.
         """
+        if user_id is not None:
+            self._user_id = user_id
+        if self._user_id is None:
+            logger.debug("cache_refresh_skipped_no_user")
+            return
         for table in CACHE_TABLES:
             try:
                 columns = _PG_SELECT_COLUMNS.get(table)
@@ -223,9 +233,11 @@ class AnalyticsCacheManager:
         logger.info("analytics_cache_refresh_complete")
 
     async def _periodic_refresh(self, interval: int = 60) -> None:
-        """Background refresh loop."""
+        """Background refresh loop. Skips iterations until a user is set."""
         while True:
             await asyncio.sleep(interval)
+            if self._user_id is None:
+                continue
             try:
                 self.refresh()
             except Exception as e:

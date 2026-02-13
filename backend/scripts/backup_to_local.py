@@ -23,7 +23,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.db.connection import DatabaseManager
 from src.db.postgres import PostgresManager
 
-DEFAULT_USER_ID = os.getenv("DEFAULT_USER_ID", "00000000-0000-0000-0000-000000000001")
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 # Load .env from project root if DATABASE_URL not already set
@@ -249,7 +248,7 @@ def main():
     parser.add_argument("--database-url", default=os.getenv("DATABASE_URL"))
     parser.add_argument("--vault-path", type=Path, default=PROJECT_ROOT / "vault")
     parser.add_argument("--data-path", type=Path, default=PROJECT_ROOT / "data")
-    parser.add_argument("--user-id", default=DEFAULT_USER_ID)
+    parser.add_argument("--user-id", required=True, help="User UUID to pull data for")
     parser.add_argument("--tables-only", action="store_true", help="Only pull data tables")
     parser.add_argument("--vault-only", action="store_true", help="Only pull vault files")
     parser.add_argument("--settings-only", action="store_true", help="Only pull JSON settings")

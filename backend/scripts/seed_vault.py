@@ -22,9 +22,6 @@ from src.db.postgres import PostgresManager
 from src.db.postgres_schema import init_postgres_schema
 
 
-DEFAULT_USER_ID = os.getenv("DEFAULT_USER_ID", "00000000-0000-0000-0000-000000000001")
-
-
 def seed_vault(vault_path: Path, database_url: str, user_id: str, dry_run: bool = False) -> int:
     """Insert all files from vault_path into Postgres vault_files table.
 
@@ -37,7 +34,7 @@ def seed_vault(vault_path: Path, database_url: str, user_id: str, dry_run: bool 
 
     pg = PostgresManager(database_url)
     pg.connect()
-    init_postgres_schema(pg, user_id)
+    init_postgres_schema(pg)
 
     count = 0
     for file_path in sorted(vault_path.rglob("*")):
@@ -93,8 +90,8 @@ def main():
     )
     parser.add_argument(
         "--user-id",
-        default=DEFAULT_USER_ID,
-        help=f"User UUID (default: {DEFAULT_USER_ID})",
+        required=True,
+        help="User UUID to associate vault files with",
     )
     parser.add_argument(
         "--dry-run",

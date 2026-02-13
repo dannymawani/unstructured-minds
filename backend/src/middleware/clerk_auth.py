@@ -1,5 +1,7 @@
 """Clerk JWT verification middleware."""
 
+import time
+
 import httpx
 import jwt
 from fastapi import HTTPException, Request
@@ -10,12 +12,18 @@ from ..logging_config import get_logger
 logger = get_logger(__name__)
 
 _jwks_cache: dict | None = None
+_jwks_fetched_at: float = 0
+_JWKS_TTL = 3600  # 1 hour
+
+# Cache constructed RSA public key objects by kid to avoid
+# re-parsing JWK on every verification.
+_rsa_key_cache: dict[str, object] = {}
 
 
 def _get_jwks() -> dict:
     """Fetch and cache Clerk's JWKS public keys."""
-    global _jwks_cache
-    if _jwks_cache is not None:
+    global _jwks_cache, _jwks_fetched_at
+    if _jwks_cache is not None and (time.monotonic() - _jwks_fetched_at < _JWKS_TTL):
         return _jwks_cache
 
     url = f"https://{settings.clerk_domain}/.well-known/jwks.json"
@@ -23,6 +31,7 @@ def _get_jwks() -> dict:
         resp = httpx.get(url, timeout=10)
         resp.raise_for_status()
         _jwks_cache = resp.json()
+        _jwks_fetched_at = time.monotonic()
         logger.info("clerk_jwks_fetched", domain=settings.clerk_domain)
         return _jwks_cache
     except httpx.HTTPError as e:
@@ -31,9 +40,11 @@ def _get_jwks() -> dict:
 
 
 def clear_jwks_cache() -> None:
-    """Clear the JWKS cache (useful for key rotation or testing)."""
-    global _jwks_cache
+    """Clear the JWKS and RSA key caches (useful for key rotation or testing)."""
+    global _jwks_cache, _jwks_fetched_at
     _jwks_cache = None
+    _jwks_fetched_at = 0
+    _rsa_key_cache.clear()
 
 
 def verify_clerk_token(request: Request) -> dict:
@@ -67,7 +78,11 @@ def verify_clerk_token(request: Request) -> dict:
             raise HTTPException(401, "Unknown signing key")
 
     try:
-        public_key = jwt.algorithms.RSAAlgorithm.from_jwk(key_data)
+        if kid in _rsa_key_cache:
+            public_key = _rsa_key_cache[kid]
+        else:
+            public_key = jwt.algorithms.RSAAlgorithm.from_jwk(key_data)
+            _rsa_key_cache[kid] = public_key
         payload = jwt.decode(
             token,
             public_key,

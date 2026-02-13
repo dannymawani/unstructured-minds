@@ -35,7 +35,6 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - USE_CLOUD=${USE_CLOUD:-true}
       - DATABASE_URL=${DATABASE_URL:-}
-      - DEFAULT_USER_ID=${DEFAULT_USER_ID:-00000000-0000-0000-0000-000000000001}
       - VAULT_PATH=/app/vault
       - DATA_PATH=/app/data
       - HOST=0.0.0.0
