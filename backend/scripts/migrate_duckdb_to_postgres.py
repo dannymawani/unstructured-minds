@@ -3,13 +3,14 @@
 
 Usage:
     cd backend
-    python -m scripts.migrate_duckdb_to_postgres
+    python -m scripts.migrate_duckdb_to_postgres --user-id <UUID>
 
 Requires:
     - DATABASE_URL env var pointing to Supabase Postgres
     - Existing DuckDB file at data/unstructured.duckdb
 """
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -127,6 +128,10 @@ def migrate_json_settings(pg: PostgresManager, user_id: str, data_path: Path) ->
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Migrate DuckDB data to Postgres")
+    parser.add_argument("--user-id", required=True, help="User UUID to associate migrated data with")
+    args = parser.parse_args()
+
     database_url = settings.database_url
     if not database_url:
         print("ERROR: DATABASE_URL not set. Add it to .env or set as environment variable.")
@@ -137,7 +142,7 @@ def main():
         print(f"ERROR: DuckDB file not found at {duckdb_path}")
         sys.exit(1)
 
-    user_id = settings.default_user_id
+    user_id = args.user_id
     print(f"Migration: DuckDB → Postgres")
     print(f"  DuckDB: {duckdb_path}")
     print(f"  Postgres: {database_url[:50]}...")
@@ -150,7 +155,7 @@ def main():
 
     pg = PostgresManager(database_url)
     pg.connect()
-    init_postgres_schema(pg, user_id)
+    init_postgres_schema(pg)
 
     # Migrate tables
     print("=== Migrating tables ===")

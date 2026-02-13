@@ -2,9 +2,9 @@
 
 import uuid
 
-from fastapi import Request
+from fastapi import HTTPException, Request
 
-from ..config import settings
+from ..config import LOCAL_USER_ID, settings
 from ..middleware.clerk_auth import verify_clerk_token
 from ..storage import StorageBackend
 from ..storage.datastore import DataStore
@@ -46,13 +46,27 @@ def get_datastore(request: Request) -> DataStore:
 
 
 def get_user_id(request: Request) -> str:
-    """Return the authenticated user ID as a UUID string.
+    """Return the authenticated user ID.
 
-    When Clerk auth is configured, maps the Clerk sub claim to a
+    Local mode: returns LOCAL_USER_ID (single implicit user).
+    Cloud mode: verifies Clerk JWT and maps the sub claim to a
     deterministic UUID via uuid5 so it fits Postgres UUID columns.
-    When auth is disabled, returns DEFAULT_USER_ID for local/dev mode.
+
+    Results are cached on request.state so that multiple dependencies
+    calling this within the same request only verify the JWT once.
     """
-    if not settings.auth_enabled:
-        return settings.default_user_id
-    payload = verify_clerk_token(request)
-    return str(uuid.uuid5(CLERK_NAMESPACE, payload["sub"]))
+    cached = getattr(request.state, "_user_id", None)
+    if cached is not None:
+        return cached
+    if not settings.is_cloud_mode:
+        uid = LOCAL_USER_ID
+    else:
+        if not settings.clerk_secret_key or not settings.clerk_domain:
+            raise HTTPException(
+                500,
+                "Cloud mode requires CLERK_SECRET_KEY and CLERK_DOMAIN",
+            )
+        payload = verify_clerk_token(request)
+        uid = str(uuid.uuid5(CLERK_NAMESPACE, payload["sub"]))
+    request.state._user_id = uid
+    return uid

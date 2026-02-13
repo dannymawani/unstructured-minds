@@ -36,7 +36,6 @@ from .extraction.exercise_matcher import ExerciseMatcher
 from .extraction.exercise_normalizer import normalize_exercises
 from .middleware import limiter, SecurityHeadersMiddleware, RequestLoggingMiddleware
 from .storage import get_storage_backend
-from .storage.postgres import PostgresStorage
 from .storage.datastore import DataStore
 
 # Configure structured logging
@@ -71,7 +70,7 @@ async def lifespan(app: FastAPI):
         # Vault/data files stored in Postgres.
         pg = PostgresManager(settings.database_url, pool_min=settings.db_pool_min, pool_max=settings.db_pool_max)
         pg.connect()
-        init_postgres_schema(pg, settings.default_user_id)
+        init_postgres_schema(pg)
         app.state.db = pg
 
         # In-memory DuckDB for fast analytics
@@ -79,20 +78,17 @@ async def lifespan(app: FastAPI):
         analytics_db.connect()
         app.state.analytics_db = analytics_db
 
-        # Populate analytics cache from Postgres.
-        # Short-term: cache uses default_user_id. Per-request user-scoped
-        # queries go directly to Postgres via dependencies.
-        analytics_cache_manager = AnalyticsCacheManager(
-            pg, analytics_db, settings.default_user_id
-        )
+        # Analytics cache — user_id is set on first authenticated request.
+        # Background refresh skips until a user is known.
+        analytics_cache_manager = AnalyticsCacheManager(pg, analytics_db)
         analytics_cache_manager.init_cache_schema()
-        analytics_cache_manager.refresh()
         analytics_cache_manager.start_background_refresh(interval=60)
 
-        # Storage: default instances for startup tasks (e.g. exercise normalization).
-        # Per-request user-scoped storage is created in dependencies.py.
-        storage = PostgresStorage(pg, settings.default_user_id)
-        data_storage = PostgresStorage(pg, settings.default_user_id, "_data")
+        # Cloud mode: no default storage at startup — per-request
+        # user-scoped storage is created in dependencies.py.
+        # Use local filesystem for startup tasks (exercise normalization).
+        storage = get_storage_backend("local", base_path=settings.vault_path)
+        data_storage = get_storage_backend("local", base_path=settings.data_path)
 
         logger.info("database_initialized", mode="cloud", backend="postgres")
     else:
@@ -146,11 +142,9 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("community_exercises_load_failed", error=str(e))
 
-    # Build user_settings_store for cloud mode
+    # In cloud mode, skip user-specific settings at startup (no user yet).
+    # Exercise normalization will use local filesystem fallback.
     user_settings_store = None
-    if settings.is_cloud_mode:
-        from .db.user_settings import UserSettingsStore
-        user_settings_store = UserSettingsStore(app.state.db, settings.default_user_id)
 
     try:
         await normalize_exercises(

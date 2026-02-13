@@ -5,6 +5,9 @@ from typing import Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Hardcoded user ID for local (single-user) mode — not configurable via env.
+LOCAL_USER_ID = "local"
+
 
 def _find_env_file() -> str:
     """Find .env file in current dir or project root (parent of backend/)."""
@@ -41,13 +44,12 @@ class Settings(BaseSettings):
     # Cloud mode: explicit flag + Postgres connection string
     use_cloud: bool = True
     database_url: Optional[str] = None
-    default_user_id: str = "00000000-0000-0000-0000-000000000001"
 
     # Postgres connection pool sizing
     db_pool_min: int = 2
     db_pool_max: int = 10
 
-    # Auth (Clerk) — optional, app works without it
+    # Auth (Clerk) — required for cloud mode, validated at request time
     clerk_secret_key: Optional[str] = None
     clerk_domain: Optional[str] = None  # e.g. "your-app.clerk.accounts.dev"
 
@@ -58,8 +60,8 @@ class Settings(BaseSettings):
 
     @property
     def auth_enabled(self) -> bool:
-        """True when Clerk credentials are configured."""
-        return self.clerk_secret_key is not None and self.clerk_domain is not None
+        """Auth is always enabled in cloud mode, always disabled in local mode."""
+        return self.is_cloud_mode
 
     @property
     def duckdb_path(self) -> Path:
