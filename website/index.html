@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Unstructured Minds — Your thoughts, structured. Your data, queryable.</title>
-  <meta name="description" content="Write naturally. AI extracts the data. Query your life. Turn messy notes into structured, queryable insights.">
+  <title>Unstructured Minds — Apple Notes for unstructured people, with a SQL engine underneath.</title>
+  <meta name="description" content="Like Apple Notes, but for people who think in messy prose. Write naturally, AI extracts the data, query your life with plain English.">
   <meta property="og:title" content="Unstructured Minds">
-  <meta property="og:description" content="Turn natural language notes into queryable data. Write freely, ask questions, get answers.">
+  <meta property="og:description" content="Like Apple Notes for unstructured people. Write freely, AI structures it, query everything.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://unstructuredminds.com">
   <meta name="twitter:card" content="summary_large_image">
@@ -513,7 +513,7 @@
     }
     .features-grid {
       display: grid;
-      grid-template-columns: repeat(2, 1fr);
+      grid-template-columns: repeat(3, 1fr);
       gap: 2px;
       margin-top: 64px;
       background: var(--border);
@@ -622,6 +622,111 @@
       font-size: 13px;
       color: var(--text-muted);
       line-height: 1.6;
+    }
+
+    /* ===================== COMPARISON ===================== */
+    .comparison {
+      padding: 120px 0;
+    }
+    .comparison-table {
+      margin-top: 64px;
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      overflow: hidden;
+    }
+    .comparison-table th,
+    .comparison-table td {
+      padding: 18px 24px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      font-size: 14px;
+    }
+    .comparison-table th {
+      background: var(--bg-elevated);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .comparison-table th:first-child { border-radius: 20px 0 0 0; }
+    .comparison-table th:last-child { border-radius: 0 20px 0 0; }
+    .comparison-table tr:last-child td { border-bottom: none; }
+    .comparison-table td:first-child {
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+    .comparison-table td {
+      color: var(--text-secondary);
+    }
+    .comparison-table .check {
+      color: var(--teal);
+      font-weight: 600;
+    }
+    .comparison-table .dash {
+      color: var(--text-muted);
+    }
+    .comparison-table .highlight-col {
+      background: rgba(20, 184, 166, 0.04);
+    }
+    @media (max-width: 600px) {
+      .comparison-table { font-size: 12px; }
+      .comparison-table th, .comparison-table td { padding: 12px 10px; }
+    }
+
+    /* ===================== OPEN SOURCE ===================== */
+    .open-source {
+      padding: 80px 0 0;
+    }
+    .oss-banner {
+      background: linear-gradient(135deg, rgba(99,102,241,0.06), rgba(20,184,166,0.06));
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 48px;
+      display: flex;
+      align-items: center;
+      gap: 40px;
+    }
+    .oss-banner-icon {
+      width: 72px; height: 72px;
+      flex-shrink: 0;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-hover);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .oss-banner-text h3 {
+      font-size: 22px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      letter-spacing: -0.3px;
+    }
+    .oss-banner-text p {
+      font-size: 15px;
+      color: var(--text-secondary);
+      line-height: 1.7;
+      margin-bottom: 16px;
+    }
+    .oss-banner-text a {
+      color: var(--teal);
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .oss-banner-text a:hover { text-decoration: underline; }
+    @media (max-width: 600px) {
+      .oss-banner {
+        flex-direction: column;
+        text-align: center;
+        padding: 32px 24px;
+        gap: 20px;
+      }
     }
 
     /* ===================== PRICING ===================== */
@@ -807,7 +912,7 @@
       .hero-demo { display: none; }
       .steps-grid { grid-template-columns: 1fr; }
       .step-connector { display: none; }
-      .features-grid { grid-template-columns: 1fr; }
+      .features-grid { grid-template-columns: 1fr 1fr; }
       .pricing-grid { grid-template-columns: 1fr; max-width: 420px; }
       .footer-grid {
         grid-template-columns: 1fr 1fr;
@@ -904,7 +1009,9 @@
       <ul class="nav-links">
         <li><a href="#how-it-works">How It Works</a></li>
         <li><a href="#features">Features</a></li>
+        <li><a href="#compare">Compare</a></li>
         <li><a href="#pricing">Pricing</a></li>
+        <li><a href="https://github.com/unstructuredminds/unstructured-minds" target="_blank" rel="noopener">GitHub</a></li>
       </ul>
       <div class="nav-actions">
         <a href="#" class="btn btn-ghost">Log in</a>
@@ -923,23 +1030,25 @@
         <div class="hero-content">
           <div class="hero-badge reveal">
             <span class="hero-badge-dot"></span>
-            Now in development
+            Open source coming soon
           </div>
           <h1 class="reveal reveal-delay-1">
-            Your thoughts, <em>structured.</em><br>
-            Your data, <em>queryable.</em>
+            Apple Notes for<br><em>unstructured</em> people.
           </h1>
           <p class="hero-sub reveal reveal-delay-2">
-            Write in natural language. AI extracts the structure. Ask questions about your life and get real answers backed by your own data.
+            Write messy notes about your day. AI extracts workouts, meals, sleep, and tasks into a personal data warehouse. Ask questions in plain English and get real answers.
           </p>
           <div class="hero-actions reveal reveal-delay-3">
             <a href="#" class="btn btn-primary btn-lg">
               Get Started Free
               <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
             </a>
-            <a href="#how-it-works" class="btn btn-outline btn-lg">See How It Works</a>
+            <a href="https://github.com/unstructuredminds/unstructured-minds" class="btn btn-outline btn-lg" target="_blank" rel="noopener">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+              Star on GitHub
+            </a>
           </div>
-          <p class="hero-note reveal reveal-delay-4">No credit card required</p>
+          <p class="hero-note reveal reveal-delay-4">No credit card required &middot; Self-host or use our cloud</p>
         </div>
 
         <div class="hero-demo reveal reveal-delay-3">
@@ -970,7 +1079,7 @@
       <div class="reveal">
         <div class="section-label">How It Works</div>
         <h2 class="section-title">Three steps. Zero forms.</h2>
-        <p class="section-subtitle">No dropdowns, no spreadsheets, no rigid input fields. Just write like you normally would.</p>
+        <p class="section-subtitle">Write like you would in Apple Notes or a journal. No dropdowns, no spreadsheets. The AI handles the structure.</p>
       </div>
 
       <div class="steps-grid">
@@ -1035,7 +1144,7 @@
             <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h14M4 8h10M4 12h14M4 16h8"/></svg>
           </div>
           <h3 class="feature-title">Rich markdown editor</h3>
-          <p class="feature-desc">A beautiful writing experience powered by Milkdown. Templates, WYSIWYG toolbar, and autosave. Write naturally &mdash; the editor gets out of your way.</p>
+          <p class="feature-desc">A beautiful writing experience powered by Milkdown. Templates, WYSIWYG toolbar, table editing, and autosave. Write naturally &mdash; the editor gets out of your way.</p>
           <span class="feature-tag teal">Milkdown-powered</span>
         </div>
 
@@ -1044,7 +1153,7 @@
             <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="3"/><path d="M11 3v2M11 17v2M3 11h2M17 11h2M5.6 5.6l1.4 1.4M15 15l1.4 1.4M5.6 16.4l1.4-1.4M15 7l1.4-1.4"/></svg>
           </div>
           <h3 class="feature-title">Smart extraction</h3>
-          <p class="feature-desc">Claude AI reads your notes and extracts workouts, meals, sleep, moods, and tasks into structured data. No tagging, no manual entry.</p>
+          <p class="feature-desc">Claude AI reads your notes and extracts workouts, meals, sleep, moods, and tasks into structured data. AI-powered exercise normalization matches variations to canonical names automatically.</p>
           <span class="feature-tag indigo">Powered by Claude</span>
         </div>
 
@@ -1053,15 +1162,33 @@
             <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="10" width="3" height="8" rx="1"/><rect x="9.5" y="6" width="3" height="12" rx="1"/><rect x="16" y="3" width="3" height="15" rx="1"/></svg>
           </div>
           <h3 class="feature-title">Visual dashboard</h3>
-          <p class="feature-desc">Charts, heatmaps, and trends. See your life data at a glance. Track progress over weeks, months, and years without lifting a finger.</p>
+          <p class="feature-desc">Activity heatmaps, nutrition tracking with calories and macros, mood correlations against sleep and exercise, and weekly charts with stacked exercise categories. Your life at a glance.</p>
         </div>
 
         <div class="feature-card reveal reveal-delay-4">
           <div class="feature-icon rose-bg">
+            <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h4v4H3zM10 6h4v4h-4zM17 6h4v4h-4zM3 14h4v4H3zM10 14h4v4h-4zM17 14h4v4h-4z"/></svg>
+          </div>
+          <h3 class="feature-title">Daily note wizard + task rollover</h3>
+          <p class="feature-desc">Create structured daily notes in seconds. The wizard prompts you through goals, metrics, and priorities &mdash; and automatically surfaces incomplete tasks from previous days so nothing falls through the cracks.</p>
+          <span class="feature-tag teal">New in v0.8</span>
+        </div>
+
+        <div class="feature-card reveal reveal-delay-1">
+          <div class="feature-icon teal-bg">
+            <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="3" width="6" height="16" rx="1"/><rect x="10" y="3" width="6" height="16" rx="1"/><rect x="18" y="3" width="4" height="16" rx="1"/><path d="M5 7h0M13 7h0M5 11h0M13 11h0"/></svg>
+          </div>
+          <h3 class="feature-title">Personal kanban</h3>
+          <p class="feature-desc">Drag-and-drop task board with two-way markdown sync. Check off a task in your note and it moves on the board. Move it on the board and the note updates. Deadlines, categories, and task detail modals included.</p>
+        </div>
+
+        <div class="feature-card reveal reveal-delay-2">
+          <div class="feature-icon indigo-bg">
             <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
           </div>
-          <h3 class="feature-title">Your data, your control</h3>
-          <p class="feature-desc">Your notes live in YOUR Google Drive. Your extracted data is isolated in your own database. Export everything, anytime. No vendor lock-in.</p>
+          <h3 class="feature-title">Self-host or cloud</h3>
+          <p class="feature-desc">Run locally with DuckDB for full privacy, or deploy to the cloud with Postgres and Clerk auth for multi-user access. Same app, two modes &mdash; your choice. No vendor lock-in, ever.</p>
+          <span class="feature-tag indigo">Docker ready</span>
         </div>
       </div>
     </div>
@@ -1101,6 +1228,105 @@
           <span class="use-case-emoji" role="img" aria-label="Analytics">&#x1F4CA;</span>
           <div class="use-case-name">Life Analytics</div>
           <div class="use-case-desc">Ask questions about any aspect of your daily life</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== COMPARISON ==================== -->
+  <section class="comparison" id="compare">
+    <div class="container">
+      <div style="text-align: center;" class="reveal">
+        <div class="section-label" style="justify-content: center;">Why Unstructured Minds?</div>
+        <h2 class="section-title">Notes apps capture. We <em>understand.</em></h2>
+        <p class="section-subtitle" style="margin: 0 auto;">Other tools make you choose between free-form writing and structured data. We give you both.</p>
+      </div>
+
+      <table class="comparison-table reveal reveal-delay-1">
+        <thead>
+          <tr>
+            <th>Capability</th>
+            <th>Apple Notes</th>
+            <th>Notion</th>
+            <th>Obsidian</th>
+            <th class="highlight-col">Unstructured Minds</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Write in natural language</td>
+            <td class="check">Yes</td>
+            <td class="dash">Structured</td>
+            <td class="check">Yes</td>
+            <td class="highlight-col check">Yes</td>
+          </tr>
+          <tr>
+            <td>AI data extraction</td>
+            <td class="dash">&mdash;</td>
+            <td class="dash">&mdash;</td>
+            <td class="dash">&mdash;</td>
+            <td class="highlight-col check">Automatic</td>
+          </tr>
+          <tr>
+            <td>Query your data in English</td>
+            <td class="dash">&mdash;</td>
+            <td class="dash">&mdash;</td>
+            <td class="dash">&mdash;</td>
+            <td class="highlight-col check">Built-in</td>
+          </tr>
+          <tr>
+            <td>Dashboard &amp; analytics</td>
+            <td class="dash">&mdash;</td>
+            <td class="dash">Basic</td>
+            <td class="dash">Plugins</td>
+            <td class="highlight-col check">Heatmaps, charts, correlations</td>
+          </tr>
+          <tr>
+            <td>Task management with sync</td>
+            <td class="dash">Checklists</td>
+            <td class="check">Yes</td>
+            <td class="dash">Plugins</td>
+            <td class="highlight-col check">Kanban + two-way markdown sync</td>
+          </tr>
+          <tr>
+            <td>Daily note wizard</td>
+            <td class="dash">&mdash;</td>
+            <td class="dash">Templates</td>
+            <td class="dash">Templates</td>
+            <td class="highlight-col check">Guided wizard + task rollover</td>
+          </tr>
+          <tr>
+            <td>Self-hostable</td>
+            <td class="dash">&mdash;</td>
+            <td class="dash">&mdash;</td>
+            <td class="check">Local</td>
+            <td class="highlight-col check">Docker + optional cloud</td>
+          </tr>
+          <tr>
+            <td>Open source</td>
+            <td class="dash">&mdash;</td>
+            <td class="dash">&mdash;</td>
+            <td class="dash">Core only</td>
+            <td class="highlight-col check">Fully open source</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ==================== OPEN SOURCE ==================== -->
+  <section class="open-source">
+    <div class="container">
+      <div class="oss-banner reveal">
+        <div class="oss-banner-icon">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="var(--text-primary)"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+        </div>
+        <div class="oss-banner-text">
+          <h3>Open source &mdash; coming soon</h3>
+          <p>We're preparing a fully open source release of Unstructured Minds. Self-host on your own infrastructure, contribute features, or fork it for your own use case. Star the repo to be notified when it drops.</p>
+          <a href="https://github.com/unstructuredminds/unstructured-minds" target="_blank" rel="noopener">
+            github.com/unstructuredminds/unstructured-minds &rarr;
+          </a>
         </div>
       </div>
     </div>
@@ -1201,12 +1427,18 @@
   <section class="cta-section">
     <div class="container">
       <div class="cta-box reveal">
-        <h2 class="section-title">Start writing. Start knowing.</h2>
-        <p class="section-subtitle">Your notes already contain insights. Let AI find them for you.</p>
-        <a href="#" class="btn btn-primary btn-lg">
-          Get Started Free
-          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
-        </a>
+        <h2 class="section-title">Your messy notes deserve<br>better than a search bar.</h2>
+        <p class="section-subtitle">Start writing like you always have. Let AI turn it into structured, queryable knowledge.</p>
+        <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
+          <a href="#" class="btn btn-primary btn-lg">
+            Get Started Free
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+          </a>
+          <a href="https://github.com/unstructuredminds/unstructured-minds" class="btn btn-outline btn-lg" target="_blank" rel="noopener">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+            Star on GitHub
+          </a>
+        </div>
       </div>
     </div>
   </section>
@@ -1252,7 +1484,7 @@
               </svg></div>
             <span class="nav-logo-text">Unstructured Minds</span>
           </a>
-          <p>Turn natural language notes into structured, queryable data. Write freely. Ask questions. Get answers.</p>
+          <p>Like Apple Notes, but for people who think in messy prose. Write freely, AI structures it, query everything. Open source.</p>
         </div>
         <div class="footer-col">
           <h4>Product</h4>
@@ -1267,7 +1499,7 @@
           <ul>
             <li><a href="#">Docs</a></li>
             <li><a href="#">Blog</a></li>
-            <li><a href="#">GitHub</a></li>
+            <li><a href="https://github.com/unstructuredminds/unstructured-minds" target="_blank" rel="noopener">GitHub</a></li>
           </ul>
         </div>
         <div class="footer-col">
