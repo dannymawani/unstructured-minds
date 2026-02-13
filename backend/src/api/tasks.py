@@ -167,28 +167,90 @@ async def list_tasks(
     date_from: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
     date_to: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
     hide_old: bool = Query(True, description="Hide done/cancelled tasks older than 7 days"),
+    done_limit: int = Query(10, ge=0, le=100, description="Max done/cancelled tasks to return"),
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
     db: DatabaseManager = Depends(get_db),
     user_id: str = Depends(get_user_id),
 ) -> TaskListResponse:
-    """List personal tasks with optional filters."""
+    """List personal tasks with optional filters.
+
+    Done/cancelled tasks are capped at `done_limit` (default 10) most recent,
+    and hidden entirely after 7 days when `hide_old` is true.
+    """
     dialect = get_dialect(db)
     ph = placeholder(dialect)
+
+    # When fetching all statuses (no filter), query active and done separately
+    # so we can cap done tasks at done_limit.
+    if not status:
+        # Active tasks (backlog, in_progress) — no cap
+        active_conds: list[str] = [f"status IN ('backlog', 'in_progress')"]
+        active_params: list = []
+        user_filter(dialect, user_id, active_conds, active_params)
+        if category:
+            active_conds.append(f"category = {ph}")
+            active_params.append(category)
+        if date_from:
+            active_conds.append(f"date >= {ph}")
+            active_params.append(date_from)
+        if date_to:
+            active_conds.append(f"date <= {ph}")
+            active_params.append(date_to)
+        active_where = " AND ".join(active_conds)
+
+        active_result = db.execute(
+            f"SELECT * FROM tasks WHERE {active_where} ORDER BY date DESC, id",
+            active_params,
+        )
+        active_cols = [desc[0] for desc in active_result.description]
+        active_rows = active_result.fetchall()
+
+        # Done/cancelled tasks — capped and filtered by age
+        done_conds: list[str] = [f"status IN ('done', 'cancelled')"]
+        done_params: list = []
+        user_filter(dialect, user_id, done_conds, done_params)
+        if hide_old:
+            done_conds.append(f"(completed_at IS NULL OR completed_at >= {ph})")
+            done_params.append((datetime.now() - timedelta(days=7)).isoformat())
+        if category:
+            done_conds.append(f"category = {ph}")
+            done_params.append(category)
+        if date_from:
+            done_conds.append(f"date >= {ph}")
+            done_params.append(date_from)
+        if date_to:
+            done_conds.append(f"date <= {ph}")
+            done_params.append(date_to)
+        done_where = " AND ".join(done_conds)
+
+        done_result = db.execute(
+            f"SELECT * FROM tasks WHERE {done_where} ORDER BY completed_at DESC NULLS LAST, date DESC LIMIT {ph}",
+            done_params + [done_limit],
+        )
+        done_cols = [desc[0] for desc in done_result.description]
+        done_rows = done_result.fetchall()
+
+        all_tasks = (
+            [_row_to_task(row, active_cols) for row in active_rows]
+            + [_row_to_task(row, done_cols) for row in done_rows]
+        )
+        total = len(all_tasks)
+        # Apply pagination to the combined result
+        paginated = all_tasks[offset:offset + limit]
+        return TaskListResponse(tasks=paginated, total=total)
+
+    # Single-status filter — simple query
     conditions: list[str] = []
     params: list = []
-
     user_filter(dialect, user_id, conditions, params)
 
-    if hide_old and not status:
-        conditions.append(
-            f"(status NOT IN ('done', 'cancelled') OR completed_at IS NULL OR completed_at >= {ph})"
-        )
+    if hide_old and status in ("done", "cancelled"):
+        conditions.append(f"(completed_at IS NULL OR completed_at >= {ph})")
         params.append((datetime.now() - timedelta(days=7)).isoformat())
 
-    if status:
-        conditions.append(f"status = {ph}")
-        params.append(status)
+    conditions.append(f"status = {ph}")
+    params.append(status)
     if category:
         conditions.append(f"category = {ph}")
         params.append(category)
@@ -206,7 +268,7 @@ async def list_tasks(
     total = count_result.fetchone()[0]
 
     result = db.execute(
-        f"SELECT * FROM tasks {where_clause} ORDER BY date DESC, id LIMIT {ph} OFFSET {ph}",
+        f"SELECT * FROM tasks {where_clause} ORDER BY completed_at DESC NULLS LAST, date DESC, id LIMIT {ph} OFFSET {ph}",
         params + [limit, offset],
     )
     columns = [desc[0] for desc in result.description]
@@ -466,3 +528,33 @@ async def bulk_complete_tasks(
         )
 
     return BulkCompleteResponse(updated=count)
+
+
+@router.delete("/clear-all")
+async def clear_all_tasks(
+    db: DatabaseManager = Depends(get_db),
+    user_id: str = Depends(get_user_id),
+):
+    """Delete all tasks for the current user.
+
+    Clears tasks from both local DuckDB and PostgreSQL (cloud mode).
+    """
+    dialect = get_dialect(db)
+
+    conditions: list[str] = []
+    params: list = []
+    user_filter(dialect, user_id, conditions, params)
+
+    where = f" WHERE {' AND '.join(conditions)}" if conditions else ""
+
+    count_result = db.execute(f"SELECT COUNT(*) FROM tasks{where}", params)
+    count = count_result.fetchone()[0]
+
+    if count > 0:
+        delete_params: list = []
+        delete_conditions: list[str] = []
+        user_filter(dialect, user_id, delete_conditions, delete_params)
+        delete_where = f" WHERE {' AND '.join(delete_conditions)}" if delete_conditions else ""
+        db.execute(f"DELETE FROM tasks{delete_where}", delete_params)
+
+    return {"deleted": count}

@@ -17,6 +17,7 @@ export const AVAILABLE_WIDGETS: WidgetDefinition[] = [
   { id: 'sleepTrends', name: 'Sleep Trends', description: 'Sleep duration over time', defaultVisible: true },
   { id: 'moodCorrelation', name: 'Mood Correlations', description: 'Scatter plot showing metric relationships', defaultVisible: true },
   { id: 'exerciseProgress', name: 'Exercise Progress', description: 'Track specific exercise progress', defaultVisible: true },
+  { id: 'nutrition', name: 'Eating Habits', description: 'Calorie and macro tracking over time', defaultVisible: true },
 ];
 
 export interface WidgetConfig {

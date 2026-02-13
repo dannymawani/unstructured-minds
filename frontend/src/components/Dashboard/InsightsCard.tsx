@@ -34,6 +34,14 @@ const PRIORITY_COLORS: Record<number, string> = {
 
 const DISMISSED_KEY = 'insights-dismissed';
 
+// Module-level cache: survives SPA navigation, clears on hard refresh
+let insightsCache: InsightsData | null = null;
+
+/** @internal Reset cache for testing */
+export function _resetInsightsCache() {
+  insightsCache = null;
+}
+
 function getDismissedInsights(): Set<string> {
   try {
     const stored = localStorage.getItem(DISMISSED_KEY);
@@ -73,6 +81,13 @@ export function InsightsCard({ apiUrl = 'http://localhost:8000' }: InsightsCardP
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchInsights = useCallback(async (isRefresh = false) => {
+    // Use cached insights on navigation (not refresh)
+    if (!isRefresh && insightsCache) {
+      setData(insightsCache);
+      setLoading(false);
+      return;
+    }
+
     if (isRefresh) {
       setRefreshing(true);
     } else {
@@ -84,6 +99,7 @@ export function InsightsCard({ apiUrl = 'http://localhost:8000' }: InsightsCardP
       const response = await fetch(`${apiUrl}/insights/daily`);
       if (!response.ok) throw new Error('Failed to fetch insights');
       const result = await response.json();
+      insightsCache = result;
       setData(result);
 
       if (isRefresh) {

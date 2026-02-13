@@ -395,7 +395,8 @@ class ExtractionPipeline:
                 act_cols.append("user_id")
                 act_vals.append(self.user_id)
 
-            activity_sql = upsert("activities", act_cols, ["id"], dialect=dialect)
+            act_conflict = ["id", "user_id"] if (dialect == "postgres" and self.user_id) else ["id"]
+            activity_sql = upsert("activities", act_cols, act_conflict, dialect=dialect)
             self.db.execute(activity_sql, act_vals)
 
             # Insert exercise records
@@ -420,7 +421,8 @@ class ExtractionPipeline:
                     ex_cols.append("user_id")
                     ex_vals.append(self.user_id)
 
-                exercise_sql = upsert("exercise_log", ex_cols, ["id"], dialect=dialect)
+                ex_conflict = ["id", "user_id"] if (dialect == "postgres" and self.user_id) else ["id"]
+                exercise_sql = upsert("exercise_log", ex_cols, ex_conflict, dialect=dialect)
                 self.db.execute(exercise_sql, ex_vals)
                 records += 1
 
@@ -450,13 +452,14 @@ class ExtractionPipeline:
         """Store tasks in database, respecting previously completed tasks.
 
         On re-extraction:
-        1. Load existing tasks for this source_file
-        2. Skip any task whose normalized description already exists
+        1. Check ALL existing tasks (globally, not just this file) for dedup
+        2. Skip any task whose normalized description already exists anywhere
         3. Remove stale backlog tasks from this file that are no longer in the note
         4. Insert genuinely new tasks
+        5. Update source_file on existing tasks if this note is newer
 
-        Uses normalized descriptions to prevent duplicates when Claude
-        extracts slightly different wording on re-extraction.
+        Uses normalized descriptions to prevent duplicates when the same task
+        appears in multiple daily notes (e.g. rolled-over tasks).
 
         Args:
             date: Date string
@@ -480,20 +483,28 @@ class ExtractionPipeline:
         dialect = get_dialect(self.db)
         ph = "%s" if dialect == "postgres" else "?"
 
-        # Load all existing tasks for this source file
-        conditions = [f"source_file = {ph}"]
-        params: list = [source_file]
+        # Load ALL existing tasks for this user (global dedup, not per-file)
+        global_conds: list[str] = []
+        global_params: list = []
         if dialect == "postgres" and self.user_id:
-            conditions.append(f"user_id = {ph}")
-            params.append(self.user_id)
-        existing_rows = self.db.execute(
-            f"SELECT id, description, status FROM tasks WHERE {' AND '.join(conditions)}",
-            params,
+            global_conds.append(f"user_id = {ph}")
+            global_params.append(self.user_id)
+        global_where = f"WHERE {' AND '.join(global_conds)}" if global_conds else ""
+        global_rows = self.db.execute(
+            f"SELECT id, description, status, source_file, date FROM tasks {global_where}",
+            global_params,
         ).fetchall()
-        # Build lookup by normalized description -> (id, status, original_desc)
-        existing_by_norm: dict[str, tuple[str, str, str]] = {
-            self._normalize_task_desc(row[1]): (row[0], row[2], row[1])
-            for row in existing_rows
+        # Build lookup by normalized description -> (id, status, source_file, date)
+        global_by_norm: dict[str, tuple[str, str, str, str]] = {
+            self._normalize_task_desc(row[1]): (row[0], row[2], row[3], str(row[4]))
+            for row in global_rows
+        }
+
+        # Also build per-file lookup for stale task cleanup
+        file_by_norm: dict[str, tuple[str, str]] = {
+            self._normalize_task_desc(row[1]): (row[0], row[2])
+            for row in global_rows
+            if row[3] == source_file
         }
 
         # Collect normalized descriptions from current extraction
@@ -502,8 +513,8 @@ class ExtractionPipeline:
             for task in tasks
         }
 
-        # Remove stale backlog tasks that are no longer in the note
-        for norm_desc, (task_id, status, _orig) in existing_by_norm.items():
+        # Remove stale backlog tasks from THIS file that are no longer in the note
+        for norm_desc, (task_id, status) in file_by_norm.items():
             if norm_desc not in new_norm_descriptions and status == "backlog":
                 del_conds = [f"id = {ph}"]
                 del_params: list = [task_id]
@@ -517,8 +528,20 @@ class ExtractionPipeline:
             description = task.get("description", "")
             norm_desc = self._normalize_task_desc(description)
 
-            # Skip if this task already exists for this source file
-            if norm_desc in existing_by_norm:
+            # Skip if this task already exists ANYWHERE for this user
+            if norm_desc in global_by_norm:
+                existing_id, existing_status, existing_file, existing_date = global_by_norm[norm_desc]
+                # Update source_file to the latest note if this note is newer
+                if date > existing_date and existing_file != source_file:
+                    upd_conds = [f"id = {ph}"]
+                    upd_params: list = [existing_id]
+                    if dialect == "postgres" and self.user_id:
+                        upd_conds.append(f"user_id = {ph}")
+                        upd_params.append(self.user_id)
+                    self.db.execute(
+                        f"UPDATE tasks SET source_file = {ph}, date = {ph} WHERE {' AND '.join(upd_conds)}",
+                        [source_file, date] + upd_params,
+                    )
                 continue
 
             task_id = self._generate_id()
@@ -540,6 +563,9 @@ class ExtractionPipeline:
                 f"INSERT INTO tasks ({', '.join(cols)}) VALUES ({placeholders})",
                 vals,
             )
+            # Track newly inserted tasks in global lookup to prevent
+            # duplicates within the same extraction batch
+            global_by_norm[norm_desc] = (task_id, status, source_file, date)
             records += 1
 
         return records
@@ -565,6 +591,20 @@ class ExtractionPipeline:
 
         dialect = get_dialect(self.db)
         ph = "%s" if dialect == "postgres" else "?"
+
+        # Delete old meal records for this date/source so re-extraction
+        # doesn't leave duplicates.
+        if dialect == "postgres" and self.user_id:
+            self.db.execute(
+                f"DELETE FROM food_log WHERE date = {ph} AND source_file = {ph} AND user_id = {ph}",
+                [date, source_file, self.user_id],
+            )
+        else:
+            self.db.execute(
+                f"DELETE FROM food_log WHERE date = {ph} AND source_file = {ph}",
+                [date, source_file],
+            )
+
         records = 0
         for meal in meals:
             meal_id = self._generate_id()
