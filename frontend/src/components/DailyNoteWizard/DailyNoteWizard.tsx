@@ -423,10 +423,10 @@ function populateNote(content: string, answers: WizardAnswers): string {
     // Add workout suggestion table for strength training
     if (answers.workout === 'Strength' && answers.workoutSuggestion?.exercises.length) {
       const suggestion = answers.workoutSuggestion
-      const dateStr = suggestion.date ? ` (${suggestion.date})` : ''
+      const dateStr = suggestion.date ? ` ${suggestion.date}` : ''
       const tableLines = [
         '',
-        `> **Last session${dateStr}** — edit below to log, or delete if skipping`,
+        `> **Suggested Workout (from${dateStr})** — edit below to log, or delete if skipping`,
         '> ',
         '> | Exercise | Last | Suggested | Reps | Sets |',
         '> |----------|------|-----------|------|------|',

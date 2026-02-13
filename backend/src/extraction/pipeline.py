@@ -36,15 +36,18 @@ class ExtractionPipeline:
         self,
         db: DatabaseManager,
         claude: Optional[ClaudeClient] = None,
+        user_id: Optional[str] = None,
     ) -> None:
         """Initialize extraction pipeline.
 
         Args:
             db: Database manager for storing extracted data
             claude: Claude client for AI extraction (optional)
+            user_id: Authenticated user's UUID (used for Postgres inserts)
         """
         self.db = db
         self.claude = claude
+        self.user_id = user_id
         # Try shared/ schemas first (checked into git), fall back to data/schemas/
         project_root = Path(__file__).resolve().parents[3]
         shared_schemas = project_root / "shared" / "schemas"
@@ -180,13 +183,16 @@ class ExtractionPipeline:
         Returns:
             True if extraction needed
         """
+        dialect = get_dialect(self.db)
+        ph = "%s" if dialect == "postgres" else "?"
+        conditions = [f"file_path = {ph}", f"success = TRUE"]
+        params: list = [file_path]
+        if dialect == "postgres" and self.user_id:
+            conditions.append(f"user_id = {ph}")
+            params.append(self.user_id)
         result = self.db.execute(
-            """
-            SELECT file_hash FROM extraction_log
-            WHERE file_path = ? AND success = TRUE
-            ORDER BY extracted_at DESC LIMIT 1
-            """,
-            [file_path],
+            f"SELECT file_hash FROM extraction_log WHERE {' AND '.join(conditions)} ORDER BY extracted_at DESC LIMIT 1",
+            params,
         ).fetchall()
         if not result:
             return True
@@ -207,12 +213,17 @@ class ExtractionPipeline:
             success: Whether extraction succeeded
             error: Error message if failed
         """
+        dialect = get_dialect(self.db)
+        ph = "%s" if dialect == "postgres" else "?"
+        cols = ["file_path", "file_hash", "success", "error_message"]
+        vals: list = [file_path, file_hash, success, error]
+        if dialect == "postgres" and self.user_id:
+            cols.append("user_id")
+            vals.append(self.user_id)
+        placeholders = ", ".join([ph] * len(cols))
         self.db.execute(
-            """
-            INSERT INTO extraction_log (file_path, file_hash, success, error_message)
-            VALUES (?, ?, ?, ?)
-            """,
-            [file_path, file_hash, success, error],
+            f"INSERT INTO extraction_log ({', '.join(cols)}) VALUES ({placeholders})",
+            vals,
         )
 
     def _extract_date_from_path(self, file_path: str) -> Optional[str]:
@@ -302,27 +313,26 @@ class ExtractionPipeline:
         if not metrics:
             return 0
 
-        # Use upsert to handle updates (DuckDB: INSERT OR REPLACE, Postgres: ON CONFLICT)
         dialect = get_dialect(self.db)
-        sql = upsert(
-            "daily_metrics",
-            ["date", "sleep_hours", "sleep_quality", "energy", "mood", "stress", "notes", "source_file"],
-            ["date"],
-            dialect=dialect,
-        )
-        self.db.execute(
-            sql,
-            [
-                date,
-                metrics.get("sleep_hours"),
-                metrics.get("sleep_quality"),
-                metrics.get("energy"),
-                metrics.get("mood"),
-                metrics.get("stress"),
-                metrics.get("notes"),
-                source_file,
-            ],
-        )
+        cols = ["date", "sleep_hours", "sleep_quality", "energy", "mood", "stress", "notes", "source_file"]
+        conflict_cols = ["date"]
+        vals: list = [
+            date,
+            metrics.get("sleep_hours"),
+            metrics.get("sleep_quality"),
+            metrics.get("energy"),
+            metrics.get("mood"),
+            metrics.get("stress"),
+            metrics.get("notes"),
+            source_file,
+        ]
+        if dialect == "postgres" and self.user_id:
+            cols.append("user_id")
+            conflict_cols.append("user_id")
+            vals.append(self.user_id)
+
+        sql = upsert("daily_metrics", cols, conflict_cols, dialect=dialect)
+        self.db.execute(sql, vals)
         return 1
 
     def _store_activities(
@@ -344,29 +354,49 @@ class ExtractionPipeline:
         if not activities:
             return 0
 
+        dialect = get_dialect(self.db)
+        ph = "%s" if dialect == "postgres" else "?"
+
+        # Delete old exercise + activity records for this date/source so
+        # re-extraction doesn't leave stale rows behind.
+        if dialect == "postgres" and self.user_id:
+            self.db.execute(
+                f"DELETE FROM exercise_log WHERE date = {ph} AND source_file = {ph} AND user_id = {ph}",
+                [date, source_file, self.user_id],
+            )
+            self.db.execute(
+                f"DELETE FROM activities WHERE date = {ph} AND source_file = {ph} AND user_id = {ph}",
+                [date, source_file, self.user_id],
+            )
+        else:
+            self.db.execute(
+                f"DELETE FROM exercise_log WHERE date = {ph} AND source_file = {ph}",
+                [date, source_file],
+            )
+            self.db.execute(
+                f"DELETE FROM activities WHERE date = {ph} AND source_file = {ph}",
+                [date, source_file],
+            )
+
         records = 0
         for i, activity in enumerate(activities):
             activity_id = f"{date.replace('-', '')}_{activity.get('activity_type', 'other')}_{i+1}"
 
             # Insert activity record
-            dialect = get_dialect(self.db)
-            activity_sql = upsert(
-                "activities",
-                ["id", "date", "activity_type", "duration_minutes", "notes", "source_file"],
-                ["id"],
-                dialect=dialect,
-            )
-            self.db.execute(
-                activity_sql,
-                [
-                    activity_id,
-                    date,
-                    activity.get("activity_type", "other"),
-                    activity.get("duration_minutes"),
-                    activity.get("notes"),
-                    source_file,
-                ],
-            )
+            act_cols = ["id", "date", "activity_type", "duration_minutes", "notes", "source_file"]
+            act_vals: list = [
+                activity_id, date,
+                activity.get("activity_type", "other"),
+                activity.get("duration_minutes"),
+                activity.get("notes"),
+                source_file,
+            ]
+            if dialect == "postgres" and self.user_id:
+                act_cols.append("user_id")
+                act_vals.append(self.user_id)
+
+            activity_sql = upsert("activities", act_cols, ["id"], dialect=dialect)
+            self.db.execute(activity_sql, act_vals)
 
             # Insert exercise records
             for j, exercise in enumerate(activity.get("exercises", [])):
@@ -374,29 +404,24 @@ class ExtractionPipeline:
                 exercise_name = self._exercise_matcher.match(
                     exercise.get("name", "unknown")
                 )[0]
-                exercise_sql = upsert(
-                    "exercise_log",
-                    ["id", "activity_id", "date", "exercise_name", "weight_kg", "reps", "set_number",
-                     "duration_minutes", "distance_km", "notes", "source_file"],
-                    ["id"],
-                    dialect=dialect,
-                )
-                self.db.execute(
-                    exercise_sql,
-                    [
-                        exercise_id,
-                        activity_id,
-                        date,
-                        exercise_name,
-                        exercise.get("weight_kg"),
-                        exercise.get("reps"),
-                        j + 1,
-                        exercise.get("duration_minutes"),
-                        exercise.get("distance_km"),
-                        exercise.get("notes"),
-                        source_file,
-                    ],
-                )
+                ex_cols = ["id", "activity_id", "date", "exercise_name", "weight_kg", "reps", "set_number",
+                           "duration_minutes", "distance_km", "notes", "source_file"]
+                ex_vals: list = [
+                    exercise_id, activity_id, date, exercise_name,
+                    exercise.get("weight_kg"),
+                    exercise.get("reps"),
+                    j + 1,
+                    exercise.get("duration_minutes"),
+                    exercise.get("distance_km"),
+                    exercise.get("notes"),
+                    source_file,
+                ]
+                if dialect == "postgres" and self.user_id:
+                    ex_cols.append("user_id")
+                    ex_vals.append(self.user_id)
+
+                exercise_sql = upsert("exercise_log", ex_cols, ["id"], dialect=dialect)
+                self.db.execute(exercise_sql, ex_vals)
                 records += 1
 
         return records
@@ -452,10 +477,18 @@ class ExtractionPipeline:
             "cancelled": "cancelled",
         }
 
+        dialect = get_dialect(self.db)
+        ph = "%s" if dialect == "postgres" else "?"
+
         # Load all existing tasks for this source file
+        conditions = [f"source_file = {ph}"]
+        params: list = [source_file]
+        if dialect == "postgres" and self.user_id:
+            conditions.append(f"user_id = {ph}")
+            params.append(self.user_id)
         existing_rows = self.db.execute(
-            "SELECT id, description, status FROM tasks WHERE source_file = ?",
-            [source_file],
+            f"SELECT id, description, status FROM tasks WHERE {' AND '.join(conditions)}",
+            params,
         ).fetchall()
         # Build lookup by normalized description -> (id, status, original_desc)
         existing_by_norm: dict[str, tuple[str, str, str]] = {
@@ -470,10 +503,14 @@ class ExtractionPipeline:
         }
 
         # Remove stale backlog tasks that are no longer in the note
-        # (keep done/cancelled/in_progress — those were acted on by the user)
         for norm_desc, (task_id, status, _orig) in existing_by_norm.items():
             if norm_desc not in new_norm_descriptions and status == "backlog":
-                self.db.execute("DELETE FROM tasks WHERE id = ?", [task_id])
+                del_conds = [f"id = {ph}"]
+                del_params: list = [task_id]
+                if dialect == "postgres" and self.user_id:
+                    del_conds.append(f"user_id = {ph}")
+                    del_params.append(self.user_id)
+                self.db.execute(f"DELETE FROM tasks WHERE {' AND '.join(del_conds)}", del_params)
 
         records = 0
         for task in tasks:
@@ -489,22 +526,19 @@ class ExtractionPipeline:
             status = STATUS_MAP.get(raw_status, raw_status)
             completed_at = datetime.now() if status in ("done", "cancelled") else None
 
+            cols = ["id", "date", "description", "status", "completed_at", "category", "priority", "source_file"]
+            vals: list = [
+                task_id, date, description, status, completed_at,
+                task.get("category"), task.get("priority"), source_file,
+            ]
+            if dialect == "postgres" and self.user_id:
+                cols.append("user_id")
+                vals.append(self.user_id)
+
+            placeholders = ", ".join([ph] * len(cols))
             self.db.execute(
-                """
-                INSERT INTO tasks
-                (id, date, description, status, completed_at, category, priority, source_file)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                [
-                    task_id,
-                    date,
-                    description,
-                    status,
-                    completed_at,
-                    task.get("category"),
-                    task.get("priority"),
-                    source_file,
-                ],
+                f"INSERT INTO tasks ({', '.join(cols)}) VALUES ({placeholders})",
+                vals,
             )
             records += 1
 
@@ -529,29 +563,32 @@ class ExtractionPipeline:
         if not meals:
             return 0
 
+        dialect = get_dialect(self.db)
+        ph = "%s" if dialect == "postgres" else "?"
         records = 0
         for meal in meals:
             meal_id = self._generate_id()
+            cols = ["id", "date", "meal_type", "time", "description", "calories",
+                    "protein_g", "carbs_g", "fat_g", "notes", "source_file"]
+            vals: list = [
+                meal_id, date,
+                meal.get("meal_type"),
+                meal.get("time"),
+                meal.get("description", ""),
+                meal.get("calories"),
+                meal.get("protein_g"),
+                meal.get("carbs_g"),
+                meal.get("fat_g"),
+                meal.get("notes"),
+                source_file,
+            ]
+            if dialect == "postgres" and self.user_id:
+                cols.append("user_id")
+                vals.append(self.user_id)
+            placeholders = ", ".join([ph] * len(cols))
             self.db.execute(
-                """
-                INSERT INTO food_log
-                (id, date, meal_type, time, description, calories,
-                 protein_g, carbs_g, fat_g, notes, source_file)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                [
-                    meal_id,
-                    date,
-                    meal.get("meal_type"),
-                    meal.get("time"),
-                    meal.get("description", ""),
-                    meal.get("calories"),
-                    meal.get("protein_g"),
-                    meal.get("carbs_g"),
-                    meal.get("fat_g"),
-                    meal.get("notes"),
-                    source_file,
-                ],
+                f"INSERT INTO food_log ({', '.join(cols)}) VALUES ({placeholders})",
+                vals,
             )
             records += 1
 
@@ -582,59 +619,65 @@ class ExtractionPipeline:
             return 0
 
         extraction_id = self._generate_id()
+        dialect = get_dialect(self.db)
+        ph = "%s" if dialect == "postgres" else "?"
 
-        # Ensure custom_extractions table exists
-        self.db.execute(
-            """
-            CREATE TABLE IF NOT EXISTS custom_extractions (
-                id VARCHAR PRIMARY KEY,
-                schema_name VARCHAR NOT NULL,
-                date DATE,
-                data JSON NOT NULL,
-                source_file VARCHAR,
-                extracted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        # Ensure custom_extractions table exists (DuckDB only; Postgres schema managed separately)
+        if dialect != "postgres":
+            self.db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS custom_extractions (
+                    id VARCHAR PRIMARY KEY,
+                    schema_name VARCHAR NOT NULL,
+                    date DATE,
+                    data JSON NOT NULL,
+                    source_file VARCHAR,
+                    extracted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """
             )
-            """
-        )
 
+        cols = ["id", "schema_name", "date", "data", "source_file"]
+        vals: list = [extraction_id, schema_name, date, json.dumps(data), source_file]
+        if dialect == "postgres" and self.user_id:
+            cols.append("user_id")
+            vals.append(self.user_id)
+        placeholders = ", ".join([ph] * len(cols))
         self.db.execute(
-            """
-            INSERT INTO custom_extractions
-            (id, schema_name, date, data, source_file)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            [
-                extraction_id,
-                schema_name,
-                date,
-                json.dumps(data),
-                source_file,
-            ],
+            f"INSERT INTO custom_extractions ({', '.join(cols)}) VALUES ({placeholders})",
+            vals,
         )
 
         return 1
 
     @staticmethod
     def _strip_suggestions(content: str) -> str:
-        """Remove blockquoted workout suggestions before extraction.
+        """Remove blockquoted workout suggestion tables before extraction.
 
-        Strips lines that are part of a suggestion block (lines starting with >
-        that follow a "> **Last session" header) so that suggested workouts
-        are not mistakenly extracted as logged workouts.
+        Strips any contiguous blockquote block (lines starting with >) that
+        contains a markdown table (pipe characters). This catches all header
+        variants — "> **Last session", "> **Suggested Workout**", etc.
         """
         lines = content.split("\n")
-        result = []
-        in_suggestion = False
+        result: list[str] = []
+        block: list[str] = []
         for line in lines:
             stripped = line.strip()
-            if stripped.startswith("> **Last session"):
-                in_suggestion = True
-                continue
-            if in_suggestion:
-                if stripped.startswith(">"):
-                    continue
-                in_suggestion = False
-            result.append(line)
+            if stripped.startswith(">"):
+                block.append(line)
+            else:
+                if block:
+                    # Keep the block only if it doesn't look like a suggestion table
+                    has_table = any("|" in l for l in block)
+                    if not has_table:
+                        result.extend(block)
+                    block = []
+                result.append(line)
+        # Handle trailing blockquote
+        if block:
+            has_table = any("|" in l for l in block)
+            if not has_table:
+                result.extend(block)
         return "\n".join(result)
 
     async def extract(

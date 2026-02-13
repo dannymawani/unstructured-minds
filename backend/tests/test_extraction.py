@@ -268,3 +268,142 @@ class TestExtractionAPI:
         assert data["total"] == 0
         assert data["successful"] == 0
         assert data["failed"] == 0
+
+
+class TestStripSuggestions:
+    """Tests for _strip_suggestions method."""
+
+    def test_strips_suggested_workout_with_table(self, mock_db):
+        """Test that suggested workout tables with blockquotes are stripped."""
+        pipeline = ExtractionPipeline(mock_db)
+        content = """## Workout
+- **Type**: Strength
+- **Focus**: Upper Body
+
+> **Suggested Workout (from 2026-02-10)** — edit below to log
+> 
+> | Exercise | Last | Suggested | Reps | Sets |
+> |----------|------|-----------|------|------|
+> | Squat | 100kg | 102.5kg | 5 | 3 |
+
+### Actual workout
+- Bench Press: 80kg x 5 x 3
+- Deadlift: 120kg x 3 x 3"""
+
+        result = pipeline._strip_suggestions(content)
+        
+        assert "| Squat |" not in result
+        assert "Suggested Workout" not in result
+        assert "Bench Press" in result
+        assert "Deadlift" in result
+
+    def test_strips_old_format_suggestion(self, mock_db):
+        """Test stripping old-format 'Last session' blockquote tables."""
+        pipeline = ExtractionPipeline(mock_db)
+        content = """> **Last session (2026-02-08)** — edit below
+> 
+> | Exercise | Last | Suggested | Reps | Sets |
+> |----------|------|-----------|------|------|
+> | Row | 60kg | 62.5kg | 8 | 3 |
+
+### My workout
+- Pull-ups: BW x 10 x 3"""
+
+        result = pipeline._strip_suggestions(content)
+        
+        assert "| Row |" not in result
+        assert "Last session" not in result
+        assert "Pull-ups" in result
+
+    def test_preserves_non_table_blockquotes(self, mock_db):
+        """Test that blockquotes without tables are preserved."""
+        pipeline = ExtractionPipeline(mock_db)
+        content = """> This is a regular blockquote with no table
+> Just some text here
+
+### Notes
+- Something important"""
+
+        result = pipeline._strip_suggestions(content)
+        
+        assert "regular blockquote" in result
+        assert "Just some text here" in result
+        assert "Something important" in result
+
+    def test_strips_ai_generated_header_variant(self, mock_db):
+        """Test stripping AI-generated 'Suggested Workout' header variant."""
+        pipeline = ExtractionPipeline(mock_db)
+        content = """> **Suggested Workout**
+> 
+> | Exercise | Weight | Reps | Sets |
+> |----------|--------|------|------|
+> | Turkish Get-Up | 16kg | 3 | 3 |
+
+Actual exercises:
+- Leg Curl 40kg 3x12"""
+
+        result = pipeline._strip_suggestions(content)
+        
+        assert "Turkish Get-Up" not in result
+        assert "Suggested Workout" not in result
+        assert "Leg Curl" in result
+
+    def test_handles_content_without_blockquotes(self, mock_db):
+        """Test handling of content with no blockquotes."""
+        pipeline = ExtractionPipeline(mock_db)
+        content = """## My Workout
+- Squat: 100kg x 5 x 3
+- Bench: 80kg x 5 x 3"""
+
+        result = pipeline._strip_suggestions(content)
+        
+        assert result == content
+
+    def test_handles_multiple_blockquote_blocks(self, mock_db):
+        """Test handling multiple blockquote blocks."""
+        pipeline = ExtractionPipeline(mock_db)
+        content = """> Regular blockquote
+> Just notes
+
+> **Suggested Workout**
+> 
+> | Exercise | Reps |
+> |----------|------|
+> | Squat | 5 |
+
+> Another blockquote
+> More notes
+
+## Actual exercises
+- Deadlift: 120kg"""
+
+        result = pipeline._strip_suggestions(content)
+        
+        # Regular blockquotes should stay
+        assert "Regular blockquote" in result
+        assert "Another blockquote" in result
+        # Suggested workout should be stripped
+        assert "| Squat |" not in result
+        # Actual data should stay
+        assert "Deadlift" in result
+
+    def test_empty_content(self, mock_db):
+        """Test handling of empty content."""
+        pipeline = ExtractionPipeline(mock_db)
+        
+        result = pipeline._strip_suggestions("")
+        assert result == ""
+
+    def test_blockquote_at_end_of_content(self, mock_db):
+        """Test blockquote at end of file without trailing newline."""
+        pipeline = ExtractionPipeline(mock_db)
+        content = """## Workout
+
+> **Suggested Workout**
+> | Exercise | Reps |
+> |----------|------|
+> | Squat | 5 |"""
+
+        result = pipeline._strip_suggestions(content)
+        
+        assert "| Squat |" not in result

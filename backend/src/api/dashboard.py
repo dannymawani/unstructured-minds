@@ -11,7 +11,7 @@ from ..config import settings
 from ..db import DatabaseManager
 from ..extraction.exercise_matcher import ExerciseMatcher
 from ..extraction.exercise_normalizer import normalize_exercises
-from .dependencies import get_db as _get_db, get_analytics_db
+from .dependencies import get_db as _get_db, get_analytics_db, get_user_id
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -370,36 +370,35 @@ def get_exercise_progress(
         for row in result
     ]
 
-    # Calculate summary
-    summary_result = db.execute(
+    # Combined summary + current max in a single query (avoids N+1)
+    summary_row = db.execute(
         """
-        SELECT
-            MAX(weight_kg) as all_time_max,
-            SUM(COALESCE(weight_kg, 0) * COALESCE(reps, 0)) as total_volume,
-            COUNT(DISTINCT date) as total_sessions
-        FROM exercise_log
-        WHERE exercise_name = ?
-        """,
-        [exercise],
-    ).fetchone()
-
-    # Get current max (from most recent session)
-    current_max_result = db.execute(
-        """
-        SELECT MAX(weight_kg)
-        FROM exercise_log
-        WHERE exercise_name = ? AND date = (
-            SELECT MAX(date) FROM exercise_log WHERE exercise_name = ?
+        WITH summary AS (
+            SELECT
+                MAX(weight_kg) as all_time_max,
+                SUM(COALESCE(weight_kg, 0) * COALESCE(reps, 0)) as total_volume,
+                COUNT(DISTINCT date) as total_sessions
+            FROM exercise_log
+            WHERE exercise_name = ?
+        ),
+        current AS (
+            SELECT MAX(weight_kg) as current_max
+            FROM exercise_log
+            WHERE exercise_name = ? AND date = (
+                SELECT MAX(date) FROM exercise_log WHERE exercise_name = ?
+            )
         )
+        SELECT s.all_time_max, s.total_volume, s.total_sessions, c.current_max
+        FROM summary s, current c
         """,
-        [exercise, exercise],
+        [exercise, exercise, exercise],
     ).fetchone()
 
     summary = ExerciseSummary(
-        current_max=float(current_max_result[0]) if current_max_result and current_max_result[0] else None,
-        all_time_max=float(summary_result[0]) if summary_result and summary_result[0] else None,
-        total_volume=int(summary_result[1]) if summary_result and summary_result[1] else 0,
-        total_sessions=summary_result[2] if summary_result else 0,
+        current_max=float(summary_row[3]) if summary_row and summary_row[3] else None,
+        all_time_max=float(summary_row[0]) if summary_row and summary_row[0] else None,
+        total_volume=int(summary_row[1]) if summary_row and summary_row[1] else 0,
+        total_sessions=summary_row[2] if summary_row else 0,
     )
 
     return ExerciseProgressResponse(
@@ -851,18 +850,18 @@ class LastWorkoutResponse(BaseModel):
     focus: Optional[str] = None
 
 
-def _load_json_config(filename: str, request: Request = None) -> dict:
+def _load_json_config(filename: str, request: Request = None, user_id: str = None) -> dict:
     """Load a JSON config file. Checks user_settings (Postgres) first, then data dir."""
     import json
 
     # In hybrid/postgres mode, check user_settings table
-    if request:
+    if request and user_id:
         from ..db.sql_compat import get_dialect
         from ..db.user_settings import UserSettingsStore
         db = request.app.state.db
         if get_dialect(db) == "postgres":
             key = filename.removesuffix(".json")
-            store = UserSettingsStore(db, settings.default_user_id)
+            store = UserSettingsStore(db, user_id)
             data = store.get(key)
             if data is not None:
                 return data
@@ -883,6 +882,7 @@ def get_last_strength_workout(
     request: Request,
     db: DatabaseManager = Depends(get_db),
     matcher: ExerciseMatcher = Depends(get_exercise_matcher),
+    user_id: str = Depends(get_user_id),
 ) -> LastWorkoutResponse:
     """Get the last strength training workout with progressive overload suggestions.
 
@@ -896,7 +896,7 @@ def get_last_strength_workout(
         Last workout date, exercises with suggested weights, and focus area
     """
     # Load config for progressive overload increment and exercise display names
-    training_config = _load_json_config("training_config.json", request)
+    training_config = _load_json_config("training_config.json", request, user_id)
     exercise_defs = _load_json_config("exercise_definitions.json")
     increment = training_config.get("preferences", {}).get(
         "progressive_overload_increment_kg", 1.5

@@ -9,8 +9,9 @@ from fastapi import APIRouter, Depends, Request, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from ..db import DatabaseManager
+from ..db.sql_compat import get_dialect, placeholder, user_filter
 from ..storage import StorageBackend
-from .dependencies import get_db as _dep_get_db
+from .dependencies import get_db as _dep_get_db, get_storage as _dep_get_storage, get_user_id
 from .settings import resolve_daily_note_path
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
@@ -83,7 +84,7 @@ def get_db(request: Request):
 
 
 def get_storage(request: Request) -> StorageBackend:
-    return request.app.state.storage
+    return _dep_get_storage(request)
 
 
 def _row_to_task(row: tuple, columns: list[str]) -> TaskOut:
@@ -169,28 +170,33 @@ async def list_tasks(
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
     db: DatabaseManager = Depends(get_db),
+    user_id: str = Depends(get_user_id),
 ) -> TaskListResponse:
     """List personal tasks with optional filters."""
-    conditions = []
+    dialect = get_dialect(db)
+    ph = placeholder(dialect)
+    conditions: list[str] = []
     params: list = []
+
+    user_filter(dialect, user_id, conditions, params)
 
     if hide_old and not status:
         conditions.append(
-            "(status NOT IN ('done', 'cancelled') OR completed_at IS NULL OR completed_at >= ?)"
+            f"(status NOT IN ('done', 'cancelled') OR completed_at IS NULL OR completed_at >= {ph})"
         )
         params.append((datetime.now() - timedelta(days=7)).isoformat())
 
     if status:
-        conditions.append("status = ?")
+        conditions.append(f"status = {ph}")
         params.append(status)
     if category:
-        conditions.append("category = ?")
+        conditions.append(f"category = {ph}")
         params.append(category)
     if date_from:
-        conditions.append("date >= ?")
+        conditions.append(f"date >= {ph}")
         params.append(date_from)
     if date_to:
-        conditions.append("date <= ?")
+        conditions.append(f"date <= {ph}")
         params.append(date_to)
 
     where = " AND ".join(conditions)
@@ -200,7 +206,7 @@ async def list_tasks(
     total = count_result.fetchone()[0]
 
     result = db.execute(
-        f"SELECT * FROM tasks {where_clause} ORDER BY date DESC, id LIMIT ? OFFSET ?",
+        f"SELECT * FROM tasks {where_clause} ORDER BY date DESC, id LIMIT {ph} OFFSET {ph}",
         params + [limit, offset],
     )
     columns = [desc[0] for desc in result.description]
@@ -214,9 +220,15 @@ async def list_tasks(
 async def get_task(
     task_id: str,
     db: DatabaseManager = Depends(get_db),
+    user_id: str = Depends(get_user_id),
 ) -> TaskOut:
     """Get a single task by ID."""
-    result = db.execute("SELECT * FROM tasks WHERE id = ?", [task_id])
+    dialect = get_dialect(db)
+    ph = placeholder(dialect)
+    conditions = [f"id = {ph}"]
+    params: list = [task_id]
+    user_filter(dialect, user_id, conditions, params)
+    result = db.execute(f"SELECT * FROM tasks WHERE {' AND '.join(conditions)}", params)
     columns = [desc[0] for desc in result.description]
     row = result.fetchone()
     if not row:
@@ -230,10 +242,17 @@ async def update_task(
     request: TaskUpdateRequest,
     db: DatabaseManager = Depends(get_db),
     storage: StorageBackend = Depends(get_storage),
+    user_id: str = Depends(get_user_id),
 ) -> TaskOut:
     """Update a task's status, category, or priority. Syncs checkbox in source markdown."""
+    dialect = get_dialect(db)
+    ph = placeholder(dialect)
+
     # Fetch existing task
-    result = db.execute("SELECT * FROM tasks WHERE id = ?", [task_id])
+    fetch_conds = [f"id = {ph}"]
+    fetch_params: list = [task_id]
+    user_filter(dialect, user_id, fetch_conds, fetch_params)
+    result = db.execute(f"SELECT * FROM tasks WHERE {' AND '.join(fetch_conds)}", fetch_params)
     columns = [desc[0] for desc in result.description]
     row = result.fetchone()
     if not row:
@@ -245,34 +264,36 @@ async def update_task(
     updates = []
     values: list = []
     if request.status is not None:
-        updates.append("status = ?")
+        updates.append(f"status = {ph}")
         values.append(request.status)
         if request.status in ("done", "cancelled"):
-            updates.append("completed_at = ?")
+            updates.append(f"completed_at = {ph}")
             values.append(datetime.now().isoformat())
         elif existing.get("completed_at"):
             updates.append("completed_at = NULL")
     if request.description is not None:
-        updates.append("description = ?")
+        updates.append(f"description = {ph}")
         values.append(request.description)
     if request.category is not None:
-        updates.append("category = ?")
+        updates.append(f"category = {ph}")
         values.append(request.category)
     if request.priority is not None:
-        updates.append("priority = ?")
+        updates.append(f"priority = {ph}")
         values.append(request.priority)
     if request.deadline is not None:
-        updates.append("deadline = ?")
+        updates.append(f"deadline = {ph}")
         values.append(request.deadline)
     if request.notes is not None:
-        updates.append("notes = ?")
+        updates.append(f"notes = {ph}")
         values.append(request.notes)
 
     if not updates:
         raise HTTPException(status_code=400, detail="No fields to update")
 
+    where_conds = [f"id = {ph}"]
     values.append(task_id)
-    db.execute(f"UPDATE tasks SET {', '.join(updates)} WHERE id = ?", values)
+    user_filter(dialect, user_id, where_conds, values)
+    db.execute(f"UPDATE tasks SET {', '.join(updates)} WHERE {' AND '.join(where_conds)}", values)
 
     # Two-way sync: update checkbox in source markdown
     if existing.get("source_file"):
@@ -285,7 +306,6 @@ async def update_task(
                 existing.get("status") or "backlog",
             )
         if request.status is not None:
-            # Use the new description if it was also updated
             desc = request.description if request.description is not None else existing["description"]
             await _sync_task_to_markdown(
                 storage,
@@ -295,7 +315,10 @@ async def update_task(
             )
 
     # Return updated task
-    result = db.execute("SELECT * FROM tasks WHERE id = ?", [task_id])
+    refetch_conds = [f"id = {ph}"]
+    refetch_params: list = [task_id]
+    user_filter(dialect, user_id, refetch_conds, refetch_params)
+    result = db.execute(f"SELECT * FROM tasks WHERE {' AND '.join(refetch_conds)}", refetch_params)
     columns = [desc[0] for desc in result.description]
     row = result.fetchone()
     return _row_to_task(row, columns)
@@ -306,16 +329,22 @@ async def delete_task(
     task_id: str,
     db: DatabaseManager = Depends(get_db),
     storage: StorageBackend = Depends(get_storage),
+    user_id: str = Depends(get_user_id),
 ) -> None:
     """Delete a task by ID and remove from source markdown."""
-    result = db.execute("SELECT * FROM tasks WHERE id = ?", [task_id])
+    dialect = get_dialect(db)
+    ph = placeholder(dialect)
+    conditions = [f"id = {ph}"]
+    params: list = [task_id]
+    user_filter(dialect, user_id, conditions, params)
+    result = db.execute(f"SELECT * FROM tasks WHERE {' AND '.join(conditions)}", params)
     columns = [desc[0] for desc in result.description]
     row = result.fetchone()
     if not row:
         raise HTTPException(status_code=404, detail=f"Task not found: {task_id}")
 
     task = dict(zip(columns, row))
-    db.execute("DELETE FROM tasks WHERE id = ?", [task_id])
+    db.execute(f"DELETE FROM tasks WHERE {' AND '.join(conditions)}", params)
 
     # Remove checkbox from source markdown
     if task.get("source_file"):
@@ -346,20 +375,25 @@ async def create_task(
     request: TaskCreateRequest,
     db: DatabaseManager = Depends(get_db),
     storage: StorageBackend = Depends(get_storage),
+    user_id: str = Depends(get_user_id),
 ) -> TaskOut:
-    """Create a new task. Adds to DuckDB and appends to today's daily note."""
+    """Create a new task. Adds to DB and appends to today's daily note."""
+    dialect = get_dialect(db)
+    ph = placeholder(dialect)
     now = datetime.now()
     date_str = now.strftime("%Y-%m-%d")
     task_id = f"{now.strftime('%Y%m%d')}_{uuid.uuid4().hex[:8]}"
 
     daily_note_path = resolve_daily_note_path(date_str)
 
-    # Insert into DuckDB
-    db.execute(
-        """INSERT INTO tasks (id, date, description, status, category, priority, source_file, deadline, notes)
-           VALUES (?, ?, ?, 'backlog', ?, ?, ?, ?, ?)""",
-        [task_id, date_str, request.description, request.category, request.priority, daily_note_path, request.deadline, request.notes],
-    )
+    cols = ["id", "date", "description", "status", "category", "priority", "source_file", "deadline", "notes"]
+    vals: list = [task_id, date_str, request.description, "backlog", request.category,
+                  request.priority, daily_note_path, request.deadline, request.notes]
+    if dialect == "postgres":
+        cols.append("user_id")
+        vals.append(user_id)
+    placeholders = ", ".join([ph] * len(cols))
+    db.execute(f"INSERT INTO tasks ({', '.join(cols)}) VALUES ({placeholders})", vals)
 
     # Append to today's daily note
     try:
@@ -381,7 +415,10 @@ async def create_task(
     except Exception:
         pass  # Task is in DB even if markdown append fails
 
-    result = db.execute("SELECT * FROM tasks WHERE id = ?", [task_id])
+    fetch_conds = [f"id = {ph}"]
+    fetch_params: list = [task_id]
+    user_filter(dialect, user_id, fetch_conds, fetch_params)
+    result = db.execute(f"SELECT * FROM tasks WHERE {' AND '.join(fetch_conds)}", fetch_params)
     columns = [desc[0] for desc in result.description]
     row = result.fetchone()
     return _row_to_task(row, columns)
@@ -391,11 +428,15 @@ async def create_task(
 async def bulk_complete_tasks(
     request: BulkCompleteRequest,
     db: DatabaseManager = Depends(get_db),
+    user_id: str = Depends(get_user_id),
 ) -> BulkCompleteResponse:
     """Mark all tasks matching given statuses as done with backdated completed_at.
 
     Backdating ensures tasks are hidden by the default hide_old filter (7 days).
     """
+    dialect = get_dialect(db)
+    ph = placeholder(dialect)
+
     valid_statuses = {"backlog", "in_progress", "done", "cancelled"}
     for s in request.statuses:
         if s not in valid_statuses:
@@ -404,19 +445,24 @@ async def bulk_complete_tasks(
     if not request.statuses:
         return BulkCompleteResponse(updated=0)
 
-    placeholders = ", ".join("?" for _ in request.statuses)
+    status_placeholders = ", ".join(ph for _ in request.statuses)
     completed_at = (datetime.now() - timedelta(days=request.backdate_days)).isoformat()
 
-    count_result = db.execute(
-        f"SELECT COUNT(*) FROM tasks WHERE status IN ({placeholders})",
-        request.statuses,
-    )
+    conditions = [f"status IN ({status_placeholders})"]
+    params: list = list(request.statuses)
+    user_filter(dialect, user_id, conditions, params)
+    where = " AND ".join(conditions)
+
+    count_result = db.execute(f"SELECT COUNT(*) FROM tasks WHERE {where}", params)
     count = count_result.fetchone()[0]
 
     if count > 0:
+        update_params: list = [completed_at] + list(request.statuses)
+        update_conds = [f"status IN ({status_placeholders})"]
+        user_filter(dialect, user_id, update_conds, update_params)
         db.execute(
-            f"UPDATE tasks SET status = 'done', completed_at = ? WHERE status IN ({placeholders})",
-            [completed_at] + request.statuses,
+            f"UPDATE tasks SET status = 'done', completed_at = {ph} WHERE {' AND '.join(update_conds)}",
+            update_params,
         )
 
     return BulkCompleteResponse(updated=count)

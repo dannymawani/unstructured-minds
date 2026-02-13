@@ -69,7 +69,7 @@ async def lifespan(app: FastAPI):
         # Postgres is the source of truth for all data.
         # DuckDB (in-memory) is a disposable analytics cache.
         # Vault/data files stored in Postgres.
-        pg = PostgresManager(settings.database_url)
+        pg = PostgresManager(settings.database_url, pool_min=settings.db_pool_min, pool_max=settings.db_pool_max)
         pg.connect()
         init_postgres_schema(pg, settings.default_user_id)
         app.state.db = pg
@@ -79,7 +79,9 @@ async def lifespan(app: FastAPI):
         analytics_db.connect()
         app.state.analytics_db = analytics_db
 
-        # Populate analytics cache from Postgres
+        # Populate analytics cache from Postgres.
+        # Short-term: cache uses default_user_id. Per-request user-scoped
+        # queries go directly to Postgres via dependencies.
         analytics_cache_manager = AnalyticsCacheManager(
             pg, analytics_db, settings.default_user_id
         )
@@ -87,7 +89,8 @@ async def lifespan(app: FastAPI):
         analytics_cache_manager.refresh()
         analytics_cache_manager.start_background_refresh(interval=60)
 
-        # Storage: vault files in Postgres
+        # Storage: default instances for startup tasks (e.g. exercise normalization).
+        # Per-request user-scoped storage is created in dependencies.py.
         storage = PostgresStorage(pg, settings.default_user_id)
         data_storage = PostgresStorage(pg, settings.default_user_id, "_data")
 
