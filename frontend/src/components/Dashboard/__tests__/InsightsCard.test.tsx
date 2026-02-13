@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import { InsightsCard } from '../InsightsCard';
+import { InsightsCard, _resetInsightsCache } from '../InsightsCard';
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -15,6 +15,7 @@ const mockLocalStorage = {
 Object.defineProperty(window, 'localStorage', { value: mockLocalStorage });
 
 beforeEach(() => {
+  _resetInsightsCache();
   mockFetch.mockReset();
   mockLocalStorage.getItem.mockReset();
   mockLocalStorage.setItem.mockReset();

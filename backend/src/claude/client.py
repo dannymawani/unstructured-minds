@@ -456,6 +456,10 @@ Use the classify_exercises tool to return your classifications."""
         return f"""Extract structured data from the following content.
 Use the extract_data tool to return the data.
 
+For any food or meals mentioned, ALWAYS estimate calories and macronutrients
+(protein_g, carbs_g, fat_g) based on typical serving sizes, even if the user
+did not provide numbers. Use your nutritional knowledge to give reasonable estimates.
+
 Content:
 {content}
 """

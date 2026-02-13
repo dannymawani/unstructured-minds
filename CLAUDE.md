@@ -51,6 +51,10 @@ Filenames and CSV dates: `YYYY-MM-DD`. Daily note path: `Daily-Notes/YYYY-MM/YYY
 
 No AUTO_INCREMENT — use `DEFAULT nextval('seq')` or app-generated IDs.
 
+### Dashboard & Analytics Cache
+
+In cloud mode, dashboard endpoints use an in-memory DuckDB (analytics cache) populated from Postgres per-user. The `dashboard.py` module defines a **local `get_db`** that depends on `get_user_id` (auth + cache seeding). This local function **must be defined before all endpoint functions** in the file — Python evaluates `Depends(get_db)` default args at function definition time, so any endpoint defined before the local `get_db` would bind to the imported `dependencies.get_db` (Postgres, no auth, no user isolation).
+
 ### Cloud Setup
 
 ```bash
@@ -85,6 +89,11 @@ See `docs/AUTH.md` for the full auth architecture.
 ### Commit Hygiene
 
 Stage specific files (`git add <files>`), not `git add .`. Check with `git diff --cached --stat`.
+
+## Shell / Environment
+
+- **macOS zsh**: Always quote URLs with single quotes in `curl` commands. Unquoted `?` and `&` trigger zsh globbing errors: `curl -s 'http://localhost:8000/endpoint?param=value'`
+- Use `python3` not `python` — only `python3` is on `PATH`.
 
 ## CSS/UI
 
