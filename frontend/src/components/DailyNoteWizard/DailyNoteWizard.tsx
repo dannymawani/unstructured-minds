@@ -1,12 +1,12 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, forwardRef } from 'react'
 import { cn } from '@/lib/utils'
-import { X, ChevronLeft, ArrowRight, Loader2 } from 'lucide-react'
+import { X, ChevronLeft, ArrowRight, Loader2, CheckSquare, Square, AlertTriangle, Clock, ArrowRightCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 interface DailyNoteWizardProps {
   isOpen: boolean
   onClose: () => void
-  onComplete: (content: string) => void
+  onComplete: (content: string, selectedTaskIds?: string[]) => void
   noteContent: string
   date: string
   apiBaseUrl?: string
@@ -27,6 +27,18 @@ interface WorkoutSuggestion {
   focus: string | null
 }
 
+interface RolloverTask {
+  id: string
+  date: string
+  description: string
+  status: string
+  category: string | null
+  priority: number | null
+  deadline: string | null
+  deadline_status: string | null // "overdue" | "due_today" | "upcoming" | null
+  auto_select: boolean
+}
+
 interface WizardAnswers {
   workout: WorkoutType | null
   sleep: number | null
@@ -36,9 +48,11 @@ interface WizardAnswers {
   personal: string
   adhoc: string
   workoutSuggestion: WorkoutSuggestion | null
+  rolloverTasks: RolloverTask[]
+  selectedRolloverIds: Set<string>
 }
 
-const TOTAL_STEPS = 7
+const TOTAL_STEPS = 8
 
 export function DailyNoteWizard({ isOpen, onClose, onComplete, noteContent, date, apiBaseUrl }: DailyNoteWizardProps) {
   const [step, setStep] = useState(1)
@@ -51,9 +65,42 @@ export function DailyNoteWizard({ isOpen, onClose, onComplete, noteContent, date
     personal: '',
     adhoc: '',
     workoutSuggestion: null,
+    rolloverTasks: [],
+    selectedRolloverIds: new Set(),
   })
   const [isPopulating, setIsPopulating] = useState(false)
+  const [rolloverLoading, setRolloverLoading] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Fetch rollover tasks when wizard opens
+  useEffect(() => {
+    if (!isOpen || !apiBaseUrl) return
+
+    setRolloverLoading(true)
+    fetch(`${apiBaseUrl}/tasks/rollover?target_date=${date}`)
+      .then(res => res.ok ? res.json() : null)
+      .then((data: { tasks: RolloverTask[]; total: number } | null) => {
+        if (data && data.tasks.length > 0) {
+          const autoSelected = new Set(
+            data.tasks.filter(t => t.auto_select).map(t => t.id)
+          )
+          setAnswers(a => ({
+            ...a,
+            rolloverTasks: data.tasks,
+            selectedRolloverIds: autoSelected,
+          }))
+        } else {
+          // No rollover tasks — auto-skip to step 2
+          setAnswers(a => ({ ...a, rolloverTasks: [], selectedRolloverIds: new Set() }))
+          setStep(2)
+        }
+      })
+      .catch(() => {
+        setAnswers(a => ({ ...a, rolloverTasks: [], selectedRolloverIds: new Set() }))
+        setStep(2)
+      })
+      .finally(() => setRolloverLoading(false))
+  }, [isOpen, apiBaseUrl, date])
 
   // Reset when opening
   useEffect(() => {
@@ -68,6 +115,8 @@ export function DailyNoteWizard({ isOpen, onClose, onComplete, noteContent, date
         personal: '',
         adhoc: '',
         workoutSuggestion: null,
+        rolloverTasks: [],
+        selectedRolloverIds: new Set(),
       })
     }
   }, [isOpen])
@@ -90,7 +139,7 @@ export function DailyNoteWizard({ isOpen, onClose, onComplete, noteContent, date
 
   // Focus textarea when reaching text steps
   useEffect(() => {
-    if (isOpen && step >= 5) {
+    if (isOpen && step >= 6) {
       setTimeout(() => textareaRef.current?.focus(), 50)
     }
   }, [isOpen, step])
@@ -101,6 +150,16 @@ export function DailyNoteWizard({ isOpen, onClose, onComplete, noteContent, date
     } else {
       // Final step — populate via API, fall back to client-side
       setIsPopulating(true)
+
+      // Build rollover_tasks payload for API
+      const selectedRolloverTasks = answers.rolloverTasks
+        .filter(t => answers.selectedRolloverIds.has(t.id))
+        .map(t => ({
+          description: t.description,
+          deadline: t.deadline,
+          deadline_status: t.deadline_status,
+        }))
+
       try {
         if (apiBaseUrl) {
           const res = await fetch(`${apiBaseUrl}/calendar/daily-note/populate`, {
@@ -117,11 +176,13 @@ export function DailyNoteWizard({ isOpen, onClose, onComplete, noteContent, date
               personal: answers.personal,
               adhoc: answers.adhoc,
               workout_suggestion: answers.workoutSuggestion,
+              rollover_tasks: selectedRolloverTasks.length > 0 ? selectedRolloverTasks : null,
             }),
           })
           if (res.ok) {
             const data = await res.json()
-            onComplete(data.content)
+            const selectedIds = [...answers.selectedRolloverIds]
+            onComplete(data.content, selectedIds.length > 0 ? selectedIds : undefined)
             return
           }
         }
@@ -133,13 +194,18 @@ export function DailyNoteWizard({ isOpen, onClose, onComplete, noteContent, date
 
       // Client-side fallback
       const populated = populateNote(noteContent, answers)
-      onComplete(populated)
+      const selectedIds = [...answers.selectedRolloverIds]
+      onComplete(populated, selectedIds.length > 0 ? selectedIds : undefined)
     }
   }, [step, noteContent, answers, onComplete, apiBaseUrl, date])
 
   const goBack = useCallback(() => {
-    if (step > 1) setStep(s => s - 1)
-  }, [step])
+    if (step > 1) {
+      // Skip rollover step when going back if there are no tasks
+      if (step === 2 && answers.rolloverTasks.length === 0) return
+      setStep(s => s - 1)
+    }
+  }, [step, answers.rolloverTasks.length])
 
   // Handle Enter key in textareas to advance
   const handleTextareaKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -152,6 +218,9 @@ export function DailyNoteWizard({ isOpen, onClose, onComplete, noteContent, date
   if (!isOpen) return null
 
   const formattedDate = formatDate(date)
+  // Effective step display accounts for auto-skipped rollover
+  const displayStep = answers.rolloverTasks.length === 0 ? step - 1 : step
+  const displayTotal = answers.rolloverTasks.length === 0 ? TOTAL_STEPS - 1 : TOTAL_STEPS
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
@@ -170,17 +239,17 @@ export function DailyNoteWizard({ isOpen, onClose, onComplete, noteContent, date
         {/* Progress bar */}
         <div className="px-6 pb-4">
           <div className="flex items-center gap-1.5">
-            {Array.from({ length: TOTAL_STEPS }, (_, i) => (
+            {Array.from({ length: displayTotal }, (_, i) => (
               <div
                 key={i}
                 className={cn(
                   'h-1 flex-1 rounded-full transition-colors',
-                  i < step ? 'bg-primary' : 'bg-muted'
+                  i < displayStep ? 'bg-primary' : 'bg-muted'
                 )}
               />
             ))}
           </div>
-          <p className="text-xs text-muted-foreground mt-1.5">Step {step} of {TOTAL_STEPS}</p>
+          <p className="text-xs text-muted-foreground mt-1.5">Step {displayStep} of {displayTotal}</p>
         </div>
 
         {/* Populating overlay */}
@@ -194,6 +263,14 @@ export function DailyNoteWizard({ isOpen, onClose, onComplete, noteContent, date
         {/* Step content */}
         <div className="px-6 pb-6 min-h-[200px] flex flex-col">
           {step === 1 && (
+            <StepRollover
+              tasks={answers.rolloverTasks}
+              selectedIds={answers.selectedRolloverIds}
+              loading={rolloverLoading}
+              onChange={(ids) => setAnswers(a => ({ ...a, selectedRolloverIds: ids }))}
+            />
+          )}
+          {step === 2 && (
             <StepWorkout
               value={answers.workout}
               onChange={(v) => {
@@ -202,44 +279,44 @@ export function DailyNoteWizard({ isOpen, onClose, onComplete, noteContent, date
                   fetchWorkoutSuggestion()
                 }
                 // Auto-advance after selection
-                setTimeout(() => setStep(2), 200)
-              }}
-            />
-          )}
-          {step === 2 && (
-            <StepNumber
-              question="How did you sleep?"
-              label="Sleep rating"
-              value={answers.sleep}
-              onChange={(v) => {
-                setAnswers(a => ({ ...a, sleep: v }))
                 setTimeout(() => setStep(3), 200)
               }}
             />
           )}
           {step === 3 && (
             <StepNumber
-              question="What's your energy level?"
-              label="Energy"
-              value={answers.energy}
+              question="How did you sleep?"
+              label="Sleep rating"
+              value={answers.sleep}
               onChange={(v) => {
-                setAnswers(a => ({ ...a, energy: v }))
+                setAnswers(a => ({ ...a, sleep: v }))
                 setTimeout(() => setStep(4), 200)
               }}
             />
           )}
           {step === 4 && (
             <StepNumber
-              question="How's your mood?"
-              label="Mood"
-              value={answers.mood}
+              question="What's your energy level?"
+              label="Energy"
+              value={answers.energy}
               onChange={(v) => {
-                setAnswers(a => ({ ...a, mood: v }))
+                setAnswers(a => ({ ...a, energy: v }))
                 setTimeout(() => setStep(5), 200)
               }}
             />
           )}
           {step === 5 && (
+            <StepNumber
+              question="How's your mood?"
+              label="Mood"
+              value={answers.mood}
+              onChange={(v) => {
+                setAnswers(a => ({ ...a, mood: v }))
+                setTimeout(() => setStep(6), 200)
+              }}
+            />
+          )}
+          {step === 6 && (
             <StepText
               question="What are your work priorities today?"
               placeholder="e.g. Finish API integration, review PR #42, standup at 10am..."
@@ -249,7 +326,7 @@ export function DailyNoteWizard({ isOpen, onClose, onComplete, noteContent, date
               ref={textareaRef}
             />
           )}
-          {step === 6 && (
+          {step === 7 && (
             <StepText
               question="Any personal items for today?"
               placeholder="e.g. Grocery shopping, call dentist, pick up package..."
@@ -259,7 +336,7 @@ export function DailyNoteWizard({ isOpen, onClose, onComplete, noteContent, date
               ref={textareaRef}
             />
           )}
-          {step === 7 && (
+          {step === 8 && (
             <StepText
               question="Anything else on your mind?"
               placeholder="Free-form notes, thoughts, ideas..."
@@ -278,7 +355,7 @@ export function DailyNoteWizard({ isOpen, onClose, onComplete, noteContent, date
             variant="ghost"
             size="sm"
             onClick={goBack}
-            disabled={step === 1}
+            disabled={step === 1 || (step === 2 && answers.rolloverTasks.length === 0)}
             className="gap-1"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -286,12 +363,26 @@ export function DailyNoteWizard({ isOpen, onClose, onComplete, noteContent, date
           </Button>
 
           <div className="flex gap-2">
-            {step === 7 && (
+            {step === 1 && answers.rolloverTasks.length > 0 && (
+              <Button variant="ghost" size="sm" onClick={() => {
+                setAnswers(a => ({ ...a, selectedRolloverIds: new Set() }))
+                setStep(2)
+              }}>
+                Skip
+              </Button>
+            )}
+            {step === 8 && (
               <Button variant="ghost" size="sm" onClick={goNext}>
                 Skip
               </Button>
             )}
-            {step >= 5 && (
+            {(step === 1 && answers.rolloverTasks.length > 0) && (
+              <Button size="sm" onClick={goNext} className="gap-1">
+                Next
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            )}
+            {step >= 6 && (
               <Button size="sm" onClick={goNext} className="gap-1">
                 {step === TOTAL_STEPS ? 'Finish' : 'Next'}
                 <ArrowRight className="h-4 w-4" />
@@ -305,6 +396,124 @@ export function DailyNoteWizard({ isOpen, onClose, onComplete, noteContent, date
 }
 
 // --- Sub-components ---
+
+function StepRollover({
+  tasks,
+  selectedIds,
+  loading,
+  onChange,
+}: {
+  tasks: RolloverTask[]
+  selectedIds: Set<string>
+  loading: boolean
+  onChange: (ids: Set<string>) => void
+}) {
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 py-8">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">Checking for pending tasks...</p>
+      </div>
+    )
+  }
+
+  if (tasks.length === 0) return null
+
+  const allSelected = tasks.every(t => selectedIds.has(t.id))
+  const noneSelected = selectedIds.size === 0
+
+  const toggleAll = () => {
+    if (allSelected) {
+      onChange(new Set())
+    } else {
+      onChange(new Set(tasks.map(t => t.id)))
+    }
+  }
+
+  const toggleTask = (id: string) => {
+    const next = new Set(selectedIds)
+    if (next.has(id)) {
+      next.delete(id)
+    } else {
+      next.add(id)
+    }
+    onChange(next)
+  }
+
+  return (
+    <div className="flex flex-col gap-3 py-2 flex-1">
+      <div className="flex items-center justify-between">
+        <h3 className="text-xl font-medium">Carry forward tasks?</h3>
+        <button
+          onClick={toggleAll}
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          {allSelected ? 'Deselect all' : 'Select all'}
+        </button>
+      </div>
+      <p className="text-sm text-muted-foreground">
+        {tasks.length} pending task{tasks.length !== 1 ? 's' : ''} from previous days
+      </p>
+
+      <div className="flex flex-col gap-1 max-h-[250px] overflow-y-auto pr-1">
+        {tasks.map((task) => {
+          const isSelected = selectedIds.has(task.id)
+          return (
+            <button
+              key={task.id}
+              onClick={() => toggleTask(task.id)}
+              className={cn(
+                'flex items-start gap-2.5 px-3 py-2 rounded-lg text-left transition-all text-sm',
+                'hover:bg-accent/50',
+                isSelected ? 'bg-primary/5 border border-primary/20' : 'bg-card border border-transparent'
+              )}
+            >
+              {isSelected
+                ? <CheckSquare className="h-4 w-4 mt-0.5 text-primary shrink-0" />
+                : <Square className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+              }
+              <div className="flex-1 min-w-0">
+                <span className="block truncate">{task.description}</span>
+                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                  {task.deadline_status === 'overdue' && (
+                    <span className="inline-flex items-center gap-1 text-xs text-rose-500 font-medium">
+                      <AlertTriangle className="h-3 w-3" />
+                      Overdue
+                    </span>
+                  )}
+                  {task.deadline_status === 'due_today' && (
+                    <span className="inline-flex items-center gap-1 text-xs text-amber-500 font-medium">
+                      <Clock className="h-3 w-3" />
+                      Due today
+                    </span>
+                  )}
+                  {task.deadline_status === 'upcoming' && task.deadline && (
+                    <span className="text-xs text-muted-foreground">
+                      Due {formatShortDate(task.deadline)}
+                    </span>
+                  )}
+                  {task.status === 'in_progress' && (
+                    <span className="inline-flex items-center gap-1 text-xs text-blue-500 font-medium">
+                      <ArrowRightCircle className="h-3 w-3" />
+                      In progress
+                    </span>
+                  )}
+                  {task.category && (
+                    <span className="text-xs text-muted-foreground">{task.category}</span>
+                  )}
+                </div>
+              </div>
+            </button>
+          )
+        })}
+      </div>
+
+      {noneSelected && (
+        <p className="text-xs text-muted-foreground mt-1">No tasks selected — skip or select some to carry forward</p>
+      )}
+    </div>
+  )
+}
 
 function StepWorkout({ value, onChange }: { value: WorkoutType | null; onChange: (v: WorkoutType) => void }) {
   const options: { type: WorkoutType; emoji: string }[] = [
@@ -375,8 +584,6 @@ function StepNumber({
   )
 }
 
-import { forwardRef } from 'react'
-
 const StepText = forwardRef<
   HTMLTextAreaElement,
   {
@@ -413,6 +620,37 @@ StepText.displayName = 'StepText'
 
 function populateNote(content: string, answers: WizardAnswers): string {
   let result = content
+
+  // Carried Forward tasks — insert before Today's Focus
+  const selectedTasks = answers.rolloverTasks.filter(t => answers.selectedRolloverIds.has(t.id))
+  if (selectedTasks.length > 0) {
+    const lines = ['## Carried Forward\n']
+    for (const task of selectedTasks) {
+      let desc = task.description
+      if (task.deadline_status === 'overdue' && task.deadline) {
+        desc += ` (Overdue: ${formatShortDate(task.deadline)})`
+      } else if (task.deadline_status === 'due_today') {
+        desc += ' (Due today)'
+      } else if (task.deadline_status === 'upcoming' && task.deadline) {
+        desc += ` (${formatShortDate(task.deadline)})`
+      }
+      lines.push(`- [ ] ${desc}`)
+    }
+    const carriedBlock = lines.join('\n') + '\n\n'
+
+    const focusIdx = result.indexOf("## 🎯 Today's Focus")
+    if (focusIdx !== -1) {
+      result = result.slice(0, focusIdx) + carriedBlock + result.slice(focusIdx)
+    } else {
+      // Insert before first ## section
+      const firstSection = result.search(/^## /m)
+      if (firstSection !== -1) {
+        result = result.slice(0, firstSection) + carriedBlock + result.slice(firstSection)
+      } else {
+        result = result + '\n' + carriedBlock
+      }
+    }
+  }
 
   // Workout type
   if (answers.workout) {
@@ -548,4 +786,10 @@ function formatDate(dateStr: string): string {
     month: 'long',
     day: 'numeric',
   })
+}
+
+function formatShortDate(dateStr: string): string {
+  const [year, month, day] = dateStr.split('-').map(Number)
+  const d = new Date(year, month - 1, day)
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
