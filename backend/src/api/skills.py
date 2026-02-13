@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from ..skills import SkillContext, SkillRegistry, get_default_registry
 from ..storage import StorageBackend
+from .dependencies import get_storage as _dep_get_storage
 
 
 router = APIRouter()
@@ -43,8 +44,8 @@ class SkillExecuteResponse(BaseModel):
 
 
 def get_storage(request: Request) -> StorageBackend:
-    """Get storage backend from app state."""
-    return request.app.state.storage
+    """Get storage backend (user-scoped in cloud mode)."""
+    return _dep_get_storage(request)
 
 
 def get_skill_registry() -> SkillRegistry:

@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from ..config import settings
 from ..db import DatabaseManager, get_table_names
 from ..db.sql_compat import get_dialect
-from .dependencies import get_db as _dep_get_db
+from .dependencies import get_db as _dep_get_db, get_storage as _dep_get_storage
 from ..middleware import limiter, validate_file_size, FileSizeError
 from ..middleware.rate_limit import RATE_LIMIT_IMPORT
 from ..middleware.validation import MAX_FILE_SIZE_BYTES, sanitize_sql_identifier
@@ -46,8 +46,8 @@ def get_db(request: Request):
 
 
 def get_storage(request: Request) -> StorageBackend:
-    """Get storage backend from app state."""
-    return request.app.state.storage
+    """Get storage backend (user-scoped in cloud mode)."""
+    return _dep_get_storage(request)
 
 
 async def _create_vault_zip(storage: StorageBackend) -> io.BytesIO:

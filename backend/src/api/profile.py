@@ -7,13 +7,14 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Optional
 
-from fastapi import APIRouter, Body, HTTPException, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from ..config import settings
-from ..db.sql_compat import get_dialect
+from ..db.sql_compat import get_dialect, user_filter, placeholder
 from ..db.user_settings import UserSettingsStore
 from ..storage.datastore import DataStore
+from .dependencies import get_user_id, get_datastore as _dep_get_datastore
 
 logger = logging.getLogger(__name__)
 
@@ -22,10 +23,6 @@ router = APIRouter(prefix="/profile", tags=["profile"])
 
 PROFILE_PATH = "life_profile.json"
 PROFILE_FILE = settings.data_path / "life_profile.json"
-
-
-def _get_datastore(request: Request) -> DataStore:
-    return request.app.state.datastore
 
 
 # --- Pydantic Models ---
@@ -138,18 +135,18 @@ def _load_profile_sync() -> dict:
     return LifeProfile().model_dump()
 
 
-def _get_user_settings_store(request: Request):
+def _get_user_settings_store(request: Request, user_id: str):
     """Get UserSettingsStore if running in cloud mode, else None."""
     db = request.app.state.db
     if get_dialect(db) == "postgres":
-        return UserSettingsStore(db, settings.default_user_id)
+        return UserSettingsStore(db, user_id)
     return None
 
 
-async def _load_profile(datastore: DataStore, request: Request = None) -> dict:
+async def _load_profile(datastore: DataStore, request: Request = None, user_id: str = None) -> dict:
     """Load profile from Postgres (cloud) or DataStore (local)."""
-    if request:
-        store = _get_user_settings_store(request)
+    if request and user_id:
+        store = _get_user_settings_store(request, user_id)
         if store:
             data = store.get("life_profile")
             if data is not None:
@@ -162,10 +159,10 @@ async def _load_profile(datastore: DataStore, request: Request = None) -> dict:
     return LifeProfile().model_dump()
 
 
-async def _save_profile(datastore: DataStore, data: dict, request: Request = None) -> None:
+async def _save_profile(datastore: DataStore, data: dict, request: Request = None, user_id: str = None) -> None:
     """Save profile to Postgres (cloud) or DataStore (local)."""
-    if request:
-        store = _get_user_settings_store(request)
+    if request and user_id:
+        store = _get_user_settings_store(request, user_id)
         if store:
             store.set("life_profile", data)
             return
@@ -177,23 +174,21 @@ async def _save_profile(datastore: DataStore, data: dict, request: Request = Non
 
 
 @router.get("")
-async def get_profile(request: Request) -> dict:
+async def get_profile(request: Request, user_id: str = Depends(get_user_id), datastore: DataStore = Depends(_dep_get_datastore)) -> dict:
     """Get full life profile."""
-    datastore = _get_datastore(request)
-    return await _load_profile(datastore, request)
+    return await _load_profile(datastore, request, user_id)
 
 
 @router.put("")
-async def update_profile(profile: LifeProfile, request: Request) -> dict:
+async def update_profile(profile: LifeProfile, request: Request, user_id: str = Depends(get_user_id), datastore: DataStore = Depends(_dep_get_datastore)) -> dict:
     """Update full life profile."""
-    datastore = _get_datastore(request)
     data = profile.model_dump()
-    await _save_profile(datastore, data, request)
+    await _save_profile(datastore, data, request, user_id)
     return data
 
 
 @router.patch("/{section}")
-async def update_section(section: str, request: Request, request_body: Any = Body(...)) -> dict:
+async def update_section(section: str, request: Request, request_body: Any = Body(...), user_id: str = Depends(get_user_id), datastore: DataStore = Depends(_dep_get_datastore)) -> dict:
     """Update a single profile section."""
     valid_sections = {"overview", "personal", "work", "training", "goals"}
     if section not in valid_sections:
@@ -202,10 +197,9 @@ async def update_section(section: str, request: Request, request_body: Any = Bod
             detail=f"Invalid section: {section}. Must be one of: {', '.join(sorted(valid_sections))}",
         )
 
-    datastore = _get_datastore(request)
-    profile = await _load_profile(datastore, request)
+    profile = await _load_profile(datastore, request, user_id)
     profile[section] = request_body
-    await _save_profile(datastore, profile, request)
+    await _save_profile(datastore, profile, request, user_id)
     return profile
 
 
@@ -234,11 +228,18 @@ def _row_to_review(row: tuple, columns: list[str]) -> dict:
 
 
 @router.get("/reviews")
-def list_reviews(request: Request) -> list[dict]:
+def list_reviews(request: Request, user_id: str = Depends(get_user_id)) -> list[dict]:
     """List all progress reviews, newest first."""
     db = request.app.state.db
+    dialect = get_dialect(db)
+    ph = placeholder(dialect)
+    conditions: list[str] = []
+    params: list = []
+    user_filter(dialect, user_id, conditions, params)
+    where = f"WHERE {' AND '.join(conditions)} " if conditions else ""
     result = db.execute(
-        "SELECT * FROM progress_reviews ORDER BY period_start DESC"
+        f"SELECT * FROM progress_reviews {where}ORDER BY period_start DESC",
+        params,
     )
     columns = [desc[0] for desc in result.description]
     rows = result.fetchall()
@@ -246,37 +247,44 @@ def list_reviews(request: Request) -> list[dict]:
 
 
 @router.post("/reviews", status_code=201)
-def create_review(review: ReviewCreateRequest, request: Request) -> dict:
+def create_review(review: ReviewCreateRequest, request: Request, user_id: str = Depends(get_user_id)) -> dict:
     """Create a new progress review."""
     db = request.app.state.db
+    dialect = get_dialect(db)
+    ph = placeholder(dialect)
     review_id = str(uuid.uuid4())[:8]
 
-    db.execute(
-        """
-        INSERT INTO progress_reviews (
-            id, period_start, period_end, key_wins, challenges,
-            work_highlights, training_summary, personal_wins,
-            health_metrics, goal_progress, focus_next
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        [
-            review_id,
-            review.period_start,
-            review.period_end,
-            review.key_wins,
-            review.challenges,
-            review.work_highlights,
-            review.training_summary,
-            review.personal_wins,
-            json.dumps(review.health_metrics) if review.health_metrics else None,
-            json.dumps(review.goal_progress) if review.goal_progress else None,
-            review.focus_next,
-        ],
-    )
+    cols = ["id", "period_start", "period_end", "key_wins", "challenges",
+            "work_highlights", "training_summary", "personal_wins",
+            "health_metrics", "goal_progress", "focus_next"]
+    vals = [
+        review_id,
+        review.period_start,
+        review.period_end,
+        review.key_wins,
+        review.challenges,
+        review.work_highlights,
+        review.training_summary,
+        review.personal_wins,
+        json.dumps(review.health_metrics) if review.health_metrics else None,
+        json.dumps(review.goal_progress) if review.goal_progress else None,
+        review.focus_next,
+    ]
+    if dialect == "postgres":
+        cols.append("user_id")
+        vals.append(user_id)
+
+    placeholders = ", ".join([ph] * len(cols))
+    col_list = ", ".join(cols)
+    db.execute(f"INSERT INTO progress_reviews ({col_list}) VALUES ({placeholders})", vals)
 
     # Fetch the created review
+    conditions: list[str] = [f"id = {ph}"]
+    params: list = [review_id]
+    user_filter(dialect, user_id, conditions, params)
     result = db.execute(
-        "SELECT * FROM progress_reviews WHERE id = ?", [review_id]
+        f"SELECT * FROM progress_reviews WHERE {' AND '.join(conditions)}",
+        params,
     )
     columns = [desc[0] for desc in result.description]
     row = result.fetchone()
@@ -284,11 +292,17 @@ def create_review(review: ReviewCreateRequest, request: Request) -> dict:
 
 
 @router.get("/reviews/{review_id}")
-def get_review(review_id: str, request: Request) -> dict:
+def get_review(review_id: str, request: Request, user_id: str = Depends(get_user_id)) -> dict:
     """Get a single progress review by ID."""
     db = request.app.state.db
+    dialect = get_dialect(db)
+    ph = placeholder(dialect)
+    conditions: list[str] = [f"id = {ph}"]
+    params: list = [review_id]
+    user_filter(dialect, user_id, conditions, params)
     result = db.execute(
-        "SELECT * FROM progress_reviews WHERE id = ?", [review_id]
+        f"SELECT * FROM progress_reviews WHERE {' AND '.join(conditions)}",
+        params,
     )
     columns = [desc[0] for desc in result.description]
     row = result.fetchone()
@@ -299,40 +313,52 @@ def get_review(review_id: str, request: Request) -> dict:
 
 @router.put("/reviews/{review_id}")
 def update_review(
-    review_id: str, review: ReviewUpdateRequest, request: Request
+    review_id: str, review: ReviewUpdateRequest, request: Request, user_id: str = Depends(get_user_id)
 ) -> dict:
     """Update an existing progress review."""
     db = request.app.state.db
+    dialect = get_dialect(db)
+    ph = placeholder(dialect)
 
     # Check exists
+    conditions: list[str] = [f"id = {ph}"]
+    params_check: list = [review_id]
+    user_filter(dialect, user_id, conditions, params_check)
     existing = db.execute(
-        "SELECT id FROM progress_reviews WHERE id = ?", [review_id]
+        f"SELECT id FROM progress_reviews WHERE {' AND '.join(conditions)}",
+        params_check,
     ).fetchone()
     if not existing:
         raise HTTPException(status_code=404, detail="Review not found")
 
     # Build dynamic update
     updates = []
-    params = []
+    params: list = []
     for field, value in review.model_dump(exclude_unset=True).items():
         if field in ("health_metrics", "goal_progress") and value is not None:
-            updates.append(f"{field} = ?")
+            updates.append(f"{field} = {ph}")
             params.append(json.dumps(value))
         else:
-            updates.append(f"{field} = ?")
+            updates.append(f"{field} = {ph}")
             params.append(value)
 
     if updates:
         updates.append("updated_at = CURRENT_TIMESTAMP")
+        where_conds: list[str] = [f"id = {ph}"]
         params.append(review_id)
+        user_filter(dialect, user_id, where_conds, params)
         db.execute(
-            f"UPDATE progress_reviews SET {', '.join(updates)} WHERE id = ?",
+            f"UPDATE progress_reviews SET {', '.join(updates)} WHERE {' AND '.join(where_conds)}",
             params,
         )
 
     # Fetch updated review
+    fetch_conds: list[str] = [f"id = {ph}"]
+    fetch_params: list = [review_id]
+    user_filter(dialect, user_id, fetch_conds, fetch_params)
     result = db.execute(
-        "SELECT * FROM progress_reviews WHERE id = ?", [review_id]
+        f"SELECT * FROM progress_reviews WHERE {' AND '.join(fetch_conds)}",
+        fetch_params,
     )
     columns = [desc[0] for desc in result.description]
     row = result.fetchone()
@@ -340,17 +366,26 @@ def update_review(
 
 
 @router.delete("/reviews/{review_id}", status_code=204)
-def delete_review(review_id: str, request: Request) -> None:
+def delete_review(review_id: str, request: Request, user_id: str = Depends(get_user_id)) -> None:
     """Delete a progress review."""
     db = request.app.state.db
+    dialect = get_dialect(db)
+    ph = placeholder(dialect)
 
+    conditions: list[str] = [f"id = {ph}"]
+    params: list = [review_id]
+    user_filter(dialect, user_id, conditions, params)
     existing = db.execute(
-        "SELECT id FROM progress_reviews WHERE id = ?", [review_id]
+        f"SELECT id FROM progress_reviews WHERE {' AND '.join(conditions)}",
+        params,
     ).fetchone()
     if not existing:
         raise HTTPException(status_code=404, detail="Review not found")
 
-    db.execute("DELETE FROM progress_reviews WHERE id = ?", [review_id])
+    db.execute(
+        f"DELETE FROM progress_reviews WHERE {' AND '.join(conditions)}",
+        params,
+    )
 
 
 # --- Review Generation ---
@@ -574,7 +609,7 @@ def _gather_review_context(
 
 
 @router.post("/reviews/generate")
-async def generate_review(request: Request) -> dict:
+async def generate_review(request: Request, user_id: str = Depends(get_user_id), datastore: DataStore = Depends(_dep_get_datastore)) -> dict:
     """Auto-generate a progress review using AI based on data since the last review.
 
     Queries activities, exercises, daily metrics, and tasks from DuckDB,
@@ -595,9 +630,16 @@ async def generate_review(request: Request) -> dict:
 
     # Determine review period
     today = date.today()
+    dialect = get_dialect(db)
+    ph = placeholder(dialect)
     try:
+        conditions: list[str] = []
+        params: list = []
+        user_filter(dialect, user_id, conditions, params)
+        where = f"WHERE {' AND '.join(conditions)} " if conditions else ""
         last_review = db.execute(
-            "SELECT period_end FROM progress_reviews ORDER BY period_end DESC LIMIT 1"
+            f"SELECT period_end FROM progress_reviews {where}ORDER BY period_end DESC LIMIT 1",
+            params,
         ).fetchone()
     except Exception:
         last_review = None
@@ -629,8 +671,7 @@ async def generate_review(request: Request) -> dict:
     context = _gather_review_context(db, period_start, period_end)
 
     # Load life profile for additional context
-    datastore = _get_datastore(request)
-    profile = await _load_profile(datastore, request)
+    profile = await _load_profile(datastore, request, user_id)
     profile_summary = ""
     if profile.get("overview", {}).get("name"):
         profile_summary = f"User: {profile['overview']['name']}"

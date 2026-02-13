@@ -260,6 +260,11 @@ def _create_indexes(pg) -> None:
         "CREATE INDEX IF NOT EXISTS idx_pg_activities_type ON activities(user_id, activity_type)",
         "CREATE INDEX IF NOT EXISTS idx_pg_kanban_updates_task ON kanban_task_updates(user_id, task_id)",
         "CREATE INDEX IF NOT EXISTS idx_pg_vault_files_updated ON vault_files(user_id, updated_at)",
+        # Composite indexes for common query patterns
+        "CREATE INDEX IF NOT EXISTS idx_pg_exercise_name_date ON exercise_log(user_id, exercise_name, date)",
+        "CREATE INDEX IF NOT EXISTS idx_pg_tasks_date_status ON tasks(user_id, date, status)",
+        "CREATE INDEX IF NOT EXISTS idx_pg_activities_date_type ON activities(user_id, date, activity_type)",
+        "CREATE INDEX IF NOT EXISTS idx_pg_food_date_type ON food_log(user_id, date, meal_type)",
     ]
     for sql in indexes:
         pg.execute(sql)

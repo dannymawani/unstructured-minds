@@ -320,6 +320,27 @@ def _create_indexes(conn: duckdb.DuckDBPyConnection) -> None:
         ON activities(activity_type)
     """)
 
+    # Composite indexes for common query patterns
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_exercise_name_date
+        ON exercise_log(exercise_name, date)
+    """)
+
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_tasks_date_status
+        ON tasks(date, status)
+    """)
+
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_activities_date_type
+        ON activities(date, activity_type)
+    """)
+
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_food_date_type
+        ON food_log(date, meal_type)
+    """)
+
 
 def get_table_names(conn: duckdb.DuckDBPyConnection) -> list[str]:
     """Get list of table names in database.
