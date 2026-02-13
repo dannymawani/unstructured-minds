@@ -19,9 +19,15 @@ RUN npm ci
 # Copy source files
 COPY . .
 
-# Build the production bundle (route API calls through nginx proxy)
+# Clerk publishable key must be a build arg (not runtime env) because Vite
+# bakes VITE_* variables into the JS bundle at build time.
+ARG VITE_CLERK_PUBLISHABLE_KEY
 ENV VITE_API_URL=/api
-RUN npm run build
+ENV VITE_CLERK_PUBLISHABLE_KEY=${VITE_CLERK_PUBLISHABLE_KEY}
+RUN if [ -z "$VITE_CLERK_PUBLISHABLE_KEY" ]; then \
+      echo "⚠ WARNING: VITE_CLERK_PUBLISHABLE_KEY is empty. Clerk auth will be disabled."; \
+    fi && \
+    npm run build
 
 # -----------------------------------------------------------------------------
 # Stage 2: Runtime - Serve with nginx
@@ -33,6 +39,7 @@ RUN rm /etc/nginx/conf.d/default.conf
 
 # Copy custom nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY nginx/security-headers.conf /etc/nginx/conf.d/security-headers.conf
 
 # Copy built assets from build stage
 COPY --from=build /app/dist /usr/share/nginx/html

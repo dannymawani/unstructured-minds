@@ -25,7 +25,6 @@ import {
   LayoutDashboard,
   FileText,
   Kanban,
-  Calendar,
   User,
   Sun,
   Moon,
@@ -52,7 +51,10 @@ function SignInGate() {
   return (
     <div className="h-screen flex items-center justify-center bg-background">
       <div className="text-center space-y-6 max-w-sm mx-auto px-4">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Unstructured Minds</h1>
+        <div className="flex items-center gap-3">
+          <img src="/um-logo.svg" alt="Unstructured Minds" className="w-8 h-8" />
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Unstructured Minds</h1>
+        </div>
         <p className="text-muted-foreground">Sign in to access your notes and data.</p>
         <SignInButton mode="modal">
           <button className="bg-teal-500 hover:bg-teal-600 text-white px-6 py-2.5 rounded-lg font-medium transition-colors">
@@ -320,7 +322,10 @@ function App() {
               <Menu className="w-5 h-5" />
             </Button>
           )}
-          <h1 className="text-sm sm:text-base font-semibold tracking-tight truncate">{ui.isMobile ? 'UM' : 'Unstructured Minds'}</h1>
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <img src="/um-logo.svg" alt="" className="w-5 h-5 sm:w-6 sm:h-6" />
+            <h1 className="text-sm sm:text-base font-semibold tracking-tight truncate">{ui.isMobile ? 'UM' : 'Unstructured Minds'}</h1>
+          </div>
           {!ui.isMobile && (
             <div className="hidden sm:flex items-center gap-1 bg-muted rounded-lg p-1">
               {([['editor', FileText, 'Editor'], ['dashboard', LayoutDashboard, 'Dashboard'], ['kanban', Kanban, 'Kanban'], ['profile', User, 'Profile']] as const).map(([v, Icon, label]) => (

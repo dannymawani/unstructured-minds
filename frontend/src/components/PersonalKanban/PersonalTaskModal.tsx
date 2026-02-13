@@ -332,7 +332,7 @@ export function PersonalTaskModal({
                       method: 'DELETE',
                     })
                     if (res.ok || res.status === 204) {
-                      onTaskDeleted(task.id)
+                      onTaskDeleted?.(task.id)
                       onClose()
                     }
                   } catch (err) {

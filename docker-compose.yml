@@ -59,6 +59,9 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        # Must be a build arg (not runtime env) — Vite bakes VITE_* into JS at build time
+        - VITE_CLERK_PUBLISHABLE_KEY=${VITE_CLERK_PUBLISHABLE_KEY:-}
     container_name: unstructured-minds-frontend
     ports:
       - "${FRONTEND_PORT:-3000}:80"

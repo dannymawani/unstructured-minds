@@ -1,0 +1,17 @@
+{
+  "name": "Unstructured Minds",
+  "short_name": "UM",
+  "description": "Natural language notes transformed into structured, queryable data.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#14b8a6",
+  "icons": [
+    {
+      "src": "/um-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
