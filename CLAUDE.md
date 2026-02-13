@@ -1,33 +1,8 @@
 # Unstructured Minds - Development Guide
 
-## Reference Implementation
-
-**For function clarification and data patterns, refer to the working Obsidian repo:**
-```
-/Users/dmh/Code/obsedian
-```
-
-This repo contains the original working implementation of:
-- Data extraction from markdown notes
-- CSV storage patterns and schemas
-- Daily note workflows
-- Skills and automation
-
-### Key Reference Paths in Obsidian Repo
-
-| What | Path |
-|------|------|
-| Data schemas | `/Users/dmh/Code/obsedian/data/schemas/` |
-| CSV data | `/Users/dmh/Code/obsedian/data/` |
-| Daily notes | `/Users/dmh/Code/obsedian/secondbrain/Daily-Notes/` |
-| Templates | `/Users/dmh/Code/obsedian/secondbrain/Templates/` |
-| Claude config | `/Users/dmh/Code/obsedian/CLAUDE.md` |
-
----
-
 ## Project Overview
 
-Unstructured Minds transforms natural language notes into structured, queryable data using Claude as the AI extraction layer and DuckDB as the data warehouse.
+Unstructured Minds transforms natural language notes into structured, queryable data using Claude as the AI extraction layer and DuckDB / Postgres as the data warehouse.
 
 ### Core Flow
 ```
@@ -42,6 +17,7 @@ Markdown Note → Claude Extraction → DuckDB → Natural Language Query
 | Backend | Python >=3.12 + FastAPI |
 | Database | DuckDB 1.4 (local) / Supabase Postgres (hybrid/cloud) |
 | AI | Claude API (Haiku 4.5 for extraction, Sonnet 4.5 for queries) |
+| Authentication | Clerk (optional, multi-user) |
 | Deployment | Docker Compose |
 
 > **Note:** No Electron - this is a containerized web app for easy deployment and lighter footprint.
@@ -77,8 +53,8 @@ data/                                 # Per-instance, gitignored
 
 | Mode | Trigger | Description |
 |------|---------|-------------|
-| **Local** (default) | `USE_CLOUD=false` | DuckDB file + local filesystem. Zero external deps. |
-| **Cloud** | `USE_CLOUD=true` + `DATABASE_URL` | Postgres (source of truth) + in-memory DuckDB (analytics cache) + `vault_files` table (markdown storage) |
+| **Local** | `USE_CLOUD=false` | DuckDB file + local filesystem. Zero external deps. |
+| **Cloud** (default) | `USE_CLOUD=true` + `DATABASE_URL` | Postgres (source of truth) + in-memory DuckDB (analytics cache) + `vault_files` table (markdown storage) |
 
 Configuration env vars: `ANTHROPIC_API_KEY` + `USE_CLOUD` + `DATABASE_URL` (when cloud).
 

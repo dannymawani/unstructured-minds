@@ -241,18 +241,23 @@ class ClaudeClient:
         workout_section = ""
         suggestion = answers.get("workout_suggestion")
         if suggestion and suggestion.get("exercises"):
-            lines = [f"\nWorkout suggestion from last session ({suggestion.get('date', '')}):",
-                     "Include this as a blockquote table after the Focus line:"]
-            lines.append("| Exercise | Last | Suggested | Reps | Sets |")
-            lines.append("|----------|------|-----------|------|------|")
+            date_str = suggestion.get('date', '')
+            lines = [
+                "",
+                f"> **Suggested Workout (from {date_str})** — edit below to log, or delete if skipping",
+                "> ",
+                "> | Exercise | Last | Suggested | Reps | Sets |",
+                "> |----------|------|-----------|------|------|",
+            ]
             for ex in suggestion["exercises"]:
                 name = ex.get("display_name") or ex.get("exercise_name", "")
                 last_w = f"{ex['weight_kg']}kg" if ex.get("weight_kg") and ex["weight_kg"] > 0 else "BW"
                 sugg_w = f"{ex['suggested_weight_kg']}kg" if ex.get("suggested_weight_kg") else last_w
                 reps = str(ex.get("reps")) if ex.get("reps") else "-"
                 sets = str(ex.get("sets")) if ex.get("sets") else "-"
-                lines.append(f"| {name} | {last_w} | {sugg_w} | {reps} | {sets} |")
-            lines.append("Wrap the table in a blockquote (> prefix) and add a header explaining it's a suggestion.")
+                lines.append(f"> | {name} | {last_w} | {sugg_w} | {reps} | {sets} |")
+            lines.append("")
+            lines.append("Insert this blockquote table after the Focus line in the Workout section.")
             workout_section = "\n".join(lines)
 
         user_prompt = f"""Date: {date}

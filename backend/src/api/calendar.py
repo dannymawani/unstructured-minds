@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from ..claude import ClaudeClient
 from ..db import DatabaseManager
 from ..storage import StorageBackend
-from .dependencies import get_db as _dep_get_db
+from .dependencies import get_db as _dep_get_db, get_storage as _dep_get_storage
 from ..templates.daily_note import render_daily_note as render_fallback_template
 
 logger = logging.getLogger(__name__)
@@ -43,8 +43,8 @@ def get_db(request: Request):
 
 
 def get_storage(request: Request) -> StorageBackend:
-    """Get storage backend from app state."""
-    return request.app.state.storage
+    """Get storage backend (user-scoped in cloud mode)."""
+    return _dep_get_storage(request)
 
 
 def get_claude(request: Request) -> ClaudeClient:
@@ -354,7 +354,7 @@ def _populate_fallback(template: str, answers: dict) -> str:
         date_str = suggestion.get("date", "")
         table_lines = [
             "",
-            f"> **Last session ({date_str})** — edit below to log, or delete if skipping",
+            f"> **Suggested Workout (from {date_str})** — edit below to log, or delete if skipping",
             "> ",
             "> | Exercise | Last | Suggested | Reps | Sets |",
             "> |----------|------|-----------|------|------|",

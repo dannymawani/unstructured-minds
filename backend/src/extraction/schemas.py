@@ -12,7 +12,11 @@ EXERCISE_SCHEMA: dict[str, Any] = {
     "properties": {
         "activities": {
             "type": "array",
-            "description": "List of workout activities found in the note",
+            "description": (
+                "List of workout activities ACTUALLY PERFORMED as logged in the note. "
+                "Ignore any exercises in blockquotes (> prefix) — those are suggestions, not completed workouts. "
+                "Only extract exercises the user explicitly logged with weights, reps, and sets."
+            ),
             "items": {
                 "type": "object",
                 "properties": {

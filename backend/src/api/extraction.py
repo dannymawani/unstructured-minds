@@ -11,7 +11,7 @@ from sse_starlette.sse import EventSourceResponse
 from ..claude import ClaudeClient
 from ..db import DatabaseManager
 from ..extraction import ExtractionPipeline
-from .dependencies import get_db as _dep_get_db
+from .dependencies import get_db as _dep_get_db, get_storage as _dep_get_storage, get_user_id
 from ..middleware import limiter, validate_file_path, PathValidationError
 from ..middleware.rate_limit import RATE_LIMIT_EXTRACTION
 from ..middleware.validation import MAX_FILE_PATH_LENGTH
@@ -78,8 +78,8 @@ def get_db(request: Request):
 
 
 def get_storage(request: Request) -> StorageBackend:
-    """Get storage backend from app state."""
-    return request.app.state.storage
+    """Get storage backend (user-scoped in cloud mode)."""
+    return _dep_get_storage(request)
 
 
 def get_claude(request: Request) -> ClaudeClient:
@@ -95,6 +95,7 @@ async def extract_file(
     db: DatabaseManager = Depends(get_db),
     storage: StorageBackend = Depends(get_storage),
     claude: ClaudeClient = Depends(get_claude),
+    user_id: str = Depends(get_user_id),
 ) -> ExtractResponse:
     """Extract structured data from a markdown file.
 
@@ -127,7 +128,7 @@ async def extract_file(
         raise HTTPException(status_code=500, detail=f"Error reading file: {str(e)}")
 
     # Run extraction
-    pipeline = ExtractionPipeline(db, claude)
+    pipeline = ExtractionPipeline(db, claude, user_id=user_id)
     result = await pipeline.extract(
         body.file_path,
         content,
@@ -152,6 +153,7 @@ async def extract_batch(
     db: DatabaseManager = Depends(get_db),
     storage: StorageBackend = Depends(get_storage),
     claude: ClaudeClient = Depends(get_claude),
+    user_id: str = Depends(get_user_id),
 ) -> ExtractBatchResponse:
     """Extract structured data from multiple files.
 
@@ -172,7 +174,7 @@ async def extract_batch(
         except PathValidationError as e:
             raise HTTPException(status_code=400, detail=f"Invalid path '{file_path}': {str(e)}")
 
-    pipeline = ExtractionPipeline(db, claude)
+    pipeline = ExtractionPipeline(db, claude, user_id=user_id)
     results = []
     successful = 0
     failed = 0
@@ -235,6 +237,7 @@ async def extract_all(
     db: DatabaseManager = Depends(get_db),
     storage: StorageBackend = Depends(get_storage),
     claude: ClaudeClient = Depends(get_claude),
+    user_id: str = Depends(get_user_id),
 ) -> EventSourceResponse:
     """Re-extract all markdown files in the vault via SSE.
 
@@ -259,7 +262,7 @@ async def extract_all(
         total = len(md_files)
         yield {"event": "start", "data": json.dumps({"total": total})}
 
-        pipeline = ExtractionPipeline(db, claude)
+        pipeline = ExtractionPipeline(db, claude, user_id=user_id)
         successful = 0
         failed = 0
 
