@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Dashboard improvements: nutrition tracking, activity heatmap redesign, mood correlations
+- Add task rollover to daily note wizard — carry forward incomplete tasks from last 14 days with deadline-aware formatting
+
+## [v0.7.0] - 2026-02-13
+
+### Added
+- Add Clerk authentication (opt-in, no breaking changes)
+- Add user data isolation for multi-tenant support
+- Add two-mode architecture (local DuckDB / cloud Postgres)
+- Add explicit USE_CLOUD flag to toggle local vs Postgres mode
+- Add shared community exercise pool with anonymous contributions
+
+### Changed
+- Simplify auth to two clean modes (local vs cloud)
+
+### Removed
+- Remove unused dependencies, S3 code, and stale docs
+
+## [v0.6.0] - 2026-02-10
+
+### Added
+- Add AI exercise name normalization with cached classification
+- Add fuzzy exercise name matching for canonical normalization
+- Add table insert button and table editing controls to toolbar
+- Add sortable columns to exercise table
+- Add notes field to personal tasks
+- Implement next_steps improvements across dashboard, profile, and extraction
+- Sidebar optimizations — configurable folders, drag-drop, rename UX
+- Modernize editor styling and optimize bundle splitting
+
+### Fixed
+- Use filename date instead of Claude-hallucinated dates for tasks
+- Normalize exercise names via fuzzy matching in exercise table
+- Enable interactive table editing with Milkdown tableBlock
+- Prevent hallucinated insights when database has no data
+- Prevent year selector from overlapping heatmap stats text
+- Remove hours total from activity heatmap header
+- Rebuild workout suggestion with progressive overload
+- Exclude non-date files from last daily note query
+- Resolve 6 dashboard bugs from testing round
+- Migrate daily notes, add month name toggle, improve drag-drop
+- Use vault template for daily notes and remove Obsidian syntax
+
 ## [v0.5.0] - 2026-02-07
 
 ### Added
@@ -111,3 +154,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **v0.3.0** introduces the kanban task management system with drag-and-drop, status management, and integration with daily notes.
 - **v0.4.0** adds advanced task workflows, note-aware chat, React Router navigation, and a complete design refresh with dark theme defaults.
 - **v0.5.0** introduces the daily note wizard for structured note creation, improved file management, and the life profile view for tracking goals and progress.
+- **v0.6.0** adds AI-powered exercise normalization, table editing controls, sidebar optimizations, and fixes across dashboard, tasks, and insights.
+- **v0.7.0** introduces cloud architecture with two-mode operation (local/cloud), Clerk authentication, user data isolation for multi-tenancy, and a shared community exercise pool.
