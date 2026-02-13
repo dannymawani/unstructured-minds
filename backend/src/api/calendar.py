@@ -271,6 +271,14 @@ class WorkoutSuggestionData(BaseModel):
     focus: Optional[str] = None
 
 
+class RolloverTaskForPopulate(BaseModel):
+    """A rolled-over task to include in the daily note."""
+
+    description: str
+    deadline: Optional[str] = None
+    deadline_status: Optional[str] = None  # "overdue" | "due_today" | "upcoming" | None
+
+
 class PopulateDailyNoteRequest(BaseModel):
     """Request to populate a daily note template with wizard answers."""
 
@@ -284,6 +292,7 @@ class PopulateDailyNoteRequest(BaseModel):
     personal: Optional[str] = None
     adhoc: Optional[str] = None
     workout_suggestion: Optional[WorkoutSuggestionData] = None
+    rollover_tasks: Optional[list[RolloverTaskForPopulate]] = None
 
 
 class PopulateDailyNoteResponse(BaseModel):
@@ -311,6 +320,7 @@ async def populate_daily_note(
         "personal": request.personal or "",
         "adhoc": request.adhoc or "",
         "workout_suggestion": request.workout_suggestion.model_dump() if request.workout_suggestion else None,
+        "rollover_tasks": [t.model_dump() for t in request.rollover_tasks] if request.rollover_tasks else None,
     }
 
     if claude.is_configured:
@@ -373,6 +383,47 @@ def _populate_fallback(template: str, answers: dict) -> str:
         if focus_match:
             insert_pos = focus_match.end()
             result = result[:insert_pos] + "\n" + suggestion_block + result[insert_pos:]
+
+    # Carried Forward tasks — insert before Today's Focus
+    rollover_tasks = answers.get("rollover_tasks")
+    if rollover_tasks:
+        lines = ["## Carried Forward\n"]
+        for task in rollover_tasks:
+            desc = task["description"]
+            dl_status = task.get("deadline_status")
+            deadline = task.get("deadline")
+            if dl_status == "overdue" and deadline:
+                # Format deadline date nicely
+                try:
+                    from datetime import date as _date
+                    dl = _date.fromisoformat(deadline)
+                    formatted = dl.strftime("%b %d").replace(" 0", " ")
+                    desc += f" (Overdue: {formatted})"
+                except ValueError:
+                    desc += f" (Overdue: {deadline})"
+            elif dl_status == "due_today":
+                desc += " (Due today)"
+            elif dl_status == "upcoming" and deadline:
+                try:
+                    from datetime import date as _date
+                    dl = _date.fromisoformat(deadline)
+                    formatted = dl.strftime("%b %d").replace(" 0", " ")
+                    desc += f" ({formatted})"
+                except ValueError:
+                    desc += f" ({deadline})"
+            lines.append(f"- [ ] {desc}")
+        carried_block = "\n".join(lines) + "\n\n"
+
+        focus_idx = result.find("## 🎯 Today's Focus")
+        if focus_idx != -1:
+            result = result[:focus_idx] + carried_block + result[focus_idx:]
+        else:
+            # Insert before first ## section if no Today's Focus found
+            first_section = re.search(r"^## ", result, re.MULTILINE)
+            if first_section:
+                result = result[:first_section.start()] + carried_block + result[first_section.start():]
+            else:
+                result = result + "\n" + carried_block
 
     # Metrics
     sleep = answers.get("sleep")

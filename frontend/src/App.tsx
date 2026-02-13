@@ -124,7 +124,7 @@ function App() {
   const file = useFileManager()
   const ui = useUIState()
 
-  const handleWizardComplete = useCallback(async (populatedContent: string) => {
+  const handleWizardComplete = useCallback(async (populatedContent: string, selectedTaskIds?: string[]) => {
     ui.setIsWizardOpen(false)
     file.setContent(populatedContent)
     file.contentRef.current = populatedContent
@@ -135,6 +135,17 @@ function App() {
       file.isDirtyRef.current = false
     } catch (err) {
       console.error('Error saving wizard-populated note:', err)
+    }
+    // Commit rollover: update source_file for carried-forward tasks
+    if (selectedTaskIds && selectedTaskIds.length > 0) {
+      try {
+        await api.post('/tasks/rollover', {
+          task_ids: selectedTaskIds,
+          new_source_file: ui.wizardNotePath,
+        })
+      } catch (err) {
+        console.error('Error committing rollover tasks:', err)
+      }
     }
   }, [ui.wizardNotePath, navigate, file, ui])
 

@@ -51,6 +51,12 @@ Personal section (## 🤷🏽 Personal):
 Today's Focus section (## 🎯 Today's Focus):
 - Pick the top 3-4 items from work + personal combined as `- [ ]` checkboxes
 
+Carried Forward section (## Carried Forward):
+- If carried-forward tasks are provided, insert a `## Carried Forward` section BEFORE `## 🎯 Today's Focus`
+- Each task is a `- [ ]` checkbox
+- Deadline formatting: overdue tasks get "(Overdue: Mon DD)", due-today get "(Due today)", upcoming get "(Mon DD)"
+- Do NOT duplicate carried-forward items into Today's Focus — they are separate
+
 Adhoc Notes section (## 📝 Adhoc Notes):
 - Parse adhoc text into `- item` bullet points (no checkboxes)
 - If empty, leave as `- `"""
@@ -260,6 +266,25 @@ class ClaudeClient:
             lines.append("Insert this blockquote table after the Focus line in the Workout section.")
             workout_section = "\n".join(lines)
 
+        # Build carried-forward section for prompt
+        carried_section = ""
+        rollover_tasks = answers.get("rollover_tasks")
+        if rollover_tasks:
+            lines = ["- Carried-forward tasks (insert as ## Carried Forward before Today's Focus):"]
+            for task in rollover_tasks:
+                desc = task["description"]
+                dl_status = task.get("deadline_status")
+                deadline = task.get("deadline")
+                if dl_status == "overdue" and deadline:
+                    lines.append(f"  - {desc} (overdue since {deadline})")
+                elif dl_status == "due_today":
+                    lines.append(f"  - {desc} (due today)")
+                elif dl_status == "upcoming" and deadline:
+                    lines.append(f"  - {desc} (due {deadline})")
+                else:
+                    lines.append(f"  - {desc}")
+            carried_section = "\n".join(lines)
+
         user_prompt = f"""Date: {date}
 
 Template:
@@ -276,6 +301,7 @@ Wizard answers:
 - Personal items: {answers.get('personal', '')}
 - Adhoc notes: {answers.get('adhoc', '')}
 {workout_section}
+{carried_section}
 
 Populate the template with these answers and return only the complete markdown."""
 
