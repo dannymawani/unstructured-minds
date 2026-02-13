@@ -30,7 +30,7 @@ A containerized web application that transforms natural language notes into stru
 | Feature | Description |
 |---------|-------------|
 | **Markdown Editor** | Milkdown-powered WYSIWYG editing with toolbar, templates, and raw toggle |
-| **Natural Language Logging** | Write freely, AI extracts structured data into DuckDB |
+| **Natural Language Logging** | Write freely, AI extracts structured data into DuckDB / Postgres |
 | **AI-Powered Queries** | Ask questions in plain English, get SQL-backed answers |
 | **Daily Note Wizard** | One-click daily notes with structured creation wizard |
 | **Dashboards** | Activity heatmaps, exercise progress, sleep trends, mood correlations |
@@ -40,7 +40,7 @@ A containerized web application that transforms natural language notes into stru
 | **Note Assistant** | AI chat for editing notes with image support |
 | **Full-Text Search** | Search across all vault notes with snippets and scoring |
 | **Command Palette** | Cmd+K for quick actions |
-| **Local-First** | All data stays on your machine in DuckDB |
+| **Local-First** | All data stays on your machine, or sync to Postgres cloud |
 
 ## Tech Stack
 
@@ -49,7 +49,8 @@ A containerized web application that transforms natural language notes into stru
 | Deployment | Docker Compose |
 | Frontend | React 19 + Milkdown 7 + Tailwind 4 |
 | Backend | Python (FastAPI) |
-| Database | DuckDB |
+| Database | DuckDB (local) / Postgres (cloud) |
+| Authentication | Clerk (optional) |
 | AI | Claude API (Haiku 4.5 for extraction, Sonnet 4.5 for queries) |
 
 For detailed technology choices and rationale, see [`docs/tech-stack.md`](./docs/tech-stack.md).
@@ -145,7 +146,7 @@ cd frontend && npm test
 - [x] **Phase 3:** Polish (Dashboards, Settings)
 - [x] **Phase 4:** Kanban, Task System, Calendar
 - [x] **Phase 5:** Daily Note Wizard, Life Profile
-- [ ] **Phase 6:** Cloud deployment & multi-user
+- [x] **Phase 6:** Cloud deployment & multi-user
 
 ## License
 

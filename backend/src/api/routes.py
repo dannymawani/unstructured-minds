@@ -13,6 +13,7 @@ from ..middleware import validate_file_path, PathValidationError
 from ..middleware.validation import MAX_FILE_PATH_LENGTH, MAX_QUERY_LENGTH
 from ..storage import StorageBackend
 from ..templates.daily_note import render_daily_note
+from .dependencies import get_storage as _dep_get_storage, get_user_id
 from .settings import resolve_daily_note_path
 
 logger = logging.getLogger(__name__)
@@ -160,8 +161,8 @@ def get_db(request: Request) -> DatabaseManager:
 
 
 def get_storage(request: Request) -> StorageBackend:
-    """Get storage backend from app state."""
-    return request.app.state.storage
+    """Get storage backend (user-scoped in cloud mode)."""
+    return _dep_get_storage(request)
 
 
 # =============================================================================
@@ -277,6 +278,7 @@ async def write_file(
     body: FileWriteRequest,
     extract: bool = Query(True, description="Whether to trigger Claude extraction after save"),
     storage: StorageBackend = Depends(get_storage),
+    user_id: str = Depends(get_user_id),
 ) -> FileWriteResponse:
     """Write a file to the vault.
 
@@ -306,7 +308,7 @@ async def write_file(
                 db = request.app.state.db
                 if claude.is_configured:
                     from ..extraction import ExtractionPipeline
-                    pipeline = ExtractionPipeline(db, claude)
+                    pipeline = ExtractionPipeline(db, claude, user_id=user_id)
                     result = await pipeline.extract(body.path, body.content)
                     did_extract = result.success
             except Exception:

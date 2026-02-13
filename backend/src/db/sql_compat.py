@@ -45,3 +45,23 @@ def get_dialect(db) -> str:
     if cls_name == "PostgresManager":
         return "postgres"
     return "duckdb"
+
+
+def placeholder(dialect: str) -> str:
+    """Return the parameter placeholder for the given dialect."""
+    return "%s" if dialect == "postgres" else "?"
+
+
+def user_filter(
+    dialect: str,
+    user_id: str,
+    conditions: list[str],
+    params: list,
+) -> None:
+    """Append a user_id filter for Postgres queries. No-op for DuckDB.
+
+    Mutates *conditions* and *params* in place.
+    """
+    if dialect == "postgres":
+        conditions.append(f"user_id = {placeholder(dialect)}")
+        params.append(user_id)

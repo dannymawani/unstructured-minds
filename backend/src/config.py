@@ -39,9 +39,13 @@ class Settings(BaseSettings):
     anthropic_api_key: Optional[str] = None
 
     # Cloud mode: explicit flag + Postgres connection string
-    use_cloud: bool = False
+    use_cloud: bool = True
     database_url: Optional[str] = None
     default_user_id: str = "00000000-0000-0000-0000-000000000001"
+
+    # Postgres connection pool sizing
+    db_pool_min: int = 2
+    db_pool_max: int = 10
 
     # Auth (Clerk) — optional, app works without it
     clerk_secret_key: Optional[str] = None

@@ -1,13 +1,156 @@
 {
-  "overview": {
-    "name": "Danny Mawani Holmgaard",
-    "age": null,
-    "location": "Copenhagen, Denmark",
-    "company": "LB Forsikring A/S",
+  "work": {
     "role": "Senior Data Engineer / Technical Lead",
-    "summary": "Passionate about AI tools, automation, and data governance. Balances a demanding technical leadership role with family life, strength training, BJJ, and trail running."
+    "notes": "Competence Group Lead with ~325,000 DKK budget. Java Exam Censor. Preparing to certify 4-5 internal dbt trainers.",
+    "skills": [
+      "dbt (expert)",
+      "Snowflake",
+      "Azure / Terraform",
+      "Data Governance & RBAC",
+      "Python",
+      "Leadership & Training"
+    ],
+    "company": "LB Forsikring A/S",
+    "projects": [
+      "RFCC Implementation (IN-397)",
+      "Data Governance Framework",
+      "Team Upskilling Initiative Q1 2026",
+      "DAP Transformation"
+    ],
+    "colleagues": [
+      "Michael (manager)",
+      "Kim (team)",
+      "Christian",
+      "Anders McNair",
+      "Anette & Jonas",
+      "Rick",
+      "Eliza"
+    ]
+  },
+  "goals": [
+    {
+      "id": "g-bjj",
+      "status": "active",
+      "category": "Health & Fitness",
+      "progress": null,
+      "description": "BJJ belt progression — develop technique and competition readiness",
+      "target_date": null
+    },
+    {
+      "id": "g-dl200",
+      "status": "active",
+      "category": "Health & Fitness",
+      "progress": 60,
+      "description": "Deadlift 200kg (current ~160kg)",
+      "target_date": null
+    },
+    {
+      "id": "g-sq175",
+      "status": "active",
+      "category": "Health & Fitness",
+      "progress": 20,
+      "description": "Squat 175kg (current ~90kg)",
+      "target_date": null
+    },
+    {
+      "id": "g-bp110",
+      "status": "active",
+      "category": "Health & Fitness",
+      "progress": 45,
+      "description": "Bench 110kg (current ~80kg)",
+      "target_date": null
+    },
+    {
+      "id": "g-sleep",
+      "status": "active",
+      "category": "Health & Fitness",
+      "progress": 30,
+      "description": "Consistent 7-8 hours sleep (currently averaging 6)",
+      "target_date": null
+    },
+    {
+      "id": "g-dap",
+      "status": "active",
+      "category": "Career",
+      "progress": 40,
+      "description": "Successful DAP Transformation — lead Snowflake/dbt migration Q1-Q2 2026",
+      "target_date": "2026-06-30"
+    },
+    {
+      "id": "g-cert",
+      "status": "active",
+      "category": "Career",
+      "progress": 25,
+      "description": "100% data engineers certified in dbt by March 2026",
+      "target_date": "2026-03-31"
+    },
+    {
+      "id": "g-train",
+      "status": "active",
+      "category": "Career",
+      "progress": 15,
+      "description": "Train the Trainer — establish 4-5 internal dbt experts",
+      "target_date": "2026-06-30"
+    },
+    {
+      "id": "g-tickets",
+      "status": "active",
+      "category": "Career",
+      "progress": 10,
+      "description": "80% reduction in support tickets (from ~30/month to <10)",
+      "target_date": null
+    },
+    {
+      "id": "g-family",
+      "status": "active",
+      "category": "Personal",
+      "progress": null,
+      "description": "Quality family time — regular check-ins, activities with kids",
+      "target_date": null
+    },
+    {
+      "id": "g-friends",
+      "status": "active",
+      "category": "Personal",
+      "progress": null,
+      "description": "Friendship maintenance — Friday hangouts, trail runs, beers",
+      "target_date": null
+    },
+    {
+      "id": "g-music",
+      "status": "active",
+      "category": "Personal",
+      "progress": null,
+      "description": "Dedicate time to music/creative projects",
+      "target_date": null
+    },
+    {
+      "id": "g-obsidian",
+      "status": "active",
+      "category": "Systems",
+      "progress": 50,
+      "description": "Build a sustainable knowledge management system",
+      "target_date": null
+    },
+    {
+      "id": "g-reviews",
+      "status": "active",
+      "category": "Systems",
+      "progress": null,
+      "description": "Bi-weekly reviews — regular reflection and adjustment",
+      "target_date": null
+    }
+  ],
+  "overview": {
+    "age": null,
+    "name": "Danny Mawani Holmgaard",
+    "role": "Senior Data Engineer / Technical Lead",
+    "company": "LB Forsikring A/S",
+    "summary": "Passionate about AI tools, automation, and data governance. Balances a demanding technical leadership role with family life, strength training, BJJ, and trail running.",
+    "location": "Copenhagen, Denmark"
   },
   "personal": {
+    "notes": "",
     "family": [
       "Sandra (wife)",
       "Olivia (daughter)",
@@ -26,63 +169,21 @@
       "Andreas Barnekov — family friend",
       "Hauke"
     ],
-    "interests": [
-      "Music / songwriting",
-      "AI tools & automation",
-      "Family time",
-      "Food & drink",
-      "Knowledge management"
-    ],
     "patterns": [
       "Sleep averaging 5-7 hours",
       "Energy tracked 1-10, typically 4-7",
       "Values Friday evening hangouts",
       "Morning person"
     ],
-    "notes": ""
-  },
-  "work": {
-    "role": "Senior Data Engineer / Technical Lead",
-    "company": "LB Forsikring A/S",
-    "projects": [
-      "RFCC Implementation (IN-397)",
-      "Data Governance Framework",
-      "Team Upskilling Initiative Q1 2026",
-      "DAP Transformation"
-    ],
-    "colleagues": [
-      "Michael (manager)",
-      "Kim (team)",
-      "Christian",
-      "Anders McNair",
-      "Anette & Jonas",
-      "Rick",
-      "Eliza"
-    ],
-    "skills": [
-      "dbt (expert)",
-      "Snowflake",
-      "Azure / Terraform",
-      "Data Governance & RBAC",
-      "Python",
-      "Leadership & Training"
-    ],
-    "notes": "Competence Group Lead with ~325,000 DKK budget. Java Exam Censor. Preparing to certify 4-5 internal dbt trainers."
+    "interests": [
+      "Music / songwriting",
+      "AI tools & automation",
+      "Family time",
+      "Food & drink",
+      "Knowledge management"
+    ]
   },
   "training": {
-    "disciplines": [
-      "Brazilian Jiu-Jitsu (BJJ)",
-      "Strength Training",
-      "Trail Running"
-    ],
-    "current_lifts": {
-      "Deadlift": "150-160kg x 5",
-      "Squat": "90kg x 4 (no belt)",
-      "Bench Press (Machine)": "80kg (targeting 85kg)",
-      "Military Press": "40kg",
-      "Leg Press": "130kg"
-    },
-    "recovery": "Tracks sleep quality & duration. Adjusts intensity based on energy levels. Prioritizes form over ego lifting. Takes rest days when needed.",
     "goals": [
       "Deadlift 200kg",
       "Squat 175kg",
@@ -91,120 +192,19 @@
       "Consistent 7-8h sleep",
       "Injury prevention — belt-off core work"
     ],
-    "notes": "BJJ 2-hour sessions multiple times/week. Trail running with Emil — recent 5.63km / 131m elevation / 39 min. Uses lifting belt for heavy sets."
-  },
-  "goals": [
-    {
-      "id": "g-bjj",
-      "category": "Health & Fitness",
-      "description": "BJJ belt progression — develop technique and competition readiness",
-      "status": "active",
-      "target_date": null,
-      "progress": null
-    },
-    {
-      "id": "g-dl200",
-      "category": "Health & Fitness",
-      "description": "Deadlift 200kg (current ~160kg)",
-      "status": "active",
-      "target_date": null,
-      "progress": 60
-    },
-    {
-      "id": "g-sq175",
-      "category": "Health & Fitness",
-      "description": "Squat 175kg (current ~90kg)",
-      "status": "active",
-      "target_date": null,
-      "progress": 20
-    },
-    {
-      "id": "g-bp110",
-      "category": "Health & Fitness",
-      "description": "Bench 110kg (current ~80kg)",
-      "status": "active",
-      "target_date": null,
-      "progress": 45
-    },
-    {
-      "id": "g-sleep",
-      "category": "Health & Fitness",
-      "description": "Consistent 7-8 hours sleep (currently averaging 6)",
-      "status": "active",
-      "target_date": null,
-      "progress": 30
-    },
-    {
-      "id": "g-dap",
-      "category": "Career",
-      "description": "Successful DAP Transformation — lead Snowflake/dbt migration Q1-Q2 2026",
-      "status": "active",
-      "target_date": "2026-06-30",
-      "progress": 40
-    },
-    {
-      "id": "g-cert",
-      "category": "Career",
-      "description": "100% data engineers certified in dbt by March 2026",
-      "status": "active",
-      "target_date": "2026-03-31",
-      "progress": 25
-    },
-    {
-      "id": "g-train",
-      "category": "Career",
-      "description": "Train the Trainer — establish 4-5 internal dbt experts",
-      "status": "active",
-      "target_date": "2026-06-30",
-      "progress": 15
-    },
-    {
-      "id": "g-tickets",
-      "category": "Career",
-      "description": "80% reduction in support tickets (from ~30/month to <10)",
-      "status": "active",
-      "target_date": null,
-      "progress": 10
-    },
-    {
-      "id": "g-family",
-      "category": "Personal",
-      "description": "Quality family time — regular check-ins, activities with kids",
-      "status": "active",
-      "target_date": null,
-      "progress": null
-    },
-    {
-      "id": "g-friends",
-      "category": "Personal",
-      "description": "Friendship maintenance — Friday hangouts, trail runs, beers",
-      "status": "active",
-      "target_date": null,
-      "progress": null
-    },
-    {
-      "id": "g-music",
-      "category": "Personal",
-      "description": "Dedicate time to music/creative projects",
-      "status": "active",
-      "target_date": null,
-      "progress": null
-    },
-    {
-      "id": "g-obsidian",
-      "category": "Systems",
-      "description": "Build a sustainable knowledge management system",
-      "status": "active",
-      "target_date": null,
-      "progress": 50
-    },
-    {
-      "id": "g-reviews",
-      "category": "Systems",
-      "description": "Bi-weekly reviews — regular reflection and adjustment",
-      "status": "active",
-      "target_date": null,
-      "progress": null
+    "notes": "BJJ 2-hour sessions multiple times/week. Trail running with Emil — recent 5.63km / 131m elevation / 39 min. Uses lifting belt for heavy sets.",
+    "recovery": "Tracks sleep quality & duration. Adjusts intensity based on energy levels. Prioritizes form over ego lifting. Takes rest days when needed.",
+    "disciplines": [
+      "Brazilian Jiu-Jitsu (BJJ)",
+      "Strength Training",
+      "Trail Running"
+    ],
+    "current_lifts": {
+      "Squat": "90kg x 4 (no belt)",
+      "Deadlift": "150-160kg x 5",
+      "Leg Press": "130kg",
+      "Military Press": "40kg",
+      "Bench Press (Machine)": "80kg (targeting 85kg)"
     }
-  ]
+  }
 }

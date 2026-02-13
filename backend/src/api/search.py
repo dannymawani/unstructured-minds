@@ -12,6 +12,7 @@ from ..middleware import limiter
 from ..middleware.rate_limit import RATE_LIMIT_SEARCH
 from ..middleware.validation import validate_query_length, MAX_SEARCH_QUERY_LENGTH
 from ..storage import StorageBackend
+from .dependencies import get_storage as _dep_get_storage
 
 logger = get_logger(__name__)
 
@@ -41,8 +42,8 @@ class SearchResponse(BaseModel):
 
 
 def get_storage(request: Request) -> StorageBackend:
-    """Get storage backend from app state."""
-    return request.app.state.storage
+    """Get storage backend (user-scoped in cloud mode)."""
+    return _dep_get_storage(request)
 
 
 def extract_title(path: str, content: str) -> str:

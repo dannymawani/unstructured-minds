@@ -3,7 +3,7 @@
 import json
 from typing import Optional
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 
 from datetime import datetime as dt
@@ -14,6 +14,7 @@ from ..config import settings
 from ..db.sql_compat import get_dialect
 from ..db.user_settings import UserSettingsStore
 from ..storage.datastore import DataStore
+from .dependencies import get_user_id, get_datastore as _dep_get_datastore
 
 
 router = APIRouter(prefix="/settings", tags=["settings"])
@@ -23,10 +24,6 @@ SETTINGS_PATH = "settings.json"
 
 # Default daily note path template: {YYYY}/{MM}/{YYYY}-{MM}-{DD}-daily-note
 DEFAULT_DAILY_NOTE_TEMPLATE = "{YYYY}/{MM}/{YYYY}-{MM}-{DD}-daily-note"
-
-
-def _get_datastore(request: Request) -> DataStore:
-    return request.app.state.datastore
 
 
 # ---- Sync helpers (used by resolve_daily_note_path which is called synchronously) ----
@@ -74,18 +71,18 @@ def resolve_daily_note_path(date_str: str, template: Optional[str] = None) -> st
 # ---- Async helpers (used by endpoints) ----
 
 
-def _get_user_settings_store(request: Request):
+def _get_user_settings_store(request: Request, user_id: str):
     """Get UserSettingsStore if running in cloud mode, else None."""
     db = request.app.state.db
     if get_dialect(db) == "postgres":
-        return UserSettingsStore(db, settings.default_user_id)
+        return UserSettingsStore(db, user_id)
     return None
 
 
-async def _load_settings(datastore: DataStore, request: Request = None) -> dict:
+async def _load_settings(datastore: DataStore, request: Request = None, user_id: str = None) -> dict:
     """Load settings from Postgres (cloud) or DataStore (local)."""
-    if request:
-        store = _get_user_settings_store(request)
+    if request and user_id:
+        store = _get_user_settings_store(request, user_id)
         if store:
             data = store.get("settings")
             if data is not None:
@@ -98,10 +95,10 @@ async def _load_settings(datastore: DataStore, request: Request = None) -> dict:
     return {"theme": "dark"}
 
 
-async def _save_settings(datastore: DataStore, data: dict, request: Request = None) -> None:
+async def _save_settings(datastore: DataStore, data: dict, request: Request = None, user_id: str = None) -> None:
     """Save settings to Postgres (cloud) or DataStore (local)."""
-    if request:
-        store = _get_user_settings_store(request)
+    if request and user_id:
+        store = _get_user_settings_store(request, user_id)
         if store:
             store.set("settings", data)
             return
@@ -138,11 +135,10 @@ class ThemeResponse(BaseModel):
 
 
 @router.get("", response_model=SettingsResponse)
-async def get_settings(request: Request) -> SettingsResponse:
+async def get_settings(request: Request, user_id: str = Depends(get_user_id), datastore: DataStore = Depends(_dep_get_datastore)) -> SettingsResponse:
     """Get current application settings."""
     claude = request.app.state.claude
-    datastore = _get_datastore(request)
-    stored = await _load_settings(datastore, request)
+    stored = await _load_settings(datastore, request, user_id)
 
     return SettingsResponse(
         vault_path=str(settings.vault_path),
@@ -157,10 +153,9 @@ async def get_settings(request: Request) -> SettingsResponse:
 
 
 @router.post("", response_model=SettingsResponse)
-async def update_settings(request: Request, update: SettingsUpdateRequest) -> SettingsResponse:
+async def update_settings(request: Request, update: SettingsUpdateRequest, user_id: str = Depends(get_user_id), datastore: DataStore = Depends(_dep_get_datastore)) -> SettingsResponse:
     """Update application settings."""
-    datastore = _get_datastore(request)
-    stored = await _load_settings(datastore, request)
+    stored = await _load_settings(datastore, request, user_id)
 
     if update.theme and update.theme in ["dark", "light"]:
         stored["theme"] = update.theme
@@ -176,7 +171,7 @@ async def update_settings(request: Request, update: SettingsUpdateRequest) -> Se
     if update.show_month_names is not None:
         stored["show_month_names"] = update.show_month_names
 
-    await _save_settings(datastore, stored, request)
+    await _save_settings(datastore, stored, request, user_id)
 
     claude = request.app.state.claude
     return SettingsResponse(
@@ -192,10 +187,9 @@ async def update_settings(request: Request, update: SettingsUpdateRequest) -> Se
 
 
 @router.get("/theme", response_model=ThemeResponse)
-async def get_theme(request: Request) -> ThemeResponse:
+async def get_theme(request: Request, user_id: str = Depends(get_user_id), datastore: DataStore = Depends(_dep_get_datastore)) -> ThemeResponse:
     """Get current theme settings."""
-    datastore = _get_datastore(request)
-    stored = await _load_settings(datastore, request)
+    stored = await _load_settings(datastore, request, user_id)
     return ThemeResponse(
         theme=stored.get("theme", "dark"),
         available_themes=["dark", "light"],
@@ -203,13 +197,12 @@ async def get_theme(request: Request) -> ThemeResponse:
 
 
 @router.post("/theme", response_model=ThemeResponse)
-async def set_theme(request: Request, theme: str) -> ThemeResponse:
+async def set_theme(request: Request, theme: str, user_id: str = Depends(get_user_id), datastore: DataStore = Depends(_dep_get_datastore)) -> ThemeResponse:
     """Set theme preference."""
-    datastore = _get_datastore(request)
-    stored = await _load_settings(datastore, request)
+    stored = await _load_settings(datastore, request, user_id)
     if theme in ["dark", "light"]:
         stored["theme"] = theme
-        await _save_settings(datastore, stored, request)
+        await _save_settings(datastore, stored, request, user_id)
 
     return ThemeResponse(
         theme=stored.get("theme", "dark"),

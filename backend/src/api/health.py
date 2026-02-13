@@ -12,7 +12,7 @@ from ..config import settings
 from ..db import DatabaseManager
 from ..logging_config import get_logger
 from ..storage import StorageBackend
-from .dependencies import get_db as _dep_get_db
+from .dependencies import get_db as _dep_get_db, get_storage as _dep_get_storage
 
 router = APIRouter(tags=["health"])
 logger = get_logger(__name__)
@@ -113,8 +113,8 @@ def get_db(request: Request):
 
 
 def get_storage(request: Request) -> StorageBackend:
-    """Get storage backend from app state."""
-    return request.app.state.storage
+    """Get storage backend (user-scoped in cloud mode)."""
+    return _dep_get_storage(request)
 
 
 def get_claude(request: Request):

@@ -55,9 +55,11 @@ class PostgresManager:
     use either backend interchangeably.
     """
 
-    def __init__(self, connection_string: str) -> None:
+    def __init__(self, connection_string: str, pool_min: int = 2, pool_max: int = 10) -> None:
         self._conninfo = connection_string
         self._pool: Optional[ConnectionPool] = None
+        self._pool_min = pool_min
+        self._pool_max = pool_max
 
     def connect(self) -> None:
         """Open the connection pool."""
@@ -65,9 +67,14 @@ class PostgresManager:
             return
         self._pool = ConnectionPool(
             self._conninfo,
-            min_size=2,
-            max_size=10,
-            kwargs={"row_factory": tuple_row},
+            min_size=self._pool_min,
+            max_size=self._pool_max,
+            kwargs={
+                "row_factory": tuple_row,
+                # Disable prepared statements so the pool works with
+                # transaction-mode poolers (PgBouncer / Supavisor).
+                "prepare_threshold": None,
+            },
         )
         logger.info("postgres_pool_opened")
 
