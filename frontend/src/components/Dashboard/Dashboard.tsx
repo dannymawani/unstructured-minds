@@ -7,6 +7,7 @@ import { ExerciseTable } from './ExerciseTable';
 import { ActivityHeatmap } from './ActivityHeatmap';
 import { SleepTrends } from './SleepTrends';
 import { MoodCorrelation } from './MoodCorrelation';
+import { NutritionTile } from './NutritionTile';
 import { DateRangeSelector } from './DateRangeSelector';
 import { InsightsCard } from './InsightsCard';
 import { WidgetConfigPanel, useWidgetConfig } from './WidgetConfig';
@@ -17,7 +18,6 @@ interface DashboardProps {
 
 export function Dashboard({ apiUrl = 'http://localhost:8000' }: DashboardProps) {
   const [dateRange, setDateRange] = useState(30);
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [widgets, setWidgets] = useWidgetConfig();
 
   // Get visible widgets sorted by order
@@ -63,31 +63,16 @@ export function Dashboard({ apiUrl = 'http://localhost:8000' }: DashboardProps) 
       {/* AI Insights */}
       {isVisible('insights') && <InsightsCard apiUrl={apiUrl} />}
 
-      {/* Activity Heatmap - Full screen width */}
-      {isVisible('heatmap') && (
-        <div className="relative -mx-4 sm:-mx-6">
-          {/* Year selector for heatmap */}
-          <div className="absolute top-4 right-8 sm:right-10 z-10">
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(Number(e.target.value))}
-              className="bg-secondary text-foreground text-sm rounded px-2 py-1 border-none focus:ring-2 focus:ring-ring"
-            >
-              {[...Array(3)].map((_, i) => {
-                const year = new Date().getFullYear() - i;
-                return (
-                  <option key={year} value={year}>
-                    {year}
-                  </option>
-                );
-              })}
-            </select>
-          </div>
-          <ActivityHeatmap
-            apiUrl={apiUrl}
-            year={selectedYear}
-            onDayClick={handleHeatmapDayClick}
-          />
+      {/* Heatmap + Nutrition - Side by side */}
+      {(isVisible('heatmap') || isVisible('nutrition')) && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+          {isVisible('heatmap') && (
+              <ActivityHeatmap
+                apiUrl={apiUrl}
+                onDayClick={handleHeatmapDayClick}
+              />
+          )}
+          {isVisible('nutrition') && <NutritionTile apiUrl={apiUrl} days={dateRange} />}
         </div>
       )}
 
