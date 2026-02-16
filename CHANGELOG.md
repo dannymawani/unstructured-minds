@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.8.1] - 2026-02-16
+
+### Security
+- Harden `/query/natural` endpoint with defense-in-depth against SQL injection, prompt injection, and unauthorized writes
+- Add `read_only_execute()` to DatabaseManager — wraps AI-generated SQL in BEGIN/ROLLBACK to prevent writes
+- Add DuckDB parser validation, file I/O function deny-list, and system table blocking to `validate_sql()`
+- Move SQL generation rules to system prompt to resist prompt injection overrides
+- Add automatic LIMIT safety net for unbounded queries
+- Add INVALID_QUERY handling for non-data questions
+
+### Added
+- Add onboarding system with demo data for new users
+- Add go-live architecture diagrams (drawio, PNG, SVG)
+
 ## [v0.8.0] - 2026-02-13
 
 ### Added
