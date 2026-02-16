@@ -178,7 +178,7 @@ class Settings(BaseSettings):
 - `GET|POST /kanban/tasks/{id}/notes` — Task update notes
 
 **Queries** (`/query/*`):
-- `POST /query/natural` — NL → SQL → results (30/min)
+- `POST /query/natural` — NL → SQL → results (30/min). Defense-in-depth: system prompt separation, `validate_sql()` (keyword deny-list + function deny-list + system table blocking + DuckDB parser), `read_only_execute()` (BEGIN/ROLLBACK), auto LIMIT 100
 - `GET /query/suggestion` — Suggested queries (100/min)
 
 **Other:**
@@ -208,6 +208,23 @@ get_user_id(req)      → "local" or uuid5(NAMESPACE_URL, clerk_sub)
 ```
 
 **CRITICAL:** `dashboard.py` defines a **local `get_db`** that depends on `get_user_id` (auth + cache seeding). This local function **must be defined before all endpoint functions** — Python evaluates `Depends()` defaults at function definition time.
+
+### Database Security (`db/connection.py`)
+
+`DatabaseManager.read_only_execute(sql)` — Wraps AI-generated SQL in `BEGIN TRANSACTION` / `ROLLBACK`. Results are materialized into `_MaterializedResult` before rollback. Used exclusively by `/query/natural` to ensure writes from prompt injection are always discarded.
+
+### SQL Validation (`api/query.py`)
+
+`validate_sql(sql)` — 4-layer defense:
+1. Must start with `SELECT` or `WITH`, no semicolons (multi-statement)
+2. Keyword deny-list: INSERT, UPDATE, DELETE, DROP, TRUNCATE, ALTER, CREATE, GRANT, REVOKE, EXEC, EXECUTE, ATTACH, DETACH, COPY, LOAD, INSTALL, PRAGMA, CALL, SET, EXPLAIN
+3. Function deny-list (`DANGEROUS_FUNCTIONS`): `read_csv`, `read_parquet`, `read_json`, `glob`, `http_get`, `system`, `write_csv`, `write_parquet`, etc.
+4. System table blocking (`BLOCKED_TABLE_PATTERNS`): `information_schema`, `duckdb_*`, `pg_*`, `sqlite_*`
+5. `duckdb.extract_statements(sql)` — parser ensures exactly 1 valid statement
+
+`ALLOWED_QUERY_TABLES`: `daily_metrics`, `exercise_log`, `activities`, `food_log`, `tasks`
+
+SQL generation uses `system` parameter (not user message) with explicit anti-injection rules. Claude returns `INVALID_QUERY` for non-data questions.
 
 ### Storage Backends (`storage/`)
 
