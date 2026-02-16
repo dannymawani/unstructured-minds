@@ -555,3 +555,4 @@ services:
 5. **uuid5 for user IDs** — Deterministic Clerk sub → UUID mapping
 6. **CSP in one file** — `nginx/security-headers.conf` included in both server and location blocks
 7. **VITE_CLERK_PUBLISHABLE_KEY as build arg** — Vite bakes `VITE_*` at build time
+8. **Defense-in-depth for AI-generated SQL** — 4 layers: system prompt separation, `validate_sql()` deny-lists + DuckDB parser, `read_only_execute()` BEGIN/ROLLBACK, auto LIMIT 100
