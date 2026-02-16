@@ -362,7 +362,7 @@ function App() {
 
       <main className="flex-1 flex overflow-hidden">
         <Routes>
-          <Route path="/dashboard" element={<Suspense fallback={<ViewLoadingFallback />}><section className="flex-1 overflow-auto bg-background"><Dashboard apiUrl={api.baseUrl} /></section></Suspense>} />
+          <Route path="/dashboard" element={<Suspense fallback={<ViewLoadingFallback />}><section className="flex-1 overflow-auto bg-background"><Dashboard apiUrl={api.baseUrl} onCreateNote={createDailyNote} /></section></Suspense>} />
           <Route path="/kanban" element={<Suspense fallback={<ViewLoadingFallback />}><section className="flex-1 overflow-auto bg-background"><KanbanBoard apiUrl={api.baseUrl} onFileSelect={handleFileSelect} /></section></Suspense>} />
           <Route path="/calendar" element={<Suspense fallback={<ViewLoadingFallback />}><section className="flex-1 overflow-auto bg-background"><CalendarView apiUrl={api.baseUrl} onDaySelect={handleCalendarDaySelect} /></section></Suspense>} />
           <Route path="/profile" element={<Suspense fallback={<ViewLoadingFallback />}><section className="flex-1 overflow-auto bg-background"><LifeProfile apiUrl={api.baseUrl} /></section></Suspense>} />
