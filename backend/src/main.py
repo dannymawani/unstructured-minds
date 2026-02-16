@@ -29,6 +29,7 @@ from .api.insights import router as insights_router
 from .api.note_assist import router as note_assist_router
 from .api.profile import router as profile_router
 from .api.exercises import router as exercises_router
+from .api.onboarding import router as onboarding_router
 from .claude import ClaudeClient
 from .db import DatabaseManager, PostgresManager, init_postgres_schema
 from .db.analytics_cache import AnalyticsCacheManager
@@ -234,6 +235,7 @@ app.include_router(insights_router)
 app.include_router(note_assist_router)
 app.include_router(profile_router)
 app.include_router(exercises_router)
+app.include_router(onboarding_router)
 
 
 if __name__ == "__main__":

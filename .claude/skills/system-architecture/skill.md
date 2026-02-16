@@ -22,6 +22,7 @@ unstructured_minds/
 │   │   ├── storage/            # File storage abstraction
 │   │   ├── middleware/         # Auth, rate limit, logging, CSP
 │   │   ├── claude/             # AI client wrapper
+│   │   ├── onboarding/         # Demo data + onboarding lifecycle
 │   │   ├── skills/             # Skill system
 │   │   ├── templates/          # Note templates
 │   │   ├── parsing/            # Markdown/tag parsing
@@ -36,7 +37,7 @@ unstructured_minds/
 │   │   ├── App.tsx             # Routing, layout, auth gate
 │   │   ├── main.tsx            # React root + Clerk provider
 │   │   ├── index.css           # Tailwind v4 + theme vars
-│   │   ├── components/         # 22 component directories
+│   │   ├── components/         # 23 component directories (incl. Onboarding)
 │   │   ├── hooks/              # 5 custom hooks
 │   │   └── lib/                # apiClient, utils
 │   ├── public/                 # um-icon.svg, um-logo.svg, manifest.json
@@ -191,6 +192,7 @@ class Settings(BaseSettings):
 - `/schemas` — Custom extraction schemas CRUD
 - `/templates` — Template management
 - `/exercises` — Exercise definitions
+- `/onboarding/status` (GET), `/onboarding/seed` (POST), `/onboarding/clear-demo` (POST), `/onboarding/complete` (POST) — Demo data lifecycle
 - `/insights` — ML trends/anomalies
 - `/note-assist` — Multimodal AI note editing
 - `/metrics` — Request metrics

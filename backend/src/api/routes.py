@@ -311,6 +311,16 @@ async def write_file(
                     pipeline = ExtractionPipeline(db, claude, user_id=user_id)
                     result = await pipeline.extract(body.path, body.content)
                     did_extract = result.success
+
+                    # Clean up demo data for the extracted date
+                    if did_extract:
+                        try:
+                            from ..onboarding.lifecycle import cleanup_demo_for_date
+                            extracted_date = pipeline._extract_date_from_path(body.path)
+                            if extracted_date:
+                                cleanup_demo_for_date(db, extracted_date, user_id)
+                        except Exception:
+                            pass  # Demo cleanup failure shouldn't fail the save
             except Exception:
                 pass  # Extraction failure shouldn't fail the save
 
