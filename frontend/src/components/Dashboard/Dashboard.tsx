@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { LayoutDashboard } from 'lucide-react';
 import { DashboardSummary } from './DashboardSummary';
 import { WeeklyActivityChart } from './WeeklyActivityChart';
@@ -11,14 +11,61 @@ import { NutritionTile } from './NutritionTile';
 import { DateRangeSelector } from './DateRangeSelector';
 import { InsightsCard } from './InsightsCard';
 import { WidgetConfigPanel, useWidgetConfig } from './WidgetConfig';
+import { DemoBanner } from './DemoBanner';
+import { OnboardingOverlay } from '../Onboarding/OnboardingOverlay';
+
+interface OnboardingStatus {
+  is_new_user: boolean;
+  demo_active: boolean;
+  onboarding_completed: boolean;
+  demo_data_count: number;
+  real_data_count: number;
+}
 
 interface DashboardProps {
   apiUrl?: string;
+  onCreateNote?: () => void;
 }
 
-export function Dashboard({ apiUrl = 'http://localhost:8000' }: DashboardProps) {
+export function Dashboard({ apiUrl = 'http://localhost:8000', onCreateNote }: DashboardProps) {
   const [dateRange, setDateRange] = useState(30);
   const [widgets, setWidgets] = useWidgetConfig();
+  const [onboarding, setOnboarding] = useState<OnboardingStatus | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Fetch onboarding status on mount
+  useEffect(() => {
+    async function fetchStatus() {
+      try {
+        const resp = await fetch(`${apiUrl}/onboarding/status`);
+        if (resp.ok) {
+          setOnboarding(await resp.json());
+        }
+      } catch {
+        // Non-critical — dashboard works without onboarding status
+      }
+    }
+    fetchStatus();
+  }, [apiUrl, refreshKey]);
+
+  const refresh = useCallback(() => {
+    setRefreshKey(k => k + 1);
+  }, []);
+
+  const handleSeedDemo = useCallback(() => {
+    setOnboarding(prev => prev ? { ...prev, is_new_user: false, demo_active: true, demo_data_count: 1 } : prev);
+    refresh();
+  }, [refresh]);
+
+  const handleStartWriting = useCallback(() => {
+    setOnboarding(prev => prev ? { ...prev, is_new_user: false, onboarding_completed: true } : prev);
+    onCreateNote?.();
+  }, [onCreateNote]);
+
+  const handleDemoCleared = useCallback(() => {
+    setOnboarding(prev => prev ? { ...prev, demo_active: false, demo_data_count: 0 } : prev);
+    refresh();
+  }, [refresh]);
 
   // Get visible widgets sorted by order
   const visibleWidgets = useMemo(() => {
@@ -41,8 +88,22 @@ export function Dashboard({ apiUrl = 'http://localhost:8000' }: DashboardProps) 
     console.log('Clicked sleep day:', date);
   };
 
+  // Show new user overlay
+  const showOverlay = onboarding?.is_new_user && !onboarding?.onboarding_completed;
+  // Show demo banner when demo data is active
+  const showBanner = onboarding?.demo_active && !onboarding?.is_new_user;
+
   return (
     <div className="p-4 sm:p-6 space-y-5 sm:space-y-6" data-testid="dashboard">
+      {/* Onboarding overlay for new users */}
+      {showOverlay && (
+        <OnboardingOverlay
+          apiUrl={apiUrl}
+          onSeedDemo={handleSeedDemo}
+          onStartWriting={handleStartWriting}
+        />
+      )}
+
       {/* Header with controls */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-2 sm:mb-4">
         <div className="flex items-center gap-2.5">
@@ -57,11 +118,20 @@ export function Dashboard({ apiUrl = 'http://localhost:8000' }: DashboardProps) 
         </div>
       </div>
 
+      {/* Demo data banner */}
+      {showBanner && (
+        <DemoBanner
+          apiUrl={apiUrl}
+          onCreateNote={onCreateNote ?? (() => {})}
+          onDemoCleared={handleDemoCleared}
+        />
+      )}
+
       {/* Summary Cards */}
-      {isVisible('summary') && <DashboardSummary apiUrl={apiUrl} days={dateRange} />}
+      {isVisible('summary') && <DashboardSummary apiUrl={apiUrl} days={dateRange} key={`summary-${refreshKey}`} />}
 
       {/* AI Insights */}
-      {isVisible('insights') && <InsightsCard apiUrl={apiUrl} />}
+      {isVisible('insights') && <InsightsCard apiUrl={apiUrl} key={`insights-${refreshKey}`} />}
 
       {/* Heatmap + Nutrition - Side by side */}
       {(isVisible('heatmap') || isVisible('nutrition')) && (
@@ -70,29 +140,30 @@ export function Dashboard({ apiUrl = 'http://localhost:8000' }: DashboardProps) 
               <ActivityHeatmap
                 apiUrl={apiUrl}
                 onDayClick={handleHeatmapDayClick}
+                key={`heatmap-${refreshKey}`}
               />
           )}
-          {isVisible('nutrition') && <NutritionTile apiUrl={apiUrl} days={dateRange} />}
+          {isVisible('nutrition') && <NutritionTile apiUrl={apiUrl} days={dateRange} key={`nutrition-${refreshKey}`} />}
         </div>
       )}
 
       {/* Charts Grid - Row 1 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-        {isVisible('weeklyActivity') && <WeeklyActivityChart apiUrl={apiUrl} days={dateRange} />}
-        {isVisible('metricsTrends') && <MetricsTrends apiUrl={apiUrl} days={dateRange} />}
+        {isVisible('weeklyActivity') && <WeeklyActivityChart apiUrl={apiUrl} days={dateRange} key={`weekly-${refreshKey}`} />}
+        {isVisible('metricsTrends') && <MetricsTrends apiUrl={apiUrl} days={dateRange} key={`metrics-${refreshKey}`} />}
       </div>
 
       {/* Charts Grid - Row 2 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {isVisible('sleepTrends') && (
-          <SleepTrends apiUrl={apiUrl} days={dateRange} onDayClick={handleSleepDayClick} />
+          <SleepTrends apiUrl={apiUrl} days={dateRange} onDayClick={handleSleepDayClick} key={`sleep-${refreshKey}`} />
         )}
-        {isVisible('moodCorrelation') && <MoodCorrelation apiUrl={apiUrl} days={dateRange} />}
+        {isVisible('moodCorrelation') && <MoodCorrelation apiUrl={apiUrl} days={dateRange} key={`mood-${refreshKey}`} />}
       </div>
 
       {/* Exercise Table */}
       {isVisible('exerciseProgress') && (
-        <ExerciseTable apiUrl={apiUrl} />
+        <ExerciseTable apiUrl={apiUrl} key={`exercise-${refreshKey}`} />
       )}
 
       {/* Empty state when no widgets visible */}
