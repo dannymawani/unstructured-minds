@@ -7,14 +7,17 @@
 
 ---
 
-## Current State (Feb 16, 2026)
+## Current State
 
-### What exists
+### Completed (Feb 18, 2026)
 
-- Domain `unstructuredminds.com` registered on GoDaddy
-- Nameservers pointed to Cloudflare (DNS Setup: Full)
-- Coming soon landing page built (`landing/index.html`)
-- GitHub Actions workflow for Cloudflare Pages deploy (`.github/workflows/deploy-landing.yml`)
+- [x] Domain `unstructuredminds.com` registered on GoDaddy
+- [x] Nameservers changed from GoDaddy to Cloudflare (`clara.ns.cloudflare.com`, `dax.ns.cloudflare.com`)
+- [x] DNS cleanup — removed unauthorized Mailgun records (MX, SPF, DKIM, DMARC, email CNAME)
+- [x] Cloudflare Pages project created (`unstructured-minds-landing`)
+- [x] GitHub Actions secrets set (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`)
+- [x] Coming soon landing page deployed and live at `unstructuredminds.com`
+- [x] Custom domain configured in Cloudflare Pages
 
 ### DNS cleanup needed (working with GoDaddy support)
 
