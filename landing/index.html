@@ -125,75 +125,6 @@
       max-width: 480px;
     }
 
-    /* Email signup section */
-    .signup-section {
-      width: 100%;
-      margin-top: 0.5rem;
-    }
-
-    .signup-section h2 {
-      font-size: 1.125rem;
-      font-weight: 600;
-      margin-bottom: 1rem;
-      color: #f8fafc;
-    }
-
-    .form-row {
-      display: flex;
-      gap: 0.75rem;
-      width: 100%;
-    }
-
-    .form-row input[type="email"] {
-      flex: 1;
-      padding: 0.75rem 1rem;
-      background-color: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 0.5rem;
-      color: #f8fafc;
-      font-family: 'Inter', sans-serif;
-      font-size: 0.9375rem;
-      outline: none;
-      transition: border-color 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    .form-row input[type="email"]::placeholder {
-      color: #64748b;
-    }
-
-    .form-row input[type="email"]:focus {
-      border-color: #14b8a6;
-      box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.15);
-    }
-
-    .form-row button[type="submit"] {
-      padding: 0.75rem 1.5rem;
-      background-color: #14b8a6;
-      color: #0f172a;
-      border: none;
-      border-radius: 0.5rem;
-      font-family: 'Inter', sans-serif;
-      font-size: 0.9375rem;
-      font-weight: 600;
-      cursor: pointer;
-      white-space: nowrap;
-      transition: background-color 0.2s ease, transform 0.1s ease;
-    }
-
-    .form-row button[type="submit"]:hover {
-      background-color: #2dd4bf;
-    }
-
-    .form-row button[type="submit"]:active {
-      transform: scale(0.97);
-    }
-
-    .form-note {
-      margin-top: 0.75rem;
-      font-size: 0.8125rem;
-      color: #64748b;
-    }
-
     /* Footer */
     footer {
       margin-top: 3rem;
@@ -230,14 +161,6 @@
 
       .logo-wrapper svg {
         width: 160px;
-      }
-
-      .form-row {
-        flex-direction: column;
-      }
-
-      .form-row button[type="submit"] {
-        width: 100%;
       }
 
       footer {
@@ -310,36 +233,11 @@
     <!-- Description -->
     <p class="description">A personal knowledge engine that extracts structured data from your daily notes using Claude AI. Write naturally, query precisely.</p>
 
-    <!-- Email signup -->
-    <section class="signup-section">
-      <h2>Be the first to know when we launch</h2>
-      <form
-        action="https://buttondown.com/api/emails/embed-subscribe/unstructuredminds"
-        method="post"
-        target="popupwindow"
-        onsubmit="window.open('https://buttondown.com/unstructuredminds', 'popupwindow')"
-      >
-        <div class="form-row">
-          <input
-            type="email"
-            name="email"
-            id="bd-email"
-            placeholder="you@example.com"
-            required
-            autocomplete="email"
-          />
-          <button type="submit">Subscribe</button>
-        </div>
-      </form>
-      <p class="form-note">No spam. Unsubscribe anytime.</p>
-    </section>
-
   </main>
 
   <!-- Footer -->
   <footer>
     <span>&copy; 2026 Unstructured Minds</span>
-    <a href="https://github.com/dannymawani/unstructured_minds" target="_blank" rel="noopener noreferrer">GitHub</a>
   </footer>
 </body>
 </html>
