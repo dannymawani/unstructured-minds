@@ -12,7 +12,24 @@ interface DailyNoteWizardProps {
   apiBaseUrl?: string
 }
 
-type WorkoutType = 'BJJ' | 'Strength' | 'Cardio' | 'Rest'
+interface ActivityOption {
+  id: string
+  label: string
+  emoji: string
+}
+
+const ACTIVITY_OPTIONS: ActivityOption[] = [
+  { id: 'strength', label: 'Strength', emoji: '🏋️' },
+  { id: 'running', label: 'Running', emoji: '🏃' },
+  { id: 'cycling', label: 'Cycling', emoji: '🚴' },
+  { id: 'swimming', label: 'Swimming', emoji: '🏊' },
+  { id: 'hiit', label: 'HIIT', emoji: '⚡' },
+  { id: 'yoga', label: 'Yoga', emoji: '🧘' },
+  { id: 'sports', label: 'Sports', emoji: '🎾' },
+  { id: 'martial_arts', label: 'Martial Arts', emoji: '🥋' },
+  { id: 'walking', label: 'Walking', emoji: '🚶' },
+  { id: 'other', label: 'Other', emoji: '💪' },
+]
 
 interface WorkoutSuggestion {
   date: string | null
@@ -35,12 +52,14 @@ interface RolloverTask {
   category: string | null
   priority: number | null
   deadline: string | null
-  deadline_status: string | null // "overdue" | "due_today" | "upcoming" | null
+  deadline_status: string | null
   auto_select: boolean
 }
 
 interface WizardAnswers {
-  workout: WorkoutType | null
+  activities: Set<string>
+  activityDetails: string
+  isRestDay: boolean
   sleep: number | null
   energy: number | null
   mood: number | null
@@ -52,12 +71,13 @@ interface WizardAnswers {
   selectedRolloverIds: Set<string>
 }
 
-const TOTAL_STEPS = 8
+const TOTAL_STEPS = 6
 
-export function DailyNoteWizard({ isOpen, onClose, onComplete, noteContent, date, apiBaseUrl }: DailyNoteWizardProps) {
-  const [step, setStep] = useState(1)
-  const [answers, setAnswers] = useState<WizardAnswers>({
-    workout: null,
+function makeInitialAnswers(): WizardAnswers {
+  return {
+    activities: new Set(),
+    activityDetails: '',
+    isRestDay: false,
     sleep: null,
     energy: null,
     mood: null,
@@ -67,7 +87,12 @@ export function DailyNoteWizard({ isOpen, onClose, onComplete, noteContent, date
     workoutSuggestion: null,
     rolloverTasks: [],
     selectedRolloverIds: new Set(),
-  })
+  }
+}
+
+export function DailyNoteWizard({ isOpen, onClose, onComplete, noteContent, date, apiBaseUrl }: DailyNoteWizardProps) {
+  const [step, setStep] = useState(1)
+  const [answers, setAnswers] = useState<WizardAnswers>(makeInitialAnswers)
   const [isPopulating, setIsPopulating] = useState(false)
   const [rolloverLoading, setRolloverLoading] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -90,7 +115,6 @@ export function DailyNoteWizard({ isOpen, onClose, onComplete, noteContent, date
             selectedRolloverIds: autoSelected,
           }))
         } else {
-          // No rollover tasks — auto-skip to step 2
           setAnswers(a => ({ ...a, rolloverTasks: [], selectedRolloverIds: new Set() }))
           setStep(2)
         }
@@ -106,18 +130,7 @@ export function DailyNoteWizard({ isOpen, onClose, onComplete, noteContent, date
   useEffect(() => {
     if (isOpen) {
       setStep(1)
-      setAnswers({
-        workout: null,
-        sleep: null,
-        energy: null,
-        mood: null,
-        workPriorities: '',
-        personal: '',
-        adhoc: '',
-        workoutSuggestion: null,
-        rolloverTasks: [],
-        selectedRolloverIds: new Set(),
-      })
+      setAnswers(makeInitialAnswers())
     }
   }, [isOpen])
 
@@ -139,7 +152,7 @@ export function DailyNoteWizard({ isOpen, onClose, onComplete, noteContent, date
 
   // Focus textarea when reaching text steps
   useEffect(() => {
-    if (isOpen && step >= 6) {
+    if (isOpen && step >= 4) {
       setTimeout(() => textareaRef.current?.focus(), 50)
     }
   }, [isOpen, step])
@@ -151,7 +164,6 @@ export function DailyNoteWizard({ isOpen, onClose, onComplete, noteContent, date
       // Final step — populate via API, fall back to client-side
       setIsPopulating(true)
 
-      // Build rollover_tasks payload for API
       const selectedRolloverTasks = answers.rolloverTasks
         .filter(t => answers.selectedRolloverIds.has(t.id))
         .map(t => ({
@@ -159,6 +171,16 @@ export function DailyNoteWizard({ isOpen, onClose, onComplete, noteContent, date
           deadline: t.deadline,
           deadline_status: t.deadline_status,
         }))
+
+      // Build workout string for backend
+      let workoutStr: string | null = null
+      if (answers.isRestDay) {
+        workoutStr = 'Rest'
+      } else if (answers.activities.size > 0) {
+        workoutStr = [...answers.activities]
+          .map(id => ACTIVITY_OPTIONS.find(a => a.id === id)?.label ?? id)
+          .join(', ')
+      }
 
       try {
         if (apiBaseUrl) {
@@ -168,7 +190,8 @@ export function DailyNoteWizard({ isOpen, onClose, onComplete, noteContent, date
             body: JSON.stringify({
               date,
               template: noteContent,
-              workout: answers.workout,
+              workout: workoutStr,
+              activity_details: answers.activityDetails || null,
               sleep: answers.sleep,
               energy: answers.energy,
               mood: answers.mood,
@@ -218,7 +241,6 @@ export function DailyNoteWizard({ isOpen, onClose, onComplete, noteContent, date
   if (!isOpen) return null
 
   const formattedDate = formatDate(date)
-  // Effective step display accounts for auto-skipped rollover
   const displayStep = answers.rolloverTasks.length === 0 ? step - 1 : step
   const displayTotal = answers.rolloverTasks.length === 0 ? TOTAL_STEPS - 1 : TOTAL_STEPS
 
@@ -271,52 +293,24 @@ export function DailyNoteWizard({ isOpen, onClose, onComplete, noteContent, date
             />
           )}
           {step === 2 && (
-            <StepWorkout
-              value={answers.workout}
-              onChange={(v) => {
-                setAnswers(a => ({ ...a, workout: v }))
-                if (v === 'Strength') {
-                  fetchWorkoutSuggestion()
-                }
-                // Auto-advance after selection
-                setTimeout(() => setStep(3), 200)
-              }}
+            <StepCheckin
+              sleep={answers.sleep}
+              energy={answers.energy}
+              mood={answers.mood}
+              onChange={({ sleep, energy, mood }) => setAnswers(a => ({ ...a, sleep, energy, mood }))}
             />
           )}
           {step === 3 && (
-            <StepNumber
-              question="How did you sleep?"
-              label="Sleep rating"
-              value={answers.sleep}
-              onChange={(v) => {
-                setAnswers(a => ({ ...a, sleep: v }))
-                setTimeout(() => setStep(4), 200)
-              }}
+            <StepActivity
+              activities={answers.activities}
+              isRestDay={answers.isRestDay}
+              activityDetails={answers.activityDetails}
+              onChange={(updates) => setAnswers(a => ({ ...a, ...updates }))}
+              onFetchSuggestion={fetchWorkoutSuggestion}
+              onKeyDown={handleTextareaKeyDown}
             />
           )}
           {step === 4 && (
-            <StepNumber
-              question="What's your energy level?"
-              label="Energy"
-              value={answers.energy}
-              onChange={(v) => {
-                setAnswers(a => ({ ...a, energy: v }))
-                setTimeout(() => setStep(5), 200)
-              }}
-            />
-          )}
-          {step === 5 && (
-            <StepNumber
-              question="How's your mood?"
-              label="Mood"
-              value={answers.mood}
-              onChange={(v) => {
-                setAnswers(a => ({ ...a, mood: v }))
-                setTimeout(() => setStep(6), 200)
-              }}
-            />
-          )}
-          {step === 6 && (
             <StepText
               question="What are your work priorities today?"
               placeholder="e.g. Finish API integration, review PR #42, standup at 10am..."
@@ -326,7 +320,7 @@ export function DailyNoteWizard({ isOpen, onClose, onComplete, noteContent, date
               ref={textareaRef}
             />
           )}
-          {step === 7 && (
+          {step === 5 && (
             <StepText
               question="Any personal items for today?"
               placeholder="e.g. Grocery shopping, call dentist, pick up package..."
@@ -336,7 +330,7 @@ export function DailyNoteWizard({ isOpen, onClose, onComplete, noteContent, date
               ref={textareaRef}
             />
           )}
-          {step === 8 && (
+          {step === 6 && (
             <StepText
               question="Anything else on your mind?"
               placeholder="Free-form notes, thoughts, ideas..."
@@ -371,23 +365,15 @@ export function DailyNoteWizard({ isOpen, onClose, onComplete, noteContent, date
                 Skip
               </Button>
             )}
-            {step === 8 && (
+            {step === TOTAL_STEPS && (
               <Button variant="ghost" size="sm" onClick={goNext}>
                 Skip
               </Button>
             )}
-            {(step === 1 && answers.rolloverTasks.length > 0) && (
-              <Button size="sm" onClick={goNext} className="gap-1">
-                Next
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            )}
-            {step >= 6 && (
-              <Button size="sm" onClick={goNext} className="gap-1">
-                {step === TOTAL_STEPS ? 'Finish' : 'Next'}
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            )}
+            <Button size="sm" onClick={goNext} className="gap-1">
+              {step === TOTAL_STEPS ? 'Finish' : 'Next'}
+              <ArrowRight className="h-4 w-4" />
+            </Button>
           </div>
         </div>
       </div>
@@ -420,7 +406,6 @@ function StepRollover({
   if (tasks.length === 0) return null
 
   const allSelected = tasks.every(t => selectedIds.has(t.id))
-  const noneSelected = selectedIds.size === 0
 
   const toggleAll = () => {
     if (allSelected) {
@@ -508,39 +493,79 @@ function StepRollover({
         })}
       </div>
 
-      {noneSelected && (
+      {selectedIds.size === 0 && (
         <p className="text-xs text-muted-foreground mt-1">No tasks selected — skip or select some to carry forward</p>
       )}
     </div>
   )
 }
 
-function StepWorkout({ value, onChange }: { value: WorkoutType | null; onChange: (v: WorkoutType) => void }) {
-  const options: { type: WorkoutType; emoji: string }[] = [
-    { type: 'BJJ', emoji: '🥋' },
-    { type: 'Strength', emoji: '🏋️' },
-    { type: 'Cardio', emoji: '🏃' },
-    { type: 'Rest', emoji: '😴' },
-  ]
-
+function StepCheckin({
+  sleep,
+  energy,
+  mood,
+  onChange,
+}: {
+  sleep: number | null
+  energy: number | null
+  mood: number | null
+  onChange: (values: { sleep: number | null; energy: number | null; mood: number | null }) => void
+}) {
   return (
-    <div className="flex flex-col items-center gap-6 py-4">
-      <h3 className="text-xl font-medium text-center">Any workout planned?</h3>
-      <div className="grid grid-cols-2 gap-3 w-full max-w-xs">
-        {options.map(({ type, emoji }) => (
+    <div className="flex flex-col gap-5 py-2">
+      <div>
+        <h3 className="text-xl font-medium">Quick check-in</h3>
+        <p className="text-sm text-muted-foreground mt-1">Tap to rate, tap again to clear</p>
+      </div>
+      <RatingRow
+        label="Sleep"
+        value={sleep}
+        onChange={(v) => onChange({ sleep: v, energy, mood })}
+      />
+      <RatingRow
+        label="Energy"
+        value={energy}
+        onChange={(v) => onChange({ sleep, energy: v, mood })}
+      />
+      <RatingRow
+        label="Mood"
+        value={mood}
+        onChange={(v) => onChange({ sleep, energy, mood: v })}
+      />
+    </div>
+  )
+}
+
+function RatingRow({
+  label,
+  value,
+  onChange,
+}: {
+  label: string
+  value: number | null
+  onChange: (v: number | null) => void
+}) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium">{label}</span>
+        {value !== null && (
+          <span className="text-xs text-muted-foreground">{value}/10</span>
+        )}
+      </div>
+      <div className="flex gap-1">
+        {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
           <button
-            key={type}
-            onClick={() => onChange(type)}
+            key={n}
+            onClick={() => onChange(value === n ? null : n)}
             className={cn(
-              'flex flex-col items-center gap-2 px-4 py-4 rounded-lg border-2 transition-all',
-              'hover:border-primary hover:bg-primary/5',
-              value === type
-                ? 'border-primary bg-primary/10 text-primary'
-                : 'border-border bg-card'
+              'flex-1 h-8 rounded text-xs font-medium transition-all',
+              value === n
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground'
             )}
           >
-            <span className="text-2xl">{emoji}</span>
-            <span className="text-sm font-medium">{type}</span>
+            {n}
           </button>
         ))}
       </div>
@@ -548,38 +573,91 @@ function StepWorkout({ value, onChange }: { value: WorkoutType | null; onChange:
   )
 }
 
-function StepNumber({
-  question,
-  label,
-  value,
+function StepActivity({
+  activities,
+  isRestDay,
+  activityDetails,
   onChange,
+  onFetchSuggestion,
+  onKeyDown,
 }: {
-  question: string
-  label: string
-  value: number | null
-  onChange: (v: number) => void
+  activities: Set<string>
+  isRestDay: boolean
+  activityDetails: string
+  onChange: (updates: Partial<Pick<WizardAnswers, 'activities' | 'isRestDay' | 'activityDetails'>>) => void
+  onFetchSuggestion: () => void
+  onKeyDown: (e: React.KeyboardEvent) => void
 }) {
+  const toggleActivity = (id: string) => {
+    const next = new Set(activities)
+    if (next.has(id)) {
+      next.delete(id)
+    } else {
+      next.add(id)
+      if (id === 'strength') {
+        onFetchSuggestion()
+      }
+    }
+    onChange({ activities: next, isRestDay: false })
+  }
+
+  const toggleRestDay = () => {
+    if (isRestDay) {
+      onChange({ isRestDay: false })
+    } else {
+      onChange({ activities: new Set(), isRestDay: true, activityDetails: '' })
+    }
+  }
+
   return (
-    <div className="flex flex-col items-center gap-6 py-4">
-      <h3 className="text-xl font-medium text-center">{question}</h3>
-      <div className="flex flex-wrap justify-center gap-2">
-        {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+    <div className="flex flex-col gap-4 py-2 flex-1">
+      <h3 className="text-xl font-medium">Any training or activity?</h3>
+
+      <div className="grid grid-cols-5 gap-2">
+        {ACTIVITY_OPTIONS.map(({ id, label, emoji }) => (
           <button
-            key={n}
-            onClick={() => onChange(n)}
+            key={id}
+            onClick={() => toggleActivity(id)}
             className={cn(
-              'w-10 h-10 rounded-lg text-sm font-medium transition-all',
-              'hover:border-primary hover:bg-primary/5 border-2',
-              value === n
-                ? 'border-primary bg-primary/10 text-primary'
+              'flex flex-col items-center gap-1 px-1 py-2.5 rounded-lg border transition-all text-xs',
+              'hover:border-primary/50 hover:bg-primary/5',
+              activities.has(id)
+                ? 'border-primary bg-primary/10 text-primary font-medium'
                 : 'border-border bg-card'
             )}
           >
-            {n}
+            <span className="text-lg">{emoji}</span>
+            <span className="truncate w-full text-center leading-tight">{label}</span>
           </button>
         ))}
       </div>
-      <p className="text-xs text-muted-foreground">{label}: 1 = low, 10 = great</p>
+
+      <button
+        onClick={toggleRestDay}
+        className={cn(
+          'flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-all text-sm',
+          isRestDay
+            ? 'border-primary bg-primary/10 text-primary font-medium'
+            : 'border-border bg-card hover:border-primary/50 hover:bg-primary/5'
+        )}
+      >
+        <span>😴</span>
+        <span>Rest Day</span>
+      </button>
+
+      {activities.size > 0 && !isRestDay && (
+        <textarea
+          value={activityDetails}
+          onChange={(e) => onChange({ activityDetails: e.target.value })}
+          onKeyDown={onKeyDown}
+          placeholder="Add details about your session (optional)"
+          className="min-h-[60px] w-full rounded-lg border border-border bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+        />
+      )}
+
+      {!isRestDay && activities.size === 0 && (
+        <p className="text-xs text-muted-foreground">Select activities or skip to continue</p>
+      )}
     </div>
   )
 }
@@ -642,7 +720,6 @@ function populateNote(content: string, answers: WizardAnswers): string {
     if (focusIdx !== -1) {
       result = result.slice(0, focusIdx) + carriedBlock + result.slice(focusIdx)
     } else {
-      // Insert before first ## section
       const firstSection = result.search(/^## /m)
       if (firstSection !== -1) {
         result = result.slice(0, firstSection) + carriedBlock + result.slice(firstSection)
@@ -652,14 +729,27 @@ function populateNote(content: string, answers: WizardAnswers): string {
     }
   }
 
-  // Workout type
-  if (answers.workout) {
-    result = replaceLine(result, '- **Type**:', `- **Type**: ${answers.workout}`)
-    // Also try the escaped Milkdown variant
-    result = replaceLine(result, '* **Type**:', `* **Type**: ${answers.workout}`)
+  // Activity
+  if (answers.isRestDay) {
+    result = result.replace(
+      /[*-] \*\*Type\*\*:.*\n[*-] \*\*Focus\*\*:.*/,
+      '- Rest day'
+    )
+  } else if (answers.activities.size > 0) {
+    const typeStr = [...answers.activities]
+      .map(id => ACTIVITY_OPTIONS.find(a => a.id === id)?.label ?? id)
+      .join(', ')
+
+    result = replaceLine(result, '- **Type**:', `- **Type**: ${typeStr}`)
+    result = replaceLine(result, '* **Type**:', `* **Type**: ${typeStr}`)
+
+    if (answers.activityDetails.trim()) {
+      result = replaceLine(result, '- **Focus**:', `- **Focus**: ${answers.activityDetails.trim()}`)
+      result = replaceLine(result, '* **Focus**:', `* **Focus**: ${answers.activityDetails.trim()}`)
+    }
 
     // Add workout suggestion table for strength training
-    if (answers.workout === 'Strength' && answers.workoutSuggestion?.exercises.length) {
+    if (answers.activities.has('strength') && answers.workoutSuggestion?.exercises.length) {
       const suggestion = answers.workoutSuggestion
       const dateStr = suggestion.date ? ` ${suggestion.date}` : ''
       const tableLines = [
@@ -680,7 +770,6 @@ function populateNote(content: string, answers: WizardAnswers): string {
       tableLines.push('')
       const suggestionBlock = tableLines.join('\n')
 
-      // Insert after the Focus line in the Workout section
       const focusIdx = result.indexOf('- **Focus**:')
       const focusIdxAlt = result.indexOf('* **Focus**:')
       const insertIdx = focusIdx !== -1 ? focusIdx : focusIdxAlt
@@ -715,7 +804,6 @@ function populateNote(content: string, answers: WizardAnswers): string {
   if (answers.workPriorities.trim()) {
     result = insertAfterHeader(result, '## 💼 Work', answers.workPriorities.trim())
 
-    // Also populate Today's Focus with checklist items from work priorities
     const items = answers.workPriorities
       .split('\n')
       .map(line => line.trim())
@@ -726,12 +814,12 @@ function populateNote(content: string, answers: WizardAnswers): string {
     }
   }
 
-  // Personal items — insert after "## 🤷🏽 Personal" header
+  // Personal items
   if (answers.personal.trim()) {
     result = insertAfterHeader(result, '## 🤷🏽 Personal', answers.personal.trim())
   }
 
-  // Adhoc notes — insert after "## 📝 Adhoc Notes" header
+  // Adhoc notes
   if (answers.adhoc.trim()) {
     result = insertAfterHeader(result, '## 📝 Adhoc Notes', answers.adhoc.trim())
   }
@@ -750,7 +838,6 @@ function insertAfterHeader(content: string, header: string, text: string): strin
   const idx = content.indexOf(header)
   if (idx === -1) return content
 
-  // Find end of header line
   const lineEnd = content.indexOf('\n', idx)
   if (lineEnd === -1) return content + '\n' + text
 
@@ -765,7 +852,6 @@ function replaceSection(content: string, header: string, newBody: string): strin
   const lineEnd = content.indexOf('\n', idx)
   if (lineEnd === -1) return content
 
-  // Find the next header (## or ---) or end of content
   const rest = content.slice(lineEnd + 1)
   const nextHeaderMatch = rest.match(/^(#{1,3} |\*{3}|---)/m)
   const nextHeaderIdx = nextHeaderMatch ? rest.indexOf(nextHeaderMatch[0]) : rest.length

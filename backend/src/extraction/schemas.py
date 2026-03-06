@@ -22,7 +22,7 @@ EXERCISE_SCHEMA: dict[str, Any] = {
                 "properties": {
                     "activity_type": {
                         "type": "string",
-                        "enum": ["strength", "bjj", "cardio", "yoga", "walk", "recovery", "other"],
+                        "enum": ["strength", "bjj", "cardio", "running", "cycling", "swimming", "yoga", "walk", "recovery", "other"],
                         "description": "Type of activity",
                     },
                     "duration_minutes": {
@@ -99,6 +99,10 @@ DAILY_METRICS_SCHEMA: dict[str, Any] = {
             "minimum": 1,
             "maximum": 10,
             "description": "Stress level rating 1-10",
+        },
+        "weight_kg": {
+            "type": "number",
+            "description": "Body weight in kilograms, if mentioned",
         },
         "notes": {
             "type": "string",

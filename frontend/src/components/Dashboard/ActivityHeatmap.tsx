@@ -21,32 +21,15 @@ interface ActivityHeatmapProps {
   onDayClick?: (date: string, data: HeatmapDay | null) => void;
 }
 
-// Color scale for days with both workout + note (green, intensity based on duration)
-const INTENSITY_COLORS = [
-  'bg-muted',                              // 0 - no activity
-  'bg-green-900/60 dark:bg-green-900/60', // 1 - light
-  'bg-green-700/70 dark:bg-green-700/70', // 2 - moderate
-  'bg-green-500/80 dark:bg-green-500/80', // 3 - active
-  'bg-green-400 dark:bg-green-400',       // 4 - very active
+// Green intensity scale for active days (has workout)
+const ACTIVE_COLORS = [
+  'bg-muted',                   // 0 - no activity
+  'bg-green-900/60',            // 1 - light
+  'bg-green-700/70',            // 2 - moderate
+  'bg-green-500/80',            // 3 - active
+  'bg-green-400',               // 4 - very active
 ];
 
-// Color scale for workout-only days (orange, intensity based on duration)
-const WORKOUT_ONLY_COLORS = [
-  'bg-muted',
-  'bg-orange-900/60 dark:bg-orange-900/60',
-  'bg-orange-700/70 dark:bg-orange-700/70',
-  'bg-orange-500/80 dark:bg-orange-500/80',
-  'bg-orange-400 dark:bg-orange-400',
-];
-
-
-function getISOWeekNumber(date: Date): number {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
-}
 
 function formatLocalDate(d: Date): string {
   const y = d.getFullYear();
@@ -65,25 +48,20 @@ function getIntensityLevel(duration: number, maxDuration: number): number {
 }
 
 function getDayColor(day: HeatmapDay | null, maxDuration: number): string {
-  if (!day) return INTENSITY_COLORS[0];
-  if (day.has_workout && day.has_note) {
-    return INTENSITY_COLORS[getIntensityLevel(day.duration_minutes, maxDuration)];
-  }
+  if (!day) return ACTIVE_COLORS[0];
   if (day.has_workout) {
-    const level = getIntensityLevel(day.duration_minutes, maxDuration);
-    return WORKOUT_ONLY_COLORS[level];
+    return ACTIVE_COLORS[getIntensityLevel(day.duration_minutes, maxDuration)];
   }
   if (day.has_note) {
-    return 'bg-blue-500/50 dark:bg-blue-500/50';
+    return 'bg-blue-500/50';
   }
-  return INTENSITY_COLORS[0];
+  return ACTIVE_COLORS[0];
 }
 
 function getDayTypeLabel(day: HeatmapDay | null): string {
   if (!day) return 'No entries';
-  if (day.has_workout && day.has_note) return 'Note + Workout';
-  if (day.has_workout) return 'Workout only';
-  if (day.has_note) return 'Daily note';
+  if (day.has_workout) return 'Active';
+  if (day.has_note) return 'Note only';
   return 'No entries';
 }
 
@@ -207,13 +185,25 @@ export function ActivityHeatmap({
     return result;
   }, [windowStart, windowEnd, dayMap]);
 
-  // ISO week number for each column
-  const weekNumbers = useMemo(() => {
-    return weeks.map((week) => {
-      const thursday = week.find((d) => d.date.getDay() === 4) || week[0];
-      return getISOWeekNumber(thursday.date);
+  // Month labels positioned at the first week that falls in each month
+  const monthLabels = useMemo(() => {
+    const labels: { weekIdx: number; label: string }[] = [];
+    let lastMonth = -1;
+    weeks.forEach((week, weekIdx) => {
+      // Use the first in-range day of the week to determine month
+      const representative = week.find(d => d.date >= windowStart && d.date <= windowEnd);
+      if (!representative) return;
+      const month = representative.date.getMonth();
+      if (month !== lastMonth) {
+        labels.push({
+          weekIdx,
+          label: representative.date.toLocaleDateString('en-US', { month: 'short' }),
+        });
+        lastMonth = month;
+      }
     });
-  }, [weeks]);
+    return labels;
+  }, [weeks, windowStart, windowEnd]);
 
   const handleMouseEnter = (
     e: React.MouseEvent<HTMLDivElement>,
@@ -276,8 +266,29 @@ export function ActivityHeatmap({
         </div>
       </div>
 
-      {/* Heatmap grid */}
+      {/* Month labels */}
+      <div className="flex gap-[2px] mb-1 ml-[28px]">
+        {weeks.map((_, weekIdx) => {
+          const label = monthLabels.find(m => m.weekIdx === weekIdx);
+          return (
+            <div key={weekIdx} className="flex-1 min-w-0 text-[10px] text-muted-foreground">
+              {label ? label.label : ''}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Heatmap grid with day-of-week labels */}
       <div className="flex gap-[2px] w-full">
+        {/* Day-of-week labels */}
+        <div className="flex flex-col gap-[2px] shrink-0 w-[26px] mr-px">
+          {['', 'Mon', '', 'Wed', '', 'Fri', ''].map((label, i) => (
+            <div key={i} className="aspect-square flex items-center">
+              <span className="text-[9px] text-muted-foreground leading-none">{label}</span>
+            </div>
+          ))}
+        </div>
+
         {/* Weeks */}
         <div className="flex gap-[2px] flex-1 min-w-0">
           {weeks.map((week, weekIdx) => (
@@ -303,32 +314,25 @@ export function ActivityHeatmap({
         </div>
       </div>
 
-      {/* Week numbers */}
-      <div className="flex gap-[2px] mt-1 text-[9px] text-muted-foreground/50">
-        {weekNumbers.map((wn, idx) => (
-          <div key={idx} className="flex-1 text-center min-w-0">
-            {wn}
-          </div>
-        ))}
-      </div>
-
       {/* Legend */}
-      <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground flex-wrap">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mt-3 pt-3 border-t border-border text-xs text-muted-foreground">
+        {/* Note only indicator */}
         <div className="flex items-center gap-1.5">
-          <div className="w-[12px] h-[12px] rounded-sm bg-green-500/80" />
-          <span>Note + Workout</span>
+          <div className="w-2.5 h-2.5 rounded-sm bg-blue-500/50" />
+          <span>Note only</span>
         </div>
+
+        {/* Activity intensity gradient */}
         <div className="flex items-center gap-1.5">
-          <div className="w-[12px] h-[12px] rounded-sm bg-blue-500/50" />
-          <span>Daily Note</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-[12px] h-[12px] rounded-sm bg-orange-500/80" />
-          <span>Workout Only</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-[12px] h-[12px] rounded-sm bg-muted" />
-          <span>No Entry</span>
+          <span>Less active</span>
+          <div className="flex gap-[2px]">
+            <div className="w-2.5 h-2.5 rounded-sm bg-muted" />
+            <div className="w-2.5 h-2.5 rounded-sm bg-green-900/60" />
+            <div className="w-2.5 h-2.5 rounded-sm bg-green-700/70" />
+            <div className="w-2.5 h-2.5 rounded-sm bg-green-500/80" />
+            <div className="w-2.5 h-2.5 rounded-sm bg-green-400" />
+          </div>
+          <span>More active</span>
         </div>
       </div>
 
