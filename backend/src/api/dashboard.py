@@ -4,7 +4,7 @@ import uuid
 from datetime import date, timedelta
 from typing import Any, Literal, Optional
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from ..config import settings
@@ -1250,4 +1250,342 @@ async def trigger_normalize_exercises(
         ai_classified=stats.ai_classified,
         title_cased=stats.title_cased,
         errors=stats.errors or [],
+    )
+
+
+# ── Endurance Sports Tracking ───────────────────────────────────────────────
+
+class BodyWeightEntry(BaseModel):
+    """Single body weight measurement."""
+
+    date: str
+    weight_kg: float
+
+
+class BodyWeightResponse(BaseModel):
+    """Response for body weight endpoint."""
+
+    entries: list[BodyWeightEntry]
+    current_kg: Optional[float] = None
+    period_change_kg: Optional[float] = None
+    period: Period
+
+
+@router.get("/body-weight", response_model=BodyWeightResponse)
+def get_body_weight(
+    days: int = Query(default=90, ge=1, le=365),
+    db: DatabaseManager = Depends(get_db),
+) -> BodyWeightResponse:
+    """Get body weight trend over time.
+
+    Returns weight entries where weight_kg is recorded, plus
+    the most recent weight and change over the period.
+    """
+    period = get_period(days)
+
+    result = db.execute(
+        """
+        SELECT date, weight_kg
+        FROM daily_metrics
+        WHERE weight_kg IS NOT NULL AND date >= ? AND date <= ?
+        ORDER BY date ASC
+        """,
+        [period.start_date, period.end_date],
+    ).fetchall()
+
+    entries = [
+        BodyWeightEntry(date=str(row[0]), weight_kg=float(row[1]))
+        for row in result
+    ]
+
+    current_kg = entries[-1].weight_kg if entries else None
+    period_change_kg = None
+    if len(entries) >= 2:
+        period_change_kg = round(entries[-1].weight_kg - entries[0].weight_kg, 1)
+
+    return BodyWeightResponse(
+        entries=entries,
+        current_kg=current_kg,
+        period_change_kg=period_change_kg,
+        period=period,
+    )
+
+
+ENDURANCE_SPORTS = ("running", "cycling", "swimming")
+
+
+class EnduranceCreate(BaseModel):
+    date: date
+    sport: Literal["running", "cycling", "swimming"]
+    distance_km: Optional[float] = Field(None, ge=0)
+    duration_minutes: Optional[int] = Field(None, ge=1)
+    notes: Optional[str] = None
+
+
+class EnduranceCreateResponse(BaseModel):
+    activity_id: str
+    exercise_id: str
+    message: str
+
+
+class EnduranceEntry(BaseModel):
+    date: str
+    sport: str
+    distance_km: Optional[float] = None
+    duration_minutes: Optional[int] = None
+    pace_min_per_km: Optional[float] = None
+    speed_kmh: Optional[float] = None
+    notes: Optional[str] = None
+
+
+class EnduranceTableResponse(BaseModel):
+    entries: list[EnduranceEntry]
+    total_count: int
+    offset: int
+    limit: int
+
+
+class EnduranceProgressEntry(BaseModel):
+    date: str
+    distance_km: Optional[float] = None
+    duration_minutes: Optional[int] = None
+    pace_min_per_km: Optional[float] = None
+    speed_kmh: Optional[float] = None
+
+
+class EnduranceProgressSummary(BaseModel):
+    total_distance_km: float
+    total_duration_minutes: int
+    total_sessions: int
+    avg_pace_min_per_km: Optional[float] = None
+    best_pace_min_per_km: Optional[float] = None
+    avg_speed_kmh: Optional[float] = None
+    best_speed_kmh: Optional[float] = None
+    longest_distance_km: Optional[float] = None
+
+
+class EnduranceProgressResponse(BaseModel):
+    sport: str
+    progress: list[EnduranceProgressEntry]
+    summary: EnduranceProgressSummary
+    period: Period
+
+
+def _calc_pace(distance_km: Optional[float], duration_minutes: Optional[int]) -> Optional[float]:
+    """Calculate pace in min/km. Returns None if inputs are missing or zero."""
+    if distance_km and duration_minutes and distance_km > 0:
+        return round(duration_minutes / distance_km, 2)
+    return None
+
+
+def _calc_speed(distance_km: Optional[float], duration_minutes: Optional[int]) -> Optional[float]:
+    """Calculate speed in km/h. Returns None if inputs are missing or zero."""
+    if distance_km and duration_minutes and duration_minutes > 0:
+        return round(distance_km / (duration_minutes / 60), 2)
+    return None
+
+
+@router.post("/endurance", status_code=201, response_model=EnduranceCreateResponse)
+def create_endurance_activity(
+    entry: EnduranceCreate,
+    db: DatabaseManager = Depends(get_db),
+) -> EnduranceCreateResponse:
+    """Log an endurance activity (running, cycling, swimming).
+
+    Creates both an activities record and an exercise_log record.
+    """
+    activity_id = f"{entry.date.strftime('%Y%m%d')}_{entry.sport[:3]}_manual"
+    exercise_id = str(uuid.uuid4())
+
+    # Insert activity
+    db.execute(
+        """
+        INSERT INTO activities (id, date, activity_type, duration_minutes, notes)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        [activity_id, str(entry.date), entry.sport, entry.duration_minutes, entry.notes],
+    )
+
+    # Insert exercise_log entry with distance/duration
+    db.execute(
+        """
+        INSERT INTO exercise_log (
+            id, activity_id, date, exercise_name,
+            distance_km, duration_minutes, notes,
+            source_file, extracted_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'manual_entry', CURRENT_TIMESTAMP)
+        """,
+        [
+            exercise_id,
+            activity_id,
+            str(entry.date),
+            entry.sport.title(),
+            entry.distance_km,
+            entry.duration_minutes,
+            entry.notes,
+        ],
+    )
+
+    return EnduranceCreateResponse(
+        activity_id=activity_id,
+        exercise_id=exercise_id,
+        message=f"{entry.sport.title()} activity logged successfully",
+    )
+
+
+@router.get("/endurance-table", response_model=EnduranceTableResponse)
+def get_endurance_table(
+    sport: Optional[str] = Query(default=None, description="Filter by sport"),
+    days: int = Query(default=90, ge=1, le=365),
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    sort_by: Literal["date", "distance_km", "duration_minutes", "pace_min_per_km"] = Query(default="date"),
+    sort_order: Literal["asc", "desc"] = Query(default="desc"),
+    db: DatabaseManager = Depends(get_db),
+) -> EnduranceTableResponse:
+    """Get a summary table of endurance sessions."""
+    period = get_period(days)
+
+    sport_filter = ""
+    params: list[Any] = [period.start_date, period.end_date]
+    if sport and sport in ENDURANCE_SPORTS:
+        sport_filter = "AND a.activity_type = ?"
+        params.append(sport)
+
+    result = db.execute(
+        f"""
+        SELECT
+            a.date,
+            a.activity_type,
+            el.distance_km,
+            el.duration_minutes,
+            a.notes
+        FROM activities a
+        LEFT JOIN exercise_log el ON a.id = el.activity_id
+        WHERE a.activity_type IN ('running', 'cycling', 'swimming')
+          AND a.date >= ? AND a.date <= ?
+          {sport_filter}
+        ORDER BY a.date DESC
+        """,
+        params,
+    ).fetchall()
+
+    entries = []
+    for row in result:
+        dist = float(row[2]) if row[2] is not None else None
+        dur = int(row[3]) if row[3] is not None else None
+        entries.append(EnduranceEntry(
+            date=str(row[0]),
+            sport=row[1],
+            distance_km=dist,
+            duration_minutes=dur,
+            pace_min_per_km=_calc_pace(dist, dur),
+            speed_kmh=_calc_speed(dist, dur),
+            notes=row[4],
+        ))
+
+    # Sort
+    if sort_by == "pace_min_per_km":
+        entries.sort(
+            key=lambda e: e.pace_min_per_km if e.pace_min_per_km is not None else float('inf'),
+            reverse=(sort_order == "desc"),
+        )
+    elif sort_by == "distance_km":
+        entries.sort(
+            key=lambda e: e.distance_km if e.distance_km is not None else -1,
+            reverse=(sort_order == "desc"),
+        )
+    elif sort_by == "duration_minutes":
+        entries.sort(
+            key=lambda e: e.duration_minutes if e.duration_minutes is not None else -1,
+            reverse=(sort_order == "desc"),
+        )
+    # date sort already handled by SQL ORDER BY
+
+    total_count = len(entries)
+    paginated = entries[offset:offset + limit]
+
+    return EnduranceTableResponse(
+        entries=paginated,
+        total_count=total_count,
+        offset=offset,
+        limit=limit,
+    )
+
+
+@router.get("/endurance-progress", response_model=EnduranceProgressResponse)
+def get_endurance_progress(
+    sport: str = Query(..., description="Sport to track (running, cycling, swimming)"),
+    days: int = Query(default=90, ge=1, le=365),
+    db: DatabaseManager = Depends(get_db),
+) -> EnduranceProgressResponse:
+    """Get time-series progress data for a specific endurance sport."""
+    if sport not in ENDURANCE_SPORTS:
+        raise HTTPException(status_code=400, detail=f"Invalid sport. Must be one of: {', '.join(ENDURANCE_SPORTS)}")
+
+    period = get_period(days)
+
+    result = db.execute(
+        """
+        SELECT
+            a.date,
+            el.distance_km,
+            el.duration_minutes
+        FROM activities a
+        LEFT JOIN exercise_log el ON a.id = el.activity_id
+        WHERE a.activity_type = ?
+          AND a.date >= ? AND a.date <= ?
+        ORDER BY a.date ASC
+        """,
+        [sport, period.start_date, period.end_date],
+    ).fetchall()
+
+    progress = []
+    total_dist = 0.0
+    total_dur = 0
+    paces: list[float] = []
+    speeds: list[float] = []
+    distances: list[float] = []
+
+    for row in result:
+        dist = float(row[1]) if row[1] is not None else None
+        dur = int(row[2]) if row[2] is not None else None
+        pace = _calc_pace(dist, dur)
+        speed = _calc_speed(dist, dur)
+
+        progress.append(EnduranceProgressEntry(
+            date=str(row[0]),
+            distance_km=dist,
+            duration_minutes=dur,
+            pace_min_per_km=pace,
+            speed_kmh=speed,
+        ))
+
+        if dist:
+            total_dist += dist
+            distances.append(dist)
+        if dur:
+            total_dur += dur
+        if pace:
+            paces.append(pace)
+        if speed:
+            speeds.append(speed)
+
+    summary = EnduranceProgressSummary(
+        total_distance_km=round(total_dist, 2),
+        total_duration_minutes=total_dur,
+        total_sessions=len(progress),
+        avg_pace_min_per_km=round(sum(paces) / len(paces), 2) if paces else None,
+        best_pace_min_per_km=round(min(paces), 2) if paces else None,
+        avg_speed_kmh=round(sum(speeds) / len(speeds), 2) if speeds else None,
+        best_speed_kmh=round(max(speeds), 2) if speeds else None,
+        longest_distance_km=round(max(distances), 2) if distances else None,
+    )
+
+    return EnduranceProgressResponse(
+        sport=sport,
+        progress=progress,
+        summary=summary,
+        period=period,
     )
