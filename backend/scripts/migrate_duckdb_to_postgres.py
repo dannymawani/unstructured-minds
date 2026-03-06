@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""One-time migration: copy all data from DuckDB to Supabase Postgres.
+"""One-time migration: copy all data from DuckDB to Postgres (Neon).
 
 Usage:
     cd backend
     python -m scripts.migrate_duckdb_to_postgres --user-id <UUID>
 
 Requires:
-    - DATABASE_URL env var pointing to Supabase Postgres
+    - DATABASE_URL env var pointing to Postgres
     - Existing DuckDB file at data/unstructured.duckdb
 """
 

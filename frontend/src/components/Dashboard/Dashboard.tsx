@@ -4,8 +4,10 @@ import { DashboardSummary } from './DashboardSummary';
 import { WeeklyActivityChart } from './WeeklyActivityChart';
 import { MetricsTrends } from './MetricsTrends';
 import { ExerciseTable } from './ExerciseTable';
+import { EnduranceLog } from './EnduranceLog';
 import { ActivityHeatmap } from './ActivityHeatmap';
 import { SleepTrends } from './SleepTrends';
+import { BodyWeightChart } from './BodyWeightChart';
 import { MoodCorrelation } from './MoodCorrelation';
 import { NutritionTile } from './NutritionTile';
 import { DateRangeSelector } from './DateRangeSelector';
@@ -161,9 +163,21 @@ export function Dashboard({ apiUrl = 'http://localhost:8000', onCreateNote }: Da
         {isVisible('moodCorrelation') && <MoodCorrelation apiUrl={apiUrl} days={dateRange} key={`mood-${refreshKey}`} />}
       </div>
 
+      {/* Body Weight */}
+      {isVisible('bodyWeight') && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+          <BodyWeightChart apiUrl={apiUrl} days={dateRange} key={`weight-${refreshKey}`} />
+        </div>
+      )}
+
       {/* Exercise Table */}
       {isVisible('exerciseProgress') && (
         <ExerciseTable apiUrl={apiUrl} key={`exercise-${refreshKey}`} />
+      )}
+
+      {/* Endurance Log */}
+      {isVisible('enduranceLog') && (
+        <EnduranceLog apiUrl={apiUrl} key={`endurance-${refreshKey}`} />
       )}
 
       {/* Empty state when no widgets visible */}

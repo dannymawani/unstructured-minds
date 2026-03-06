@@ -16,7 +16,9 @@ export const AVAILABLE_WIDGETS: WidgetDefinition[] = [
   { id: 'metricsTrends', name: 'Daily Metrics', description: 'Energy, mood, and stress trends', defaultVisible: true },
   { id: 'sleepTrends', name: 'Sleep Trends', description: 'Sleep duration over time', defaultVisible: true },
   { id: 'moodCorrelation', name: 'Mood Correlations', description: 'Scatter plot showing metric relationships', defaultVisible: true },
+  { id: 'bodyWeight', name: 'Body Weight', description: 'Weight trend over time', defaultVisible: true },
   { id: 'exerciseProgress', name: 'Exercise Progress', description: 'Track specific exercise progress', defaultVisible: true },
+  { id: 'enduranceLog', name: 'Endurance Log', description: 'Running, cycling, and swimming tracking', defaultVisible: true },
   { id: 'nutrition', name: 'Eating Habits', description: 'Calorie and macro tracking over time', defaultVisible: true },
 ];
 

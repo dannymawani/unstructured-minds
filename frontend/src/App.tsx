@@ -36,7 +36,6 @@ import {
   Menu,
   MessageSquare,
   ChevronDown,
-  ChevronUp,
 } from 'lucide-react'
 
 // Lazy load heavy view components for code splitting
@@ -126,6 +125,7 @@ function App() {
 
   const file = useFileManager()
   const ui = useUIState()
+  const [fileTreeRefresh, setFileTreeRefresh] = useState(0)
 
   const handleWizardComplete = useCallback(async (populatedContent: string, selectedTaskIds?: string[]) => {
     ui.setIsWizardOpen(false)
@@ -187,6 +187,17 @@ function App() {
   }, [file, ui])
 
   const handleSearchSelect = useCallback(async (path: string) => {
+    const fileContent = await file.fetchFileContent(path)
+    file.setContent(fileContent)
+    file.setSelectedFile(path)
+    navigate(`/editor?file=${encodeURIComponent(path)}`)
+  }, [file, navigate])
+
+  const handleChatNotesCreated = useCallback(() => {
+    setFileTreeRefresh(prev => prev + 1)
+  }, [])
+
+  const handleChatOpenNote = useCallback(async (path: string) => {
     const fileContent = await file.fetchFileContent(path)
     file.setContent(fileContent)
     file.setSelectedFile(path)
@@ -258,7 +269,8 @@ function App() {
         {ui.sidebarTab === 'files' && (
           <FileTree onFileSelect={handleFileSelect} selectedFile={file.selectedFile} apiBaseUrl={api.baseUrl}
             onCreateDailyNote={createDailyNote} onOpenTemplatePicker={ui.openTemplatePicker}
-            onDeleteFile={file.handleDeleteFile} onRenameFile={file.handleRenameFile} />
+            onDeleteFile={file.handleDeleteFile} onRenameFile={file.handleRenameFile}
+            refreshTrigger={fileTreeRefresh} />
         )}
         {ui.sidebarTab === 'tags' && <TagsPanel onFileSelect={handleFileSelect} apiBaseUrl={api.baseUrl} />}
         {ui.sidebarTab === 'links' && <BacklinksPanel currentFile={file.selectedFile} onFileSelect={handleFileSelect} apiBaseUrl={api.baseUrl} />}
@@ -275,7 +287,7 @@ function App() {
         <Drawer isOpen={ui.isMobileSidebarOpen} onClose={() => ui.setIsMobileSidebarOpen(false)} position="left" title="Files">{sidebarContent}</Drawer>
       )}
 
-      <section className="flex-1 flex flex-col min-h-0 overflow-hidden">
+      <section className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
         {file.selectedFile ? (
           <div className="flex-1 overflow-auto p-3 sm:p-6 bg-card">
             <MarkdownEditor key={file.selectedFile} content={file.content} onChange={file.handleContentChange} onAutosave={file.handleAutosave} />
@@ -286,28 +298,32 @@ function App() {
           </div>
         )}
 
-        {!ui.isMobile && !ui.isTablet && (
-          <>
-            <button onClick={() => ui.setIsChatExpanded(prev => !prev)}
-              className="flex items-center justify-center gap-2 px-3 py-2 border-t border-border/50 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors">
-              <MessageSquare className="h-3.5 w-3.5" />
-              <span>{ui.isChatExpanded ? 'Hide Chat' : 'Chat'}</span>
-              {ui.isChatExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
+        {!ui.isMobile && !ui.isTablet && !ui.isChatExpanded && (
+          <button onClick={() => ui.setIsChatExpanded(true)}
+            className="absolute bottom-5 right-5 z-20 flex items-center gap-2 px-4 py-2.5 rounded-full bg-teal-500 hover:bg-teal-600 text-white shadow-lg shadow-teal-500/25 hover:shadow-teal-500/40 transition-all hover:scale-105 active:scale-95">
+            <MessageSquare className="h-4 w-4" />
+            <span className="text-sm font-medium">Chat</span>
+          </button>
+        )}
+        {!ui.isMobile && !ui.isTablet && ui.isChatExpanded && (
+          <div className="h-[28rem] border-t border-border/50 flex flex-col overflow-hidden relative">
+            <button onClick={() => ui.setIsChatExpanded(false)}
+              className="absolute top-2 right-2 z-10 p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
+              title="Close chat">
+              <ChevronDown className="h-4 w-4" />
             </button>
-            {ui.isChatExpanded && (
-              <div className="h-96 border-t border-border/50 flex flex-col overflow-hidden">
-                <ChatPanel apiBaseUrl={api.baseUrl} currentFile={file.selectedFile} currentContent={file.content}
-                  onContentUpdate={file.handleNoteContentUpdate} initialMessage={ui.chatInitialMessage} />
-              </div>
-            )}
-          </>
+            <ChatPanel apiBaseUrl={api.baseUrl} currentFile={file.selectedFile} currentContent={file.content}
+              onContentUpdate={file.handleNoteContentUpdate} onNotesCreated={handleChatNotesCreated}
+              onOpenNote={handleChatOpenNote} initialMessage={ui.chatInitialMessage} />
+          </div>
         )}
       </section>
 
       {(ui.isMobile || ui.isTablet) && (
         <Drawer isOpen={ui.isMobileChatOpen} onClose={() => ui.setIsMobileChatOpen(false)} position={ui.isMobile ? 'bottom' : 'right'} title="Chat">
           <ChatPanel apiBaseUrl={api.baseUrl} currentFile={file.selectedFile} currentContent={file.content}
-            onContentUpdate={file.handleNoteContentUpdate} initialMessage={ui.chatInitialMessage} />
+            onContentUpdate={file.handleNoteContentUpdate} onNotesCreated={handleChatNotesCreated}
+            onOpenNote={handleChatOpenNote} initialMessage={ui.chatInitialMessage} />
         </Drawer>
       )}
     </>

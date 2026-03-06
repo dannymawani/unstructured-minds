@@ -121,7 +121,7 @@ class Settings(BaseSettings):
 
 | Aspect | Local | Cloud |
 |--------|-------|-------|
-| Primary DB | DuckDB file | Postgres (Supabase) |
+| Primary DB | DuckDB file | Postgres (Neon) |
 | Analytics DB | Same DuckDB | In-memory DuckDB cache |
 | Vault storage | Local filesystem | Postgres `vault_files` table |
 | Settings storage | JSON files in `data/` | Postgres `user_settings` JSONB |
@@ -164,6 +164,10 @@ class Settings(BaseSettings):
 - `GET /dashboard/predictions` — ML-based recovery/next workout
 - `GET /dashboard/nutrition` — Calorie/macro aggregates
 - `GET /dashboard/activity-groups` — Grouped activity data
+- `POST /dashboard/endurance` — Log endurance activity (running/cycling/swimming)
+- `GET /dashboard/endurance-table` — Endurance session table with pace/speed
+- `GET /dashboard/endurance-progress` — Time-series progress for a sport
+- `GET /dashboard/body-weight` — Body weight trend with period change
 
 **Tasks** (`/tasks`):
 - `GET|POST /tasks` — List/create (filters: status, date, category)
@@ -277,7 +281,7 @@ React 19 + Vite 7 + TypeScript 5.9 (strict) + Tailwind v4 + Milkdown 7 + Clerk +
 **Files:** FileTree (virtualized, nested), FileTreeItem (memoized)
 **Editor:** MarkdownEditor (Milkdown), EditorToolbar (formatting buttons), EditorPlugins (slash menu, code block exit)
 **Chat:** ChatPanel (AI assistant), ChatMessage (with query results table)
-**Dashboard:** Dashboard, DashboardSummary, WeeklyActivityChart, MetricsTrends, ExerciseTable, ActivityHeatmap, SleepTrends, MoodCorrelation, NutritionTile, ExerciseProgress, InsightsCard, WidgetConfig
+**Dashboard:** Dashboard, DashboardSummary, WeeklyActivityChart, MetricsTrends, ExerciseTable, ActivityHeatmap, SleepTrends, MoodCorrelation, NutritionTile, ExerciseProgress, EnduranceLog, EnduranceProgress, InsightsCard, WidgetConfig
 **Tasks:** PersonalKanban, PersonalTaskCard (draggable), PersonalTaskModal
 **Modals:** CommandPalette (Cmd+K), SearchModal, QuickCapture, TemplatePicker, SettingsPanel, DailyNoteWizard
 **Profile:** LifeProfile, OverviewSection, PersonalSection, WorkSection, TrainingSection, GoalsSection, ProgressReviews
@@ -353,7 +357,7 @@ Max-width: 52rem, Font: Inter
 
 **exercise_log** — `id` (PK), `activity_id` (FK), `date`, `exercise_name`, `weight_kg`, `reps`, `set_number`, `duration_minutes`, `distance_km`, `notes`, `source_file`, `extracted_at`
 
-**daily_metrics** — `date` (PK), `sleep_hours`, `sleep_quality`, `energy`, `mood`, `stress`, `notes`, `source_file`, `extracted_at`
+**daily_metrics** — `date` (PK), `sleep_hours`, `sleep_quality`, `energy`, `mood`, `stress`, `weight_kg`, `notes`, `source_file`, `extracted_at`
 
 **food_log** — `id` (PK), `date`, `meal_type`, `time`, `description`, `calories`, `protein_g`, `carbs_g`, `fat_g`, `notes`, `source_file`, `extracted_at`
 
@@ -388,7 +392,7 @@ All tables add `user_id UUID NOT NULL`. Primary keys become composite: `(user_id
 ### Shared Schemas (`shared/schemas/`)
 
 - `daily_metrics.json` — weight, sleep/energy/nutrition/mood ratings (1-10)
-- `exercise_log.json` — activity_type (strength/bjj/cardio/yoga/walk/recovery/other), exercise_name, weight/reps/sets/distance
+- `exercise_log.json` — activity_type (strength/bjj/cardio/running/cycling/swimming/yoga/walk/recovery/other), exercise_name, weight/reps/sets/distance
 - `food_log.json` — meal (breakfast/lunch/dinner/snack), food, calories, protein
 - `daily_tasks.json` — task, status (pending/completed/cancelled/rolled_over), category, priority
 

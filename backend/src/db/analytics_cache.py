@@ -62,6 +62,7 @@ _DUCKDB_CACHE_SCHEMA = {
             energy INTEGER,
             mood INTEGER,
             stress INTEGER,
+            weight_kg DECIMAL(4,1),
             notes VARCHAR,
             source_file VARCHAR,
             extracted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -156,7 +157,7 @@ _DUCKDB_CACHE_SCHEMA = {
 _PG_SELECT_COLUMNS = {
     "activities": "id, date, activity_type, duration_minutes, notes, source_file, extracted_at",
     "exercise_log": "id, activity_id, date, exercise_name, weight_kg, reps, set_number, duration_minutes, distance_km, notes, source_file, extracted_at",
-    "daily_metrics": "date, sleep_hours, sleep_quality, energy, mood, stress, notes, source_file, extracted_at",
+    "daily_metrics": "date, sleep_hours, sleep_quality, energy, mood, stress, weight_kg, notes, source_file, extracted_at",
     "food_log": "id, date, meal_type, time, description, calories, protein_g, carbs_g, fat_g, notes, source_file, extracted_at",
     "tasks": "id, date, description, status, completed_at, category, priority, source_file, deadline, notes, extracted_at",
     "extraction_log": "id, file_path, file_hash, extracted_at, success, error_message",

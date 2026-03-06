@@ -59,6 +59,7 @@ def init_postgres_schema(pg) -> None:
             energy INTEGER,
             mood INTEGER,
             stress INTEGER,
+            weight_kg DECIMAL(4,1),
             notes VARCHAR,
             source_file VARCHAR,
             extracted_at TIMESTAMPTZ DEFAULT NOW(),

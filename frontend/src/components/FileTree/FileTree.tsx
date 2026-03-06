@@ -19,6 +19,7 @@ interface FileTreeProps {
   onOpenTemplatePicker?: () => void
   onDeleteFile?: (path: string) => void
   onRenameFile?: (oldPath: string, newPath: string) => void
+  refreshTrigger?: number
 }
 
 interface FlattenedNode {
@@ -176,6 +177,7 @@ export function FileTree({
   onOpenTemplatePicker,
   onDeleteFile,
   onRenameFile,
+  refreshTrigger,
 }: FileTreeProps) {
   const [files, setFiles] = useState<FileNode[]>([])
   const [showMonthNames, setShowMonthNames] = useState(false)
@@ -234,6 +236,15 @@ export function FileTree({
   useEffect(() => {
     fetchFiles()
   }, [fetchFiles])
+
+  // Refresh when triggered externally (e.g. after catchup creates notes)
+  const refreshTriggerRef = useRef(refreshTrigger)
+  useEffect(() => {
+    if (refreshTrigger !== refreshTriggerRef.current) {
+      refreshTriggerRef.current = refreshTrigger
+      fetchFiles()
+    }
+  }, [refreshTrigger, fetchFiles])
 
   // Memoize toggle handler to prevent re-renders
   const handleToggle = useCallback((path: string) => {
