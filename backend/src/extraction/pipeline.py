@@ -314,7 +314,7 @@ class ExtractionPipeline:
             return 0
 
         dialect = get_dialect(self.db)
-        cols = ["date", "sleep_hours", "sleep_quality", "energy", "mood", "stress", "notes", "source_file"]
+        cols = ["date", "sleep_hours", "sleep_quality", "energy", "mood", "stress", "weight_kg", "notes", "source_file"]
         conflict_cols = ["date"]
         vals: list = [
             date,
@@ -323,6 +323,7 @@ class ExtractionPipeline:
             metrics.get("energy"),
             metrics.get("mood"),
             metrics.get("stress"),
+            metrics.get("weight_kg"),
             metrics.get("notes"),
             source_file,
         ]

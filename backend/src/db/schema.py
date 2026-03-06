@@ -56,6 +56,7 @@ def init_database(db_path: Path | str) -> duckdb.DuckDBPyConnection:
             energy INTEGER,
             mood INTEGER,
             stress INTEGER,
+            weight_kg DECIMAL(4,1),
             notes VARCHAR,
             source_file VARCHAR,
             extracted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -132,6 +133,12 @@ def init_database(db_path: Path | str) -> duckdb.DuckDBPyConnection:
         conn.execute("SELECT notes FROM tasks LIMIT 0")
     except duckdb.BinderException:
         conn.execute("ALTER TABLE tasks ADD COLUMN notes TEXT")
+
+    # Migration: add weight_kg column to daily_metrics if missing
+    try:
+        conn.execute("SELECT weight_kg FROM daily_metrics LIMIT 0")
+    except duckdb.BinderException:
+        conn.execute("ALTER TABLE daily_metrics ADD COLUMN weight_kg DECIMAL(4,1)")
 
     # Migration: normalize task statuses to new kanban values
     conn.execute("UPDATE tasks SET status = 'backlog' WHERE status IN ('pending', 'todo')")

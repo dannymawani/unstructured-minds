@@ -8,7 +8,7 @@ Natural language notes → structured, queryable data via Claude + DuckDB/Postgr
 |-----------|------------|
 | Frontend | React 19 + Milkdown |
 | Backend | Python >=3.12 + FastAPI |
-| Database | DuckDB 1.4 (local) / Supabase Postgres (cloud) |
+| Database | DuckDB 1.4 (local) / Neon Postgres (cloud) |
 | AI | Claude API (Haiku 4.5 extraction, Sonnet 4.5 queries) |
 | Auth | Clerk (required for cloud mode) |
 | Deploy | Docker Compose |

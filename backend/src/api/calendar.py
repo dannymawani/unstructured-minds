@@ -291,6 +291,7 @@ class PopulateDailyNoteRequest(BaseModel):
     work_priorities: Optional[str] = None
     personal: Optional[str] = None
     adhoc: Optional[str] = None
+    activity_details: Optional[str] = None
     workout_suggestion: Optional[WorkoutSuggestionData] = None
     rollover_tasks: Optional[list[RolloverTaskForPopulate]] = None
 
@@ -313,6 +314,7 @@ async def populate_daily_note(
     """
     answers = {
         "workout": request.workout,
+        "activity_details": request.activity_details or "",
         "sleep": request.sleep,
         "energy": request.energy,
         "mood": request.mood,
@@ -356,7 +358,9 @@ def _populate_fallback(template: str, answers: dict) -> str:
             )
         else:
             result = re.sub(r"^([*-] \*\*Type\*\*:)\s*$", rf"\1 {workout}", result, flags=re.MULTILINE)
-            result = re.sub(r"^([*-] \*\*Focus\*\*:)\s*$", rf"\1 {workout}", result, flags=re.MULTILINE)
+            activity_details = answers.get("activity_details", "").strip()
+            focus_value = activity_details if activity_details else workout
+            result = re.sub(r"^([*-] \*\*Focus\*\*:)\s*$", rf"\1 {focus_value}", result, flags=re.MULTILINE)
 
     # Workout suggestion — insert table after Focus line
     suggestion = answers.get("workout_suggestion")
