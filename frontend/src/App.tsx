@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react'
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router'
-import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/clerk-react'
+import { SignedIn, SignedOut, SignInButton, UserButton, useAuth } from '@clerk/clerk-react'
 import { Button } from '@/components/ui/button'
 import { FileTree } from '@/components/FileTree'
 import { MarkdownEditor } from '@/components/Editor/MarkdownEditor'
@@ -20,7 +20,6 @@ import { useTheme } from '@/hooks/useTheme'
 import { useFileManager } from '@/hooks/useFileManager'
 import { useUIState } from '@/hooks/useUIState'
 import { api, setTokenGetter } from '@/lib/apiClient'
-import { useAuth } from '@clerk/clerk-react'
 import {
   LayoutDashboard,
   FileText,
@@ -101,6 +100,7 @@ function App() {
   const navigate = useNavigate()
   const location = useLocation()
   const { theme, toggleTheme, setTheme } = useTheme()
+  const { isLoaded: clerkLoaded } = useAuth()
 
   // Fetch daily note path template from settings
   const [dailyNoteTemplate, setDailyNoteTemplate] = useState(DEFAULT_DAILY_NOTE_TEMPLATE)
@@ -401,6 +401,10 @@ function App() {
   )
 
   if (!CLERK_ENABLED) return appContent
+
+  if (!clerkLoaded) {
+    return <div className="min-h-screen bg-background" />
+  }
 
   return (
     <>

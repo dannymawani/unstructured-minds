@@ -28,6 +28,7 @@ export default defineConfig(async () => {
   }
 
   return {
+    envDir: path.resolve(__dirname, '..'),
     plugins,
     resolve: {
       alias: {

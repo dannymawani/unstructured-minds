@@ -424,6 +424,91 @@ Use the classify_exercises tool to return your classifications."""
 
         return {}
 
+    async def label_new_exercises(
+        self,
+        exercise_names: list[str],
+        known_muscle_groups: list[str],
+        known_categories: list[str],
+    ) -> list[dict]:
+        """Generate full exercise definitions (muscle groups, category, recovery) for new exercises.
+
+        Args:
+            exercise_names: New exercise names to classify
+            known_muscle_groups: Existing muscle group names for consistency
+            known_categories: Existing category names for consistency
+
+        Returns:
+            List of dicts with key, display, muscle_groups, category, recovery_hours, is_exercise
+        """
+        if not exercise_names:
+            return []
+
+        tool = {
+            "name": "label_exercises",
+            "description": "Generate exercise definitions with muscle groups",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "exercises": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "key": {"type": "string", "description": "snake_case key"},
+                                "display": {"type": "string", "description": "Title Case display name"},
+                                "muscle_groups": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                    "description": "Primary muscle groups worked",
+                                },
+                                "category": {"type": "string"},
+                                "recovery_hours": {
+                                    "type": "integer",
+                                    "description": "24, 48, or 72",
+                                },
+                                "is_exercise": {
+                                    "type": "boolean",
+                                    "description": "False if this is an activity (walk, sauna) not an exercise",
+                                },
+                            },
+                            "required": ["key", "display", "muscle_groups", "category", "recovery_hours", "is_exercise"],
+                        },
+                    },
+                },
+                "required": ["exercises"],
+            },
+        }
+
+        names_list = "\n".join(f"- {n}" for n in exercise_names)
+        muscles = ", ".join(sorted(known_muscle_groups)) if known_muscle_groups else "(none)"
+        categories = ", ".join(sorted(known_categories)) if known_categories else "(none)"
+
+        prompt = f"""Classify these exercise names. For each, provide muscle groups, category, and recovery hours.
+
+Use existing muscle group and category names where possible.
+Set is_exercise=false for activities (walks, sauna, swimming, mobility, martial arts drills, etc.).
+
+Muscle groups: {muscles}
+Categories: {categories}
+
+Exercises:
+{names_list}
+
+Use the label_exercises tool."""
+
+        response = await self._call_with_retry(
+            model=self.model_fast,
+            max_tokens=4096,
+            tools=[tool],
+            messages=[{"role": "user", "content": prompt}],
+        )
+
+        for block in response.content:
+            if block.type == "tool_use" and block.name == "label_exercises":
+                return block.input.get("exercises", [])
+
+        return []
+
     async def _call_with_retry(
         self, max_retries: int = 3, **kwargs
     ) -> Any:

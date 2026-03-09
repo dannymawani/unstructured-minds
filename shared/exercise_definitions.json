@@ -327,5 +327,82 @@
     "muscle_groups": ["shoulders", "triceps", "core"],
     "category": "functional",
     "recovery_hours": 48
+  },
+  "ghd_crunch": {
+    "display": "GHD Crunch",
+    "aliases": ["ghd crunches"],
+    "muscle_groups": ["core"],
+    "category": "core",
+    "recovery_hours": 24
+  },
+  "abdominal_machine": {
+    "display": "Abdominal Machine",
+    "aliases": [],
+    "muscle_groups": ["core"],
+    "category": "core",
+    "recovery_hours": 24
+  },
+  "romanian_deadlift": {
+    "display": "Romanian Deadlift",
+    "aliases": ["rdl"],
+    "muscle_groups": ["hamstrings", "glutes", "lower_back"],
+    "category": "compound",
+    "recovery_hours": 72
+  },
+  "bulgarian_split_squat": {
+    "display": "Bulgarian Split Squat",
+    "aliases": ["bulgarian split squats"],
+    "muscle_groups": ["quads", "glutes", "hamstrings"],
+    "category": "legs",
+    "recovery_hours": 48
+  },
+  "chinup": {
+    "display": "Chin-Up",
+    "aliases": ["chinups", "chin-ups", "chin up"],
+    "muscle_groups": ["back", "biceps", "core"],
+    "category": "back",
+    "recovery_hours": 48
+  },
+  "glute_machine": {
+    "display": "Glute Machine",
+    "aliases": [],
+    "muscle_groups": ["glutes"],
+    "category": "legs",
+    "recovery_hours": 24
+  },
+  "chest_cable_fly": {
+    "display": "Chest Cable Fly",
+    "aliases": ["cable fly", "cable flyes"],
+    "muscle_groups": ["chest"],
+    "category": "chest",
+    "recovery_hours": 24
+  },
+  "biceps_preacher_cable_curl": {
+    "display": "Biceps Preacher Cable Curl",
+    "aliases": [],
+    "muscle_groups": ["biceps"],
+    "category": "arms",
+    "recovery_hours": 24
+  },
+  "sandbag_back_throw": {
+    "display": "Sandbag Back Throw",
+    "aliases": ["sandbag back throws"],
+    "muscle_groups": ["back", "glutes", "hamstrings", "core"],
+    "category": "functional",
+    "recovery_hours": 24
+  },
+  "wallball_back_throw": {
+    "display": "Wallball Back Throw",
+    "aliases": ["wallball back throws"],
+    "muscle_groups": ["back", "glutes", "hamstrings", "core"],
+    "category": "functional",
+    "recovery_hours": 24
+  },
+  "zercher_jefferson_curl": {
+    "display": "Zercher Jefferson Curl",
+    "aliases": [],
+    "muscle_groups": ["hamstrings", "lower_back", "core"],
+    "category": "functional",
+    "recovery_hours": 48
   }
 }

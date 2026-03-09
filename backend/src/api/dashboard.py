@@ -1041,15 +1041,11 @@ def get_exercise_table(
         })
 
     def _lookup_muscle_groups(canonical: str) -> list[str]:
-        """Look up muscle groups for a canonical exercise name."""
-        key = canonical.lower().replace(" ", "_").replace("-", "_")
-        if key in exercise_defs:
-            return exercise_defs[key].get("muscle_groups", [])
-        # Fuzzy fallback by display name
-        for _k, defn in exercise_defs.items():
-            if defn.get("display", "").lower() == canonical.lower():
-                return defn.get("muscle_groups", [])
-        return []
+        """Look up muscle groups for a canonical exercise name.
+
+        Checks builtin definitions first, then community exercises via the matcher.
+        """
+        return matcher.get_muscle_groups(canonical)
 
     def _calc_trend(s1: float | None, s2: float | None, s3: float | None) -> str:
         """Calculate trend from 3 most recent session maxes (s1=newest)."""
@@ -1796,18 +1792,9 @@ def get_muscle_groups(
 
         # Normalize exercise name to canonical form
         canonical, _ = matcher.match(raw_name)
-        canonical_key = canonical.lower().replace(" ", "_").replace("-", "_")
 
-        # Look up muscle groups from definitions
-        groups = []
-        if canonical_key in exercise_defs:
-            groups = exercise_defs[canonical_key].get("muscle_groups", [])
-        else:
-            # Try fuzzy lookup by display name
-            for key, defn in exercise_defs.items():
-                if defn.get("display", "").lower() == canonical.lower():
-                    groups = defn.get("muscle_groups", [])
-                    break
+        # Look up muscle groups (checks builtins + community exercises)
+        groups = matcher.get_muscle_groups(canonical)
 
         for group in groups:
             if group not in muscle_data:

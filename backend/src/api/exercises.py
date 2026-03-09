@@ -82,7 +82,7 @@ def _get_builtin_keys(matcher: ExerciseMatcher) -> set[str]:
 
 
 @router.post("/community", status_code=201, response_model=CommunityExerciseResponse)
-def contribute_exercise(
+async def contribute_exercise(
     body: CommunityExerciseCreate,
     request: Request,
     db=Depends(get_db),
@@ -125,9 +125,33 @@ def contribute_exercise(
             message="Exercise already exists in community pool",
         )
 
+    # Auto-fill muscle groups via Claude if not provided
+    muscle_groups = body.muscle_groups
+    category = body.category
+    recovery_hours = body.recovery_hours
+    if not muscle_groups:
+        claude = getattr(request.app.state, "claude", None)
+        if claude and claude.is_configured:
+            try:
+                all_meta = [matcher.get_metadata(n) for n in matcher.canonical_names]
+                known_muscles = sorted({mg for m in all_meta for mg in m["muscle_groups"]})
+                known_cats = sorted({m["category"] for m in all_meta})
+                results = await claude.label_new_exercises(
+                    exercise_names=[display_name],
+                    known_muscle_groups=known_muscles,
+                    known_categories=known_cats,
+                )
+                if results and results[0].get("is_exercise", True):
+                    muscle_groups = results[0].get("muscle_groups", [])
+                    category = results[0].get("category", category)
+                    recovery_hours = results[0].get("recovery_hours", recovery_hours)
+                    logger.info("auto_filled_community_exercise", name=display_name, muscle_groups=muscle_groups)
+            except Exception as e:
+                logger.warning("auto_fill_exercise_failed", name=display_name, error=str(e))
+
     # Insert
     aliases_val = json.dumps([])
-    muscle_groups_val = json.dumps(body.muscle_groups) if body.muscle_groups else json.dumps([])
+    muscle_groups_val = json.dumps(muscle_groups) if muscle_groups else json.dumps([])
 
     if dialect == "postgres":
         db.execute(
@@ -135,7 +159,7 @@ def contribute_exercise(
             INSERT INTO community_exercises (exercise_key, display_name, aliases, muscle_groups, category, recovery_hours)
             VALUES (%s, %s, %s, %s, %s, %s)
             """,
-            [exercise_key, display_name, aliases_val, muscle_groups_val, body.category, body.recovery_hours],
+            [exercise_key, display_name, aliases_val, muscle_groups_val, category, recovery_hours],
         )
     else:
         db.execute(
@@ -143,7 +167,7 @@ def contribute_exercise(
             INSERT INTO community_exercises (exercise_key, display_name, aliases, muscle_groups, category, recovery_hours)
             VALUES (?, ?, ?, ?, ?, ?)
             """,
-            [exercise_key, display_name, aliases_val, muscle_groups_val, body.category, body.recovery_hours],
+            [exercise_key, display_name, aliases_val, muscle_groups_val, category, recovery_hours],
         )
 
     # Inject into in-memory matcher so it's immediately available
@@ -151,9 +175,9 @@ def contribute_exercise(
         "exercise_key": exercise_key,
         "display_name": display_name,
         "aliases": [],
-        "muscle_groups": body.muscle_groups,
-        "category": body.category,
-        "recovery_hours": body.recovery_hours,
+        "muscle_groups": muscle_groups,
+        "category": category,
+        "recovery_hours": recovery_hours,
     }])
 
     logger.info("community_exercise_contributed", key=exercise_key, name=display_name)

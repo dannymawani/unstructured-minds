@@ -6,11 +6,6 @@ output "postgres_fqdn" {
   value = azurerm_postgresql_flexible_server.main.fqdn
 }
 
-output "postgres_connection_string" {
-  value     = "postgresql://umadmin:${var.postgres_admin_password}@${azurerm_postgresql_flexible_server.main.fqdn}/unstructured_minds?sslmode=require"
-  sensitive = true
-}
-
 output "container_registry_login_server" {
   value = azurerm_container_registry.main.login_server
 }
@@ -25,4 +20,8 @@ output "frontend_url" {
 
 output "github_actions_client_id" {
   value = azuread_application.github_actions.client_id
+}
+
+output "backend_identity_principal_id" {
+  value = azurerm_container_app.backend.identity[0].principal_id
 }
