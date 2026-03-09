@@ -823,7 +823,6 @@ class ExtractionPipeline:
         return 1
 
     @staticmethod
-    @staticmethod
     def _parse_exercise_names_from_content(content: str) -> list[str]:
         """Parse original exercise names from structured markdown content.
 

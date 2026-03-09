@@ -19,6 +19,9 @@ class _MaterializedResult:
     def fetchall(self):
         return self._rows
 
+    def fetchone(self):
+        return self._rows[0] if self._rows else None
+
 
 class DatabaseManager:
     """Manages DuckDB database connections."""
@@ -64,7 +67,7 @@ class DatabaseManager:
         finally:
             cur.close()
 
-    def read_only_execute(self, query: str) -> duckdb.DuckDBPyRelation:
+    def read_only_execute(self, query: str) -> _MaterializedResult:
         """Execute a query in read-only mode, preventing any writes.
 
         Uses BEGIN TRANSACTION / ROLLBACK to ensure any write attempts
@@ -81,33 +84,43 @@ class DatabaseManager:
             duckdb.Error: If the query is invalid or attempts writes
         """
         cursor = self.connect().cursor()
-        cursor.execute("BEGIN TRANSACTION")
         try:
+            cursor.execute("BEGIN TRANSACTION")
             result = cursor.execute(query)
-            # Materialize results before rollback
             columns = result.description
             rows = result.fetchall()
             return _MaterializedResult(columns, rows)
         finally:
-            cursor.execute("ROLLBACK")
+            try:
+                cursor.execute("ROLLBACK")
+            except Exception:
+                pass
+            cursor.close()
 
-    def execute(self, query: str, params: Optional[list] = None) -> duckdb.DuckDBPyRelation:
+    def execute(self, query: str, params: Optional[list] = None) -> _MaterializedResult:
         """Execute a query using a per-call cursor for thread safety.
 
-        Note: Callers should consume results (fetchall/fetchone) immediately.
-        For explicit cursor lifecycle control, use the cursor() context manager.
+        Results are materialized immediately and the cursor is closed,
+        preventing cursor leaks in long-running processes.
 
         Args:
             query: SQL query
             params: Query parameters
 
         Returns:
-            Query result
+            Materialized query result supporting fetchall()/fetchone()
         """
         cursor = self.connect().cursor()
-        if params:
-            return cursor.execute(query, params)
-        return cursor.execute(query)
+        try:
+            if params:
+                result = cursor.execute(query, params)
+            else:
+                result = cursor.execute(query)
+            desc = result.description
+            rows = result.fetchall()
+            return _MaterializedResult(desc, rows)
+        finally:
+            cursor.close()
 
     def __enter__(self) -> "DatabaseManager":
         """Context manager entry."""

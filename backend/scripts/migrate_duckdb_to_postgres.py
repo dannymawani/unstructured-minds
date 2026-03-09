@@ -40,7 +40,6 @@ TABLES = [
 # JSON config files to migrate to user_settings
 JSON_SETTINGS = {
     "settings": "settings.json",
-    "life_profile": "life_profile.json",
     "training_config": "training_config.json",
     "ai_exercise_cache": "ai_exercise_cache.json",
 }

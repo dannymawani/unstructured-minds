@@ -1,1 +1,0 @@
-export { LifeProfile } from './LifeProfile';
