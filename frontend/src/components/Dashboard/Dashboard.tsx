@@ -80,15 +80,14 @@ export function Dashboard({ apiUrl = 'http://localhost:8000', onCreateNote }: Da
 
   const isVisible = (widgetId: string) => visibleWidgets.includes(widgetId);
 
-  // Handle heatmap day click - could navigate to daily note
-  const handleHeatmapDayClick = (date: string, data: { count: number; duration_minutes: number } | null) => {
-    console.log('Clicked day:', date, data);
-    // Could dispatch to open daily note or show details
+  // Handle heatmap day click - navigate to daily note
+  const handleHeatmapDayClick = (_date: string, _data: { count: number; duration_minutes: number } | null) => {
+    // TODO: navigate to daily note for the clicked date
   };
 
   // Handle sleep chart day click
-  const handleSleepDayClick = (date: string) => {
-    console.log('Clicked sleep day:', date);
+  const handleSleepDayClick = (_date: string) => {
+    // TODO: navigate to daily note for the clicked date
   };
 
   // Show new user overlay

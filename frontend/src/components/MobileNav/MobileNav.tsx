@@ -1,6 +1,6 @@
-import { FileText, LayoutDashboard, Kanban, User } from 'lucide-react'
+import { FileText, LayoutDashboard, Kanban } from 'lucide-react'
 
-type View = 'editor' | 'dashboard' | 'kanban' | 'calendar' | 'profile'
+type View = 'editor' | 'dashboard' | 'kanban' | 'calendar'
 
 interface MobileNavProps {
   currentView: View
@@ -11,7 +11,6 @@ const navItems: { view: View; label: string; icon: typeof FileText }[] = [
   { view: 'editor', label: 'Editor', icon: FileText },
   { view: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { view: 'kanban', label: 'Kanban', icon: Kanban },
-  { view: 'profile', label: 'Profile', icon: User },
 ]
 
 export function MobileNav({ currentView, onViewChange }: MobileNavProps) {
