@@ -40,7 +40,6 @@ shared/                       # Git-tracked, shared
 data/                         # Gitignored, per-instance
 ├── unstructured.duckdb
 ├── settings.json
-├── life_profile.json
 ├── training_config.json
 └── ai_exercise_cache.json
 ```

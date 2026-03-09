@@ -63,7 +63,6 @@ TABLE_COLUMNS = {
 # JSON settings files to migrate into user_settings table
 JSON_SETTINGS = {
     "settings.json": "settings",
-    "life_profile.json": "life_profile",
     "training_config.json": "training_config",
     "ai_exercise_cache.json": "ai_exercise_cache",
 }

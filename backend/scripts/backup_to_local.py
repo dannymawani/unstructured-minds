@@ -69,7 +69,6 @@ COMMUNITY_COLUMNS = "exercise_key, display_name, aliases, muscle_groups, categor
 # JSON settings keys → local filenames
 JSON_SETTINGS = {
     "settings": "settings.json",
-    "life_profile": "life_profile.json",
     "training_config": "training_config.json",
     "ai_exercise_cache": "ai_exercise_cache.json",
 }

@@ -2,11 +2,12 @@
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from ..logging_config import get_logger
 from ..middleware.request_logging import get_metrics
+from .dependencies import get_user_id
 
 router = APIRouter(tags=["metrics"])
 logger = get_logger(__name__)
@@ -41,7 +42,7 @@ class MetricsResetResponse(BaseModel):
 
 
 @router.get("/metrics", response_model=MetricsResponse)
-async def get_request_metrics() -> MetricsResponse:
+async def get_request_metrics(user_id: str = Depends(get_user_id)) -> MetricsResponse:
     """Get request metrics.
 
     Returns aggregated metrics about API requests including:
@@ -75,7 +76,7 @@ async def get_request_metrics() -> MetricsResponse:
 
 
 @router.post("/metrics/reset", response_model=MetricsResetResponse)
-async def reset_metrics() -> MetricsResetResponse:
+async def reset_metrics(user_id: str = Depends(get_user_id)) -> MetricsResetResponse:
     """Reset all request metrics.
 
     Clears all accumulated metrics data. Use with caution in production.
