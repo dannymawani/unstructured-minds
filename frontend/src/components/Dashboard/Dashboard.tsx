@@ -9,6 +9,7 @@ import { ActivityHeatmap } from './ActivityHeatmap';
 import { SleepTrends } from './SleepTrends';
 import { BodyWeightChart } from './BodyWeightChart';
 import { MoodCorrelation } from './MoodCorrelation';
+import { MuscleGroupMap } from './MuscleGroupMap';
 import { NutritionTile } from './NutritionTile';
 import { DateRangeSelector } from './DateRangeSelector';
 import { InsightsCard } from './InsightsCard';
@@ -163,10 +164,11 @@ export function Dashboard({ apiUrl = 'http://localhost:8000', onCreateNote }: Da
         {isVisible('moodCorrelation') && <MoodCorrelation apiUrl={apiUrl} days={dateRange} key={`mood-${refreshKey}`} />}
       </div>
 
-      {/* Body Weight */}
-      {isVisible('bodyWeight') && (
+      {/* Muscle Groups + Body Weight */}
+      {(isVisible('muscleGroups') || isVisible('bodyWeight')) && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-          <BodyWeightChart apiUrl={apiUrl} days={dateRange} key={`weight-${refreshKey}`} />
+          {isVisible('muscleGroups') && <MuscleGroupMap apiUrl={apiUrl} days={dateRange} key={`muscles-${refreshKey}`} />}
+          {isVisible('bodyWeight') && <BodyWeightChart apiUrl={apiUrl} days={dateRange} key={`weight-${refreshKey}`} />}
         </div>
       )}
 

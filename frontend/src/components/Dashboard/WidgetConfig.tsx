@@ -19,6 +19,7 @@ export const AVAILABLE_WIDGETS: WidgetDefinition[] = [
   { id: 'bodyWeight', name: 'Body Weight', description: 'Weight trend over time', defaultVisible: true },
   { id: 'exerciseProgress', name: 'Exercise Progress', description: 'Track specific exercise progress', defaultVisible: true },
   { id: 'enduranceLog', name: 'Endurance Log', description: 'Running, cycling, and swimming tracking', defaultVisible: true },
+  { id: 'muscleGroups', name: 'Muscle Groups', description: 'Body map of trained muscle groups', defaultVisible: true },
   { id: 'nutrition', name: 'Eating Habits', description: 'Calorie and macro tracking over time', defaultVisible: true },
 ];
 

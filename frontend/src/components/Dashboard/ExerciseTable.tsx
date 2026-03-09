@@ -1,6 +1,12 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Dumbbell, Plus, X, Loader2, Search, ChevronDown, ChevronUp, Share2, Check } from 'lucide-react';
+import { Dumbbell, Plus, X, Loader2, Search, ChevronDown, ChevronUp, Share2, Check, TrendingUp, TrendingDown, Minus, ChevronRight } from 'lucide-react';
 import { clearCache } from '../../lib/cachedFetch';
+
+interface SetDetail {
+  weight_kg: number | null;
+  reps: number | null;
+  set_number: number;
+}
 
 interface ExerciseTableEntry {
   exercise_name: string;
@@ -8,6 +14,11 @@ interface ExerciseTableEntry {
   last_weight_kg: number | null;
   max_weight_kg: number | null;
   total_sessions: number;
+  total_sets: number;
+  is_pr: boolean;
+  trend: 'up' | 'down' | 'flat' | 'insufficient';
+  muscle_groups: string[];
+  last_session_sets: SetDetail[];
 }
 
 interface ExerciseTableData {
@@ -27,9 +38,25 @@ function formatExerciseName(name: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function formatDate(dateStr: string): string {
+function formatRelativeDate(dateStr: string): string {
   const d = new Date(dateStr + 'T00:00:00');
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const diffMs = now.getTime() - d.getTime();
+  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return `${diffDays}d ago`;
+  if (diffDays < 30) {
+    const weeks = Math.floor(diffDays / 7);
+    return `${weeks}w ago`;
+  }
+  if (diffDays < 365) {
+    const months = Math.floor(diffDays / 30);
+    return `${months}mo ago`;
+  }
+  return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 }
 
 function formatWeight(kg: number | null): string {
@@ -37,7 +64,33 @@ function formatWeight(kg: number | null): string {
   return `${kg} kg`;
 }
 
-type SortColumn = 'total_sessions' | 'last_trained_date' | 'max_weight_kg' | 'last_weight_kg';
+function formatMuscleGroup(mg: string): string {
+  return mg
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function TrendIcon({ trend }: { trend: ExerciseTableEntry['trend'] }) {
+  switch (trend) {
+    case 'up':
+      return <TrendingUp className="w-3.5 h-3.5 text-green-400" />;
+    case 'down':
+      return <TrendingDown className="w-3.5 h-3.5 text-red-400" />;
+    case 'flat':
+      return <Minus className="w-3.5 h-3.5 text-muted-foreground" />;
+    default:
+      return null;
+  }
+}
+
+// All muscle groups that can appear
+const ALL_MUSCLE_GROUPS = [
+  'chest', 'back', 'shoulders', 'biceps', 'triceps', 'forearms',
+  'core', 'lower_back', 'upper_back', 'rear_delts',
+  'quads', 'hamstrings', 'glutes', 'adductors', 'abductors',
+];
+
+type SortColumn = 'total_sessions' | 'last_trained_date' | 'max_weight_kg' | 'last_weight_kg' | 'total_sets';
 type SortOrder = 'asc' | 'desc';
 
 const PAGE_SIZE = 10;
@@ -55,6 +108,8 @@ export function ExerciseTable({ apiUrl = 'http://localhost:8000' }: ExerciseTabl
   const [searchInput, setSearchInput] = useState('');
   const [sortBy, setSortBy] = useState<SortColumn>('total_sessions');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+  const [muscleFilter, setMuscleFilter] = useState<string | null>(null);
+  const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
   // Community share prompt state
   const [sharePrompt, setSharePrompt] = useState<{ name: string } | null>(null);
@@ -83,6 +138,7 @@ export function ExerciseTable({ apiUrl = 'http://localhost:8000' }: ExerciseTabl
         sort_order: sortOrder,
       });
       if (searchTerm) params.set('search', searchTerm);
+      if (muscleFilter) params.set('muscle_group', muscleFilter);
 
       const response = await fetch(`${apiUrl}/dashboard/exercise-table?${params}`);
       if (!response.ok) throw new Error('Failed to fetch exercises');
@@ -100,11 +156,11 @@ export function ExerciseTable({ apiUrl = 'http://localhost:8000' }: ExerciseTabl
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [apiUrl, sortBy, sortOrder]);
+  }, [apiUrl, sortBy, sortOrder, muscleFilter]);
 
   useEffect(() => {
     fetchData(search);
-  }, [apiUrl, search, sortBy, sortOrder, fetchData]);
+  }, [apiUrl, search, sortBy, sortOrder, muscleFilter, fetchData]);
 
   // Debounced search
   useEffect(() => {
@@ -211,6 +267,15 @@ export function ExerciseTable({ apiUrl = 'http://localhost:8000' }: ExerciseTabl
     }
   };
 
+  // Collect active muscle groups from current exercises for filter chips
+  const activeMuscleGroups = new Set<string>();
+  for (const ex of exercises) {
+    for (const mg of ex.muscle_groups) {
+      activeMuscleGroups.add(mg);
+    }
+  }
+  const filterGroups = ALL_MUSCLE_GROUPS.filter(mg => activeMuscleGroups.has(mg) || mg === muscleFilter);
+
   if (loading && exercises.length === 0) {
     return (
       <div className="bg-card rounded-md shadow-sm p-4 h-64 animate-pulse" data-testid="exercise-table-loading" />
@@ -265,6 +330,35 @@ export function ExerciseTable({ apiUrl = 'http://localhost:8000' }: ExerciseTabl
           className="w-full bg-muted text-foreground rounded-lg pl-9 pr-3 py-2 text-sm border-none focus:ring-2 focus:ring-ring"
         />
       </div>
+
+      {/* Muscle group filter chips */}
+      {filterGroups.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          <button
+            onClick={() => setMuscleFilter(null)}
+            className={`px-2.5 py-1 text-xs rounded-full transition-colors ${
+              !muscleFilter
+                ? 'bg-teal-500 text-white'
+                : 'bg-secondary text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            All
+          </button>
+          {filterGroups.map((mg) => (
+            <button
+              key={mg}
+              onClick={() => setMuscleFilter(muscleFilter === mg ? null : mg)}
+              className={`px-2.5 py-1 text-xs rounded-full transition-colors ${
+                muscleFilter === mg
+                  ? 'bg-teal-500 text-white'
+                  : 'bg-secondary text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {formatMuscleGroup(mg)}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Inline Add Form */}
       {showForm && (
@@ -386,8 +480,8 @@ export function ExerciseTable({ apiUrl = 'http://localhost:8000' }: ExerciseTabl
       {exercises.length === 0 ? (
         <div className="text-center py-8 text-muted-foreground">
           <Dumbbell className="w-8 h-8 mx-auto mb-2 opacity-40" />
-          <p>{search ? 'No exercises match your search.' : 'No exercises tracked yet.'}</p>
-          {!search && <p className="text-sm mt-1">Add your first exercise using the button above.</p>}
+          <p>{search || muscleFilter ? 'No exercises match your filters.' : 'No exercises tracked yet.'}</p>
+          {!search && !muscleFilter && <p className="text-sm mt-1">Add your first exercise using the button above.</p>}
         </div>
       ) : (
         <>
@@ -395,11 +489,13 @@ export function ExerciseTable({ apiUrl = 'http://localhost:8000' }: ExerciseTabl
             <table className="w-full text-sm">
               <thead className="sticky top-0 bg-card">
                 <tr className="border-b border-border text-muted-foreground text-left">
+                  <th className="pb-2 pr-4 font-medium w-5"></th>
                   <th className="pb-2 pr-4 font-medium">Exercise</th>
                   {([
                     ['last_trained_date', 'Last Trained', ''],
-                    ['last_weight_kg', 'Recent Weight', 'text-right'],
-                    ['max_weight_kg', 'Best Weight', 'text-right'],
+                    ['last_weight_kg', 'Recent', 'text-right'],
+                    ['max_weight_kg', 'Best', 'text-right'],
+                    ['total_sets', 'Sets', 'text-right'],
                     ['total_sessions', 'Sessions', 'text-right'],
                   ] as [SortColumn, string, string][]).map(([col, label, align]) => (
                     <th
@@ -421,37 +517,91 @@ export function ExerciseTable({ apiUrl = 'http://localhost:8000' }: ExerciseTabl
               </thead>
               <tbody>
                 {exercises.map((exercise) => {
-                  const isPR =
-                    exercise.last_weight_kg !== null &&
-                    exercise.max_weight_kg !== null &&
-                    exercise.last_weight_kg >= exercise.max_weight_kg;
+                  const isExpanded = expandedRow === exercise.exercise_name;
+                  const hasSets = exercise.last_session_sets.length > 0;
 
                   return (
-                    <tr
-                      key={exercise.exercise_name}
-                      className="border-b border-border/50 hover:bg-secondary/30 transition-colors"
-                    >
-                      <td className="py-2.5 pr-4">
-                        <span className="font-medium text-foreground">
-                          {formatExerciseName(exercise.exercise_name)}
-                        </span>
-                      </td>
-                      <td className="py-2.5 pr-4 text-muted-foreground">
-                        {formatDate(exercise.last_trained_date)}
-                      </td>
-                      <td className="py-2.5 pr-4 text-right text-foreground">
-                        {formatWeight(exercise.last_weight_kg)}
-                        {isPR && (
-                          <span className="ml-1.5 text-xs text-amber-400 font-medium">PR</span>
-                        )}
-                      </td>
-                      <td className="py-2.5 pr-4 text-right text-teal-400 font-medium">
-                        {formatWeight(exercise.max_weight_kg)}
-                      </td>
-                      <td className="py-2.5 text-right text-muted-foreground">
-                        {exercise.total_sessions}
-                      </td>
-                    </tr>
+                    <>
+                      <tr
+                        key={exercise.exercise_name}
+                        className={`border-b border-border/50 transition-colors ${
+                          hasSets ? 'cursor-pointer hover:bg-secondary/30' : 'hover:bg-secondary/30'
+                        } ${isExpanded ? 'bg-secondary/20' : ''}`}
+                        onClick={() => hasSets && setExpandedRow(isExpanded ? null : exercise.exercise_name)}
+                      >
+                        <td className="py-2.5 pr-1 w-5">
+                          {hasSets && (
+                            <ChevronRight className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                          )}
+                        </td>
+                        <td className="py-2.5 pr-4">
+                          <div>
+                            <span className="font-medium text-foreground">
+                              {formatExerciseName(exercise.exercise_name)}
+                            </span>
+                            <span className="ml-1.5 inline-flex items-center gap-1">
+                              <TrendIcon trend={exercise.trend} />
+                              {exercise.is_pr && (
+                                <span className="text-xs text-amber-400 font-medium">PR</span>
+                              )}
+                            </span>
+                          </div>
+                          {exercise.muscle_groups.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-0.5">
+                              {exercise.muscle_groups.map((mg) => (
+                                <span
+                                  key={mg}
+                                  className="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400"
+                                >
+                                  {formatMuscleGroup(mg)}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-2.5 pr-4 text-muted-foreground">
+                          {formatRelativeDate(exercise.last_trained_date)}
+                        </td>
+                        <td className="py-2.5 pr-4 text-right text-foreground">
+                          {formatWeight(exercise.last_weight_kg)}
+                        </td>
+                        <td className="py-2.5 pr-4 text-right text-teal-400 font-medium">
+                          {formatWeight(exercise.max_weight_kg)}
+                        </td>
+                        <td className="py-2.5 pr-4 text-right text-muted-foreground">
+                          {exercise.total_sets}
+                        </td>
+                        <td className="py-2.5 text-right text-muted-foreground">
+                          {exercise.total_sessions}
+                        </td>
+                      </tr>
+                      {/* Expanded row: last session sets */}
+                      {isExpanded && hasSets && (
+                        <tr key={`${exercise.exercise_name}-sets`} className="bg-secondary/10">
+                          <td colSpan={8} className="px-4 py-2">
+                            <div className="text-xs text-muted-foreground mb-1.5">
+                              Last session ({exercise.last_trained_date})
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {exercise.last_session_sets.map((set, i) => (
+                                <div
+                                  key={i}
+                                  className="bg-card px-2.5 py-1.5 rounded text-xs border border-border/50"
+                                >
+                                  <span className="text-muted-foreground">Set {set.set_number}</span>
+                                  {set.weight_kg !== null && (
+                                    <span className="text-foreground ml-1.5">{set.weight_kg} kg</span>
+                                  )}
+                                  {set.reps !== null && (
+                                    <span className="text-muted-foreground ml-1">x{set.reps}</span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </>
                   );
                 })}
               </tbody>
