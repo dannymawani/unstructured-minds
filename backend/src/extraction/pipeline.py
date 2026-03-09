@@ -400,32 +400,68 @@ class ExtractionPipeline:
             activity_sql = upsert("activities", act_cols, act_conflict, dialect=dialect)
             self.db.execute(activity_sql, act_vals)
 
-            # Insert exercise records
-            for j, exercise in enumerate(activity.get("exercises", [])):
-                exercise_id = self._generate_id()
-                exercise_name = self._exercise_matcher.match(
-                    exercise.get("name", "unknown")
-                )[0]
-                ex_cols = ["id", "activity_id", "date", "exercise_name", "weight_kg", "reps", "set_number",
-                           "duration_minutes", "distance_km", "notes", "source_file"]
-                ex_vals: list = [
-                    exercise_id, activity_id, date, exercise_name,
-                    exercise.get("weight_kg"),
-                    exercise.get("reps"),
-                    j + 1,
-                    exercise.get("duration_minutes"),
-                    exercise.get("distance_km"),
-                    exercise.get("notes"),
-                    source_file,
-                ]
-                if dialect == "postgres" and self.user_id:
-                    ex_cols.append("user_id")
-                    ex_vals.append(self.user_id)
+            # Insert exercise records — one row per set
+            global_set_num = 0
+            for exercise in activity.get("exercises", []):
+                raw_name = exercise.get("name", "unknown")
+                if exercise.get("_name_from_note"):
+                    # Name was restored from the original note — use it directly
+                    # (only apply exact/alias/AI-cache matches, skip fuzzy to prevent mis-mapping)
+                    canonical, confidence = self._exercise_matcher.match(raw_name)
+                    exercise_name = canonical if confidence >= 0.95 else raw_name.strip().title()
+                else:
+                    exercise_name = self._exercise_matcher.match(raw_name)[0]
 
-                ex_conflict = ["id", "user_id"] if (dialect == "postgres" and self.user_id) else ["id"]
-                exercise_sql = upsert("exercise_log", ex_cols, ex_conflict, dialect=dialect)
-                self.db.execute(exercise_sql, ex_vals)
-                records += 1
+                sets_data = exercise.get("sets", [])
+                if sets_data and isinstance(sets_data, list) and isinstance(sets_data[0], dict):
+                    # New format: per-set array with individual weights/reps
+                    for set_entry in sets_data:
+                        global_set_num += 1
+                        exercise_id = self._generate_id()
+                        ex_cols = ["id", "activity_id", "date", "exercise_name", "weight_kg", "reps", "set_number",
+                                   "duration_minutes", "distance_km", "notes", "source_file"]
+                        ex_vals: list = [
+                            exercise_id, activity_id, date, exercise_name,
+                            set_entry.get("weight_kg"),
+                            set_entry.get("reps"),
+                            global_set_num,
+                            exercise.get("duration_minutes"),
+                            exercise.get("distance_km"),
+                            exercise.get("notes"),
+                            source_file,
+                        ]
+                        if dialect == "postgres" and self.user_id:
+                            ex_cols.append("user_id")
+                            ex_vals.append(self.user_id)
+
+                        ex_conflict = ["id", "user_id"] if (dialect == "postgres" and self.user_id) else ["id"]
+                        exercise_sql = upsert("exercise_log", ex_cols, ex_conflict, dialect=dialect)
+                        self.db.execute(exercise_sql, ex_vals)
+                        records += 1
+                else:
+                    # Legacy format: single row with top-level weight_kg/reps
+                    global_set_num += 1
+                    exercise_id = self._generate_id()
+                    ex_cols = ["id", "activity_id", "date", "exercise_name", "weight_kg", "reps", "set_number",
+                               "duration_minutes", "distance_km", "notes", "source_file"]
+                    ex_vals = [
+                        exercise_id, activity_id, date, exercise_name,
+                        exercise.get("weight_kg"),
+                        exercise.get("reps"),
+                        global_set_num,
+                        exercise.get("duration_minutes"),
+                        exercise.get("distance_km"),
+                        exercise.get("notes"),
+                        source_file,
+                    ]
+                    if dialect == "postgres" and self.user_id:
+                        ex_cols.append("user_id")
+                        ex_vals.append(self.user_id)
+
+                    ex_conflict = ["id", "user_id"] if (dialect == "postgres" and self.user_id) else ["id"]
+                    exercise_sql = upsert("exercise_log", ex_cols, ex_conflict, dialect=dialect)
+                    self.db.execute(exercise_sql, ex_vals)
+                    records += 1
 
         return records
 
@@ -692,6 +728,91 @@ class ExtractionPipeline:
         return 1
 
     @staticmethod
+    @staticmethod
+    def _parse_exercise_names_from_content(content: str) -> list[str]:
+        """Parse original exercise names from structured markdown content.
+
+        Looks for lines matching patterns like:
+          * Exercise Name: 1x8 @ 20kg, ...
+          * Exercise Name: sets...
+          - Exercise Name: ...
+
+        Returns list of exercise names as written by the user.
+        """
+        names: list[str] = []
+        for line in content.split("\n"):
+            stripped = line.strip()
+            # Match bullet lines with exercise data (colon followed by set/rep info)
+            if stripped.startswith(("* ", "- ")):
+                text = stripped[2:].strip()
+                # Skip bold-prefixed metadata lines like "* **Type**: Strength"
+                if text.startswith("**") and "**:" in text:
+                    continue
+                # Skip checkbox lines
+                if text.startswith("[ ]") or text.startswith("[x]"):
+                    continue
+                # Look for "Name: <set data>" pattern
+                colon_idx = text.find(":")
+                if colon_idx > 0:
+                    after_colon = text[colon_idx + 1:].strip()
+                    # Verify it looks like exercise data (has digits for reps/weight)
+                    if re.search(r"\d+x\d+|\d+\s*kg|\d+\s*rep", after_colon, re.IGNORECASE):
+                        names.append(text[:colon_idx].strip())
+                elif re.search(r"\d+x\d+|\d+\s*kg", text):
+                    # Line without colon but with exercise data (e.g. "* GHD Crunches 1x12")
+                    match = re.match(r"^(.+?)\s*\d+x\d+", text)
+                    if match:
+                        names.append(match.group(1).strip())
+        return names
+
+    @staticmethod
+    def _restore_original_exercise_names(
+        content: str, activities: list[dict],
+    ) -> list[dict]:
+        """Replace Claude-renamed exercise names with the user's original names.
+
+        Claude sometimes renames exercises (e.g. 'Biceps Preacher Cable Curl' ->
+        'Biceps Cable Curl'). This parses the original names from the note and
+        restores them using fuzzy matching.
+        """
+        from difflib import SequenceMatcher
+
+        original_names = ExtractionPipeline._parse_exercise_names_from_content(content)
+        if not original_names:
+            return activities
+
+        for activity in activities:
+            for exercise in activity.get("exercises", []):
+                claude_name = exercise.get("name", "")
+                if not claude_name:
+                    continue
+
+                claude_lower = claude_name.lower().strip()
+
+                # Check if Claude's name exactly matches an original — keep it, but mark it
+                if any(n.lower().strip() == claude_lower for n in original_names):
+                    exercise["_name_from_note"] = True
+                    continue
+
+                # Find the best matching original name
+                best_score = 0.0
+                best_name = None
+                for orig in original_names:
+                    score = SequenceMatcher(
+                        None, claude_lower, orig.lower().strip()
+                    ).ratio()
+                    if score > best_score:
+                        best_score = score
+                        best_name = orig
+
+                # Restore original name if it's a close-enough match
+                if best_name and best_score >= 0.55:
+                    exercise["name"] = best_name
+                    exercise["_name_from_note"] = True
+
+        return activities
+
+    @staticmethod
     def _strip_suggestions(content: str) -> str:
         """Remove blockquoted workout suggestion tables before extraction.
 
@@ -777,6 +898,12 @@ class ExtractionPipeline:
 
             # Extract data using Claude
             data = await self.claude.extract(clean_content, schema)
+
+            # Restore original exercise names that Claude may have renamed
+            if data.get("activities"):
+                data["activities"] = self._restore_original_exercise_names(
+                    content, data["activities"]
+                )
 
             # Get date from file path first (reliable), then fall back to extracted data
             date = self._extract_date_from_path(file_path) or data.get("date")

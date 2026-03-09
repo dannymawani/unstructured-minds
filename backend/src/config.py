@@ -49,14 +49,25 @@ class Settings(BaseSettings):
     db_pool_min: int = 2
     db_pool_max: int = 10
 
+    # Azure managed identity (cloud mode only)
+    azure_use_managed_identity: bool = False
+    azure_postgres_host: Optional[str] = None
+    azure_postgres_db: str = "unstructured_minds"
+    azure_postgres_user: str = "um-backend"
+
     # Auth (Clerk) — required for cloud mode, validated at request time
     clerk_secret_key: Optional[str] = None
     clerk_domain: Optional[str] = None  # e.g. "your-app.clerk.accounts.dev"
 
     @property
+    def use_token_auth(self) -> bool:
+        """True when managed identity is enabled with a Postgres host."""
+        return self.azure_use_managed_identity and self.azure_postgres_host is not None
+
+    @property
     def is_cloud_mode(self) -> bool:
-        """True when USE_CLOUD=true and DATABASE_URL is set."""
-        return self.use_cloud and self.database_url is not None
+        """True when USE_CLOUD=true and DATABASE_URL or managed identity is set."""
+        return self.use_cloud and (self.database_url is not None or self.use_token_auth)
 
     @property
     def auth_enabled(self) -> bool:

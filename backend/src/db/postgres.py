@@ -2,11 +2,11 @@
 
 import re
 from contextlib import contextmanager
-from typing import Optional
+from typing import Callable, Optional
 
 import psycopg
 from psycopg.rows import tuple_row
-from psycopg_pool import ConnectionPool
+from psycopg_pool import ConnectionPool, NullConnectionPool
 
 from ..logging_config import get_logger
 
@@ -55,28 +55,59 @@ class PostgresManager:
     use either backend interchangeably.
     """
 
-    def __init__(self, connection_string: str, pool_min: int = 2, pool_max: int = 10) -> None:
+    def __init__(
+        self,
+        connection_string: str,
+        pool_min: int = 2,
+        pool_max: int = 10,
+        token_callback: Optional[Callable[[], str]] = None,
+    ) -> None:
         self._conninfo = connection_string
-        self._pool: Optional[ConnectionPool] = None
+        self._pool: Optional[ConnectionPool | NullConnectionPool] = None
         self._pool_min = pool_min
         self._pool_max = pool_max
+        self._token_callback = token_callback
+
+    def _make_conninfo(self) -> str:
+        """Build connection string, injecting a fresh token as password if using token auth."""
+        if self._token_callback:
+            token = self._token_callback()
+            return f"{self._conninfo} password={token}"
+        return self._conninfo
 
     def connect(self) -> None:
         """Open the connection pool."""
         if self._pool is not None:
             return
-        self._pool = ConnectionPool(
-            self._conninfo,
-            min_size=self._pool_min,
-            max_size=self._pool_max,
-            kwargs={
+
+        conninfo = self._make_conninfo()
+        pool_kwargs = {
+            "kwargs": {
                 "row_factory": tuple_row,
                 # Disable prepared statements so the pool works with
                 # transaction-mode poolers (PgBouncer / Supavisor).
                 "prepare_threshold": None,
             },
-        )
-        logger.info("postgres_pool_opened")
+        }
+
+        if self._token_callback:
+            # Token auth: use NullConnectionPool so each checkout gets a fresh
+            # connection with a current token. Acceptable for low-concurrency
+            # workloads (~10 users). Each connection adds ~10ms overhead.
+            self._pool = NullConnectionPool(
+                conninfo,
+                max_size=self._pool_max,
+                **pool_kwargs,
+            )
+            logger.info("postgres_pool_opened", mode="token_auth", pool_type="null")
+        else:
+            self._pool = ConnectionPool(
+                conninfo,
+                min_size=self._pool_min,
+                max_size=self._pool_max,
+                **pool_kwargs,
+            )
+            logger.info("postgres_pool_opened", mode="password", pool_type="connection")
 
     def close(self) -> None:
         """Close the connection pool."""
