@@ -50,3 +50,9 @@ variable "cors_origins" {
   type        = string
   default     = "https://app.unstructuredminds.com"
 }
+
+variable "developer_ip" {
+  description = "Developer's public IP for direct Postgres access (leave empty to skip)"
+  type        = string
+  default     = ""
+}

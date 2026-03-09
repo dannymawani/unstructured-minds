@@ -13,8 +13,11 @@ from ..claude import ClaudeClient
 from ..config import settings
 from ..db import DatabaseManager
 from ..db.sql_compat import upsert, get_dialect
+from ..logging_config import get_logger
 from .exercise_matcher import ExerciseMatcher
 from .schemas import COMBINED_EXTRACTION_SCHEMA, EXTRACTION_SCHEMAS
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -464,6 +467,98 @@ class ExtractionPipeline:
                     records += 1
 
         return records
+
+    async def _auto_label_new_exercises(self, activities: list[dict]) -> None:
+        """Auto-classify exercises that have no muscle group data.
+
+        For each exercise name not in definitions or community_exercises,
+        calls Claude to generate muscle groups/category and inserts into
+        community_exercises so they're available for all users.
+        """
+        if not self.claude or not self.claude.is_configured:
+            return
+
+        # Collect unique exercise names from this extraction
+        exercise_names: set[str] = set()
+        for activity in activities:
+            for exercise in activity.get("exercises", []):
+                raw_name = exercise.get("name", "")
+                if raw_name:
+                    canonical, _ = self._exercise_matcher.match(raw_name)
+                    exercise_names.add(canonical)
+
+        # Find ones with no muscle groups (not in definitions or community)
+        unlabeled = [
+            name for name in exercise_names
+            if not self._exercise_matcher.get_muscle_groups(name)
+        ]
+        if not unlabeled:
+            return
+
+        # Get existing muscle groups and categories for consistency
+        all_meta = [self._exercise_matcher.get_metadata(n) for n in self._exercise_matcher.canonical_names]
+        known_muscles = sorted({mg for m in all_meta for mg in m["muscle_groups"]})
+        known_categories = sorted({m["category"] for m in all_meta})
+
+        try:
+            results = await self.claude.label_new_exercises(
+                exercise_names=unlabeled,
+                known_muscle_groups=known_muscles,
+                known_categories=known_categories,
+            )
+        except Exception as e:
+            logger.warning("auto_label_exercises_failed", error=str(e))
+            return
+
+        dialect = get_dialect(self.db)
+        ph = "%s" if dialect == "postgres" else "?"
+
+        for entry in results:
+            if not entry.get("is_exercise", True):
+                continue
+            if not entry.get("muscle_groups"):
+                continue
+
+            key = entry["key"]
+            display = entry["display"]
+            muscle_groups = entry["muscle_groups"]
+            category = entry.get("category", "other")
+            recovery_hours = entry.get("recovery_hours", 48)
+
+            # Check if already exists in community_exercises
+            try:
+                existing = self.db.execute(
+                    f"SELECT exercise_key FROM community_exercises WHERE exercise_key = {ph}",
+                    [key],
+                ).fetchone()
+                if existing:
+                    continue
+            except Exception:
+                continue
+
+            # Insert into community_exercises
+            try:
+                muscle_groups_val = json.dumps(muscle_groups)
+                self.db.execute(
+                    f"""INSERT INTO community_exercises
+                        (exercise_key, display_name, aliases, muscle_groups, category, recovery_hours)
+                        VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph})""",
+                    [key, display, json.dumps([]), muscle_groups_val, category, recovery_hours],
+                )
+
+                # Update in-memory matcher immediately
+                self._exercise_matcher.load_community_exercises([{
+                    "exercise_key": key,
+                    "display_name": display,
+                    "aliases": [],
+                    "muscle_groups": muscle_groups,
+                    "category": category,
+                    "recovery_hours": recovery_hours,
+                }])
+
+                logger.info("auto_labeled_exercise", key=key, display=display, muscle_groups=muscle_groups)
+            except Exception as e:
+                logger.warning("auto_label_insert_failed", key=key, error=str(e))
 
     @staticmethod
     def _normalize_task_desc(desc: str) -> str:
@@ -937,6 +1032,8 @@ class ExtractionPipeline:
                     records_inserted["exercises"] = self._store_activities(
                         date, data["activities"], file_path
                     )
+                    # Auto-classify new exercises that have no muscle groups
+                    await self._auto_label_new_exercises(data["activities"])
 
                 if data.get("tasks") and self._is_daily_note(file_path):
                     records_inserted["tasks"] = self._store_tasks(
