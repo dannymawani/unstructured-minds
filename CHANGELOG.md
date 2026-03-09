@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Landing page redesigned with realistic app mockups (editor, dashboard, heatmap, kanban, chat)
+- Endurance table uses SQL-level pagination instead of Python-side sorting and slicing
+- Insights endpoint consolidates 5 DB queries into 3 using UNION ALL CTEs
+- Move function-level `import re` and `import json` to module-level in dashboard.py
+- Add mtime-based cache to `_load_json_config` to avoid repeated disk reads
+
+### Removed
+- Remove LifeProfile section entirely (backend API, frontend components, tests, docs)
+
+## [v0.9.0] - 2026-03-09
+
+### Added
+- Auto-label new exercises with muscle groups via Claude AI when first encountered during extraction
+- Enhanced exercise table with PR detection, trend arrows, muscle group tags, and expandable per-set details
+- Muscle group heatmap widget with interactive SVG body map showing training distribution
+- Per-set extraction for strength exercises with individual weight/rep tracking
+- Endurance tracking system with pace, distance, and heart rate logging
+- Unified chat experience combining note-assist and data query modes
+- Daily note wizard redesign with improved flow and template selection
+- Azure infrastructure setup with Terraform IaC for Container Apps, ACR, and Postgres
+
+### Changed
+- Exercise name normalization now restores original names from user notes
+- Database schema normalized for per-set exercise data storage
+
+### Fixed
+- Fix React reconciliation issues in ExerciseTable with keyed Fragments
+- Remove unused BODY_OUTLINE constant from MuscleGroupMap
+- Fix duplicate `@staticmethod` decorator that could crash extraction pipeline import
+- Fix DuckDB cursor leak — `execute()` now materializes results and closes cursors immediately
+- Remove dead `exercise_definitions.json` disk reads from 3 dashboard endpoints
+- Remove `console.log` stubs from production Dashboard event handlers
+- Fix time-dependent test failure in `test_hide_old_done_tasks`
+
+### Security
+- Add auth guards to `/insights/daily`, `/insights/weekly`, `/insights/dismiss` endpoints (previously unauthenticated)
+- Add auth guards to `/metrics` and `/metrics/reset` endpoints (previously unauthenticated)
+- Remove leaked exercise definitions disk I/O from unauthenticated request paths
+
 ## [v0.8.1] - 2026-02-16
 
 ### Security
@@ -178,3 +218,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **v0.5.0** introduces the daily note wizard for structured note creation, improved file management, and the life profile view for tracking goals and progress.
 - **v0.6.0** adds AI-powered exercise normalization, table editing controls, sidebar optimizations, and fixes across dashboard, tasks, and insights.
 - **v0.7.0** introduces cloud architecture with two-mode operation (local/cloud), Clerk authentication, user data isolation for multi-tenancy, and a shared community exercise pool.
+- **v0.8.x** adds onboarding, security hardening for natural language queries, and go-live architecture diagrams.
+- **v0.9.0** introduces AI-powered exercise auto-labeling, muscle group heatmap, per-set tracking, endurance logging, Azure IaC, and a security audit fixing unauthenticated endpoints and cursor leaks.

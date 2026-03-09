@@ -12,7 +12,6 @@ import {
   Search,
   FilePlus2,
   Zap,
-  User,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -184,7 +183,6 @@ export function createDefaultCommands(options: {
   onSwitchToDashboard: () => void
   onSwitchToKanban: () => void
   onSwitchToCalendar?: () => void
-  onSwitchToProfile?: () => void
   onSearch?: () => void
   onNewFromTemplate?: () => void
   onQuickCapture?: () => void
@@ -244,15 +242,6 @@ export function createDefaultCommands(options: {
       label: 'Switch to Calendar view',
       icon: Calendar,
       action: options.onSwitchToCalendar,
-    })
-  }
-
-  if (options.onSwitchToProfile) {
-    commands.push({
-      id: 'view-profile',
-      label: 'Switch to Profile view',
-      icon: User,
-      action: options.onSwitchToProfile,
     })
   }
 
