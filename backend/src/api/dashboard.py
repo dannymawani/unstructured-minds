@@ -311,6 +311,14 @@ def get_nutrition_data(
     )
 
 
+class SetDetail(BaseModel):
+    """A single set from a session."""
+
+    weight_kg: Optional[float] = None
+    reps: Optional[int] = None
+    set_number: int = 1
+
+
 class ExerciseTableEntry(BaseModel):
     """Single exercise row in the exercise table."""
 
@@ -319,6 +327,11 @@ class ExerciseTableEntry(BaseModel):
     last_weight_kg: Optional[float] = None
     max_weight_kg: Optional[float] = None
     total_sessions: int
+    total_sets: int = 0
+    is_pr: bool = False
+    trend: Literal["up", "down", "flat", "insufficient"] = "insufficient"
+    muscle_groups: list[str] = []
+    last_session_sets: list[SetDetail] = []
 
 
 class ExerciseTableResponse(BaseModel):
@@ -904,9 +917,10 @@ def get_activity_groups(
 @router.get("/exercise-table", response_model=ExerciseTableResponse)
 def get_exercise_table(
     search: Optional[str] = Query(default=None, description="Search exercises by name"),
+    muscle_group: Optional[str] = Query(default=None, description="Filter by muscle group"),
     limit: int = Query(default=10, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
-    sort_by: Literal["total_sessions", "last_trained_date", "max_weight_kg", "last_weight_kg", "exercise_name"] = Query(
+    sort_by: Literal["total_sessions", "last_trained_date", "max_weight_kg", "last_weight_kg", "exercise_name", "total_sets"] = Query(
         default="total_sessions", description="Column to sort by"
     ),
     sort_order: Literal["asc", "desc"] = Query(default="desc", description="Sort direction"),
@@ -916,19 +930,13 @@ def get_exercise_table(
     """Get a summary table of strength exercises the user has logged.
 
     Filtered to strength-related exercises only (by activity_id or manual entries).
-    Exercise names are normalized via fuzzy matching so variants like
-    "Deadlift" / "deadlift" / "Deadlifts" merge into one row.
-
-    Args:
-        search: Optional search filter for exercise names
-        limit: Number of exercises to return (default 10)
-        offset: Pagination offset
-        db: Database manager
-
-    Returns:
-        Table of exercise summaries sorted by total sessions descending
+    Exercise names are normalized via fuzzy matching so variants merge into one row.
+    Includes PR detection, trend calculation, muscle groups, and last session sets.
     """
-    # Fetch all strength exercises grouped by raw name
+    # Load exercise definitions for muscle group lookup
+    exercise_defs = _load_json_config("exercise_definitions.json")
+
+    # Query 1: Exercise stats with per-session max weights for trend/PR
     result = db.execute(
         """
         WITH filtered AS (
@@ -951,8 +959,34 @@ def get_exercise_table(
             SELECT
                 exercise_name,
                 MAX(weight_kg) as max_weight_kg,
-                COUNT(DISTINCT date) as total_sessions
+                COUNT(DISTINCT date) as total_sessions,
+                COUNT(*) as total_sets
             FROM filtered
+            GROUP BY exercise_name
+        ),
+        -- Get max weight per session for the 3 most recent sessions (for trend)
+        recent_sessions AS (
+            SELECT
+                exercise_name,
+                date,
+                MAX(weight_kg) as session_max,
+                ROW_NUMBER() OVER (
+                    PARTITION BY exercise_name
+                    ORDER BY date DESC
+                ) as session_rn
+            FROM filtered
+            GROUP BY exercise_name, date
+        ),
+        -- Prior max: best weight BEFORE the most recent session (for PR detection)
+        prior_max AS (
+            SELECT
+                exercise_name,
+                MAX(weight_kg) as prior_max_weight
+            FROM filtered f
+            WHERE date < (
+                SELECT MAX(date) FROM filtered f2
+                WHERE f2.exercise_name = f.exercise_name
+            )
             GROUP BY exercise_name
         )
         SELECT
@@ -960,12 +994,76 @@ def get_exercise_table(
             ls.last_trained_date,
             ls.last_weight_kg,
             es.max_weight_kg,
-            es.total_sessions
+            es.total_sessions,
+            es.total_sets,
+            pm.prior_max_weight,
+            -- Recent session maxes for trend (newest first)
+            (SELECT session_max FROM recent_sessions rs WHERE rs.exercise_name = es.exercise_name AND rs.session_rn = 1) as s1_max,
+            (SELECT session_max FROM recent_sessions rs WHERE rs.exercise_name = es.exercise_name AND rs.session_rn = 2) as s2_max,
+            (SELECT session_max FROM recent_sessions rs WHERE rs.exercise_name = es.exercise_name AND rs.session_rn = 3) as s3_max
         FROM exercise_stats es
         JOIN latest_session ls
             ON es.exercise_name = ls.exercise_name AND ls.rn = 1
+        LEFT JOIN prior_max pm
+            ON es.exercise_name = pm.exercise_name
         """,
     ).fetchall()
+
+    # Query 2: Last session sets per exercise (individual set details)
+    last_sets_result = db.execute(
+        """
+        WITH filtered AS (
+            SELECT * FROM exercise_log
+            WHERE activity_id LIKE '%strength%' OR source_file = 'manual_entry'
+        ),
+        last_date AS (
+            SELECT exercise_name, MAX(date) as last_date
+            FROM filtered
+            GROUP BY exercise_name
+        )
+        SELECT f.exercise_name, f.weight_kg, f.reps, f.set_number
+        FROM filtered f
+        JOIN last_date ld ON f.exercise_name = ld.exercise_name AND f.date = ld.last_date
+        ORDER BY f.exercise_name, f.set_number
+        """,
+    ).fetchall()
+
+    # Build last-session-sets lookup: raw_name -> list of sets
+    last_sets_by_name: dict[str, list[dict]] = {}
+    for row in last_sets_result:
+        raw_name = row[0]
+        if raw_name not in last_sets_by_name:
+            last_sets_by_name[raw_name] = []
+        last_sets_by_name[raw_name].append({
+            "weight_kg": float(row[1]) if row[1] is not None else None,
+            "reps": int(row[2]) if row[2] is not None else None,
+            "set_number": int(row[3]) if row[3] is not None else 1,
+        })
+
+    def _lookup_muscle_groups(canonical: str) -> list[str]:
+        """Look up muscle groups for a canonical exercise name."""
+        key = canonical.lower().replace(" ", "_").replace("-", "_")
+        if key in exercise_defs:
+            return exercise_defs[key].get("muscle_groups", [])
+        # Fuzzy fallback by display name
+        for _k, defn in exercise_defs.items():
+            if defn.get("display", "").lower() == canonical.lower():
+                return defn.get("muscle_groups", [])
+        return []
+
+    def _calc_trend(s1: float | None, s2: float | None, s3: float | None) -> str:
+        """Calculate trend from 3 most recent session maxes (s1=newest)."""
+        vals = [v for v in [s1, s2, s3] if v is not None]
+        if len(vals) < 2:
+            return "insufficient"
+        newest, oldest = vals[0], vals[-1]
+        diff = newest - oldest
+        threshold = oldest * 0.02 if oldest > 0 else 0.5  # 2% threshold
+        if diff > threshold:
+            return "up"
+        elif diff < -threshold:
+            return "down"
+        return "flat"
 
     # Normalize names and merge duplicates
     merged: dict[str, dict[str, Any]] = {}
@@ -973,29 +1071,70 @@ def get_exercise_table(
         raw_name = row[0]
         canonical, _ = matcher.match(raw_name)
 
+        last_trained = str(row[1])
+        last_weight = float(row[2]) if row[2] is not None else None
+        max_weight = float(row[3]) if row[3] is not None else None
+        total_sessions = row[4]
+        total_sets = row[5]
+        prior_max = float(row[6]) if row[6] is not None else None
+        s1, s2, s3 = row[7], row[8], row[9]
+
+        # PR: beat a previous session's max (not just first session)
+        is_pr = (
+            last_weight is not None
+            and prior_max is not None
+            and last_weight > prior_max
+        )
+
+        # Collect last session sets for this raw name
+        raw_sets = last_sets_by_name.get(raw_name, [])
+
         if canonical in merged:
             entry = merged[canonical]
-            if str(row[1]) > entry["last_trained_date"]:
-                entry["last_trained_date"] = str(row[1])
-                entry["last_weight_kg"] = float(row[2]) if row[2] is not None else entry["last_weight_kg"]
-            if row[3] is not None:
-                if entry["max_weight_kg"] is None or float(row[3]) > entry["max_weight_kg"]:
-                    entry["max_weight_kg"] = float(row[3])
-            entry["total_sessions"] += row[4]
+            if last_trained > entry["last_trained_date"]:
+                entry["last_trained_date"] = last_trained
+                entry["last_weight_kg"] = last_weight if last_weight is not None else entry["last_weight_kg"]
+                entry["last_session_sets"] = raw_sets
+                # Update trend from this raw name's data if it has the latest date
+                entry["_s1"] = float(s1) if s1 is not None else entry.get("_s1")
+                entry["_s2"] = float(s2) if s2 is not None else entry.get("_s2")
+                entry["_s3"] = float(s3) if s3 is not None else entry.get("_s3")
+            if max_weight is not None:
+                if entry["max_weight_kg"] is None or max_weight > entry["max_weight_kg"]:
+                    entry["max_weight_kg"] = max_weight
+            entry["total_sessions"] += total_sessions
+            entry["total_sets"] += total_sets
+            entry["is_pr"] = entry["is_pr"] or is_pr
         else:
             merged[canonical] = {
                 "exercise_name": canonical,
-                "last_trained_date": str(row[1]),
-                "last_weight_kg": float(row[2]) if row[2] is not None else None,
-                "max_weight_kg": float(row[3]) if row[3] is not None else None,
-                "total_sessions": row[4],
+                "last_trained_date": last_trained,
+                "last_weight_kg": last_weight,
+                "max_weight_kg": max_weight,
+                "total_sessions": total_sessions,
+                "total_sets": total_sets,
+                "is_pr": is_pr,
+                "muscle_groups": _lookup_muscle_groups(canonical),
+                "last_session_sets": raw_sets,
+                "_s1": float(s1) if s1 is not None else None,
+                "_s2": float(s2) if s2 is not None else None,
+                "_s3": float(s3) if s3 is not None else None,
             }
+
+    # Calculate trend for each merged entry
+    for entry in merged.values():
+        entry["trend"] = _calc_trend(entry.pop("_s1", None), entry.pop("_s2", None), entry.pop("_s3", None))
 
     # Filter by search on canonical names
     items = list(merged.values())
     if search:
         search_lower = search.lower()
         items = [e for e in items if search_lower in e["exercise_name"].lower()]
+
+    # Filter by muscle group
+    if muscle_group:
+        mg_lower = muscle_group.lower()
+        items = [e for e in items if mg_lower in [g.lower() for g in e["muscle_groups"]]]
 
     # Sort by requested column, with last_trained_date as secondary sort
     reverse = sort_order == "desc"
@@ -1018,6 +1157,14 @@ def get_exercise_table(
             last_weight_kg=e["last_weight_kg"],
             max_weight_kg=e["max_weight_kg"],
             total_sessions=e["total_sessions"],
+            total_sets=e["total_sets"],
+            is_pr=e["is_pr"],
+            trend=e["trend"],
+            muscle_groups=e["muscle_groups"],
+            last_session_sets=[
+                SetDetail(weight_kg=s["weight_kg"], reps=s["reps"], set_number=s["set_number"])
+                for s in e["last_session_sets"]
+            ],
         )
         for e in paginated
     ]
