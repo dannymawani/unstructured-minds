@@ -177,6 +177,22 @@ class NutritionResponse(BaseModel):
     period: Period
 
 
+class MuscleGroupEntry(BaseModel):
+    """Training data for a single muscle group."""
+
+    muscle_group: str
+    sessions: int
+    total_sets: int
+    exercises: list[str]
+
+
+class MuscleGroupsResponse(BaseModel):
+    """Response for muscle groups trained endpoint."""
+
+    muscle_groups: list[MuscleGroupEntry]
+    period: Period
+
+
 # ── Dependency helpers (must be above all endpoint definitions) ──────────────
 
 
@@ -923,12 +939,13 @@ def get_exercise_table(
             SELECT
                 exercise_name,
                 date as last_trained_date,
-                weight_kg as last_weight_kg,
+                MAX(weight_kg) as last_weight_kg,
                 ROW_NUMBER() OVER (
                     PARTITION BY exercise_name
-                    ORDER BY date DESC, set_number DESC
+                    ORDER BY date DESC
                 ) as rn
             FROM filtered
+            GROUP BY exercise_name, date
         ),
         exercise_stats AS (
             SELECT
@@ -1589,3 +1606,77 @@ def get_endurance_progress(
         summary=summary,
         period=period,
     )
+
+
+@router.get("/muscle-groups", response_model=MuscleGroupsResponse)
+def get_muscle_groups(
+    days: int = Query(default=7, ge=1, le=365),
+    db: DatabaseManager = Depends(get_db),
+    matcher: ExerciseMatcher = Depends(get_exercise_matcher),
+) -> MuscleGroupsResponse:
+    """Get muscle groups trained in the last N days.
+
+    Maps exercises from exercise_log to muscle groups via exercise_definitions.json.
+    """
+    import json
+
+    period = get_period(days)
+
+    # Load exercise definitions for muscle group mapping
+    exercise_defs = _load_json_config("exercise_definitions.json")
+
+    # Query distinct exercises with session/set counts
+    result = db.execute(
+        """
+        SELECT
+            exercise_name,
+            COUNT(DISTINCT date) as sessions,
+            COUNT(*) as total_sets
+        FROM exercise_log
+        WHERE date >= ? AND date <= ?
+            AND exercise_name IS NOT NULL
+        GROUP BY exercise_name
+        """,
+        [period.start_date, period.end_date],
+    ).fetchall()
+
+    # Build muscle group aggregation
+    muscle_data: dict[str, dict] = {}
+    for row in result:
+        raw_name = row[0]
+        sessions = row[1]
+        total_sets = row[2]
+
+        # Normalize exercise name to canonical form
+        canonical, _ = matcher.match(raw_name)
+        canonical_key = canonical.lower().replace(" ", "_").replace("-", "_")
+
+        # Look up muscle groups from definitions
+        groups = []
+        if canonical_key in exercise_defs:
+            groups = exercise_defs[canonical_key].get("muscle_groups", [])
+        else:
+            # Try fuzzy lookup by display name
+            for key, defn in exercise_defs.items():
+                if defn.get("display", "").lower() == canonical.lower():
+                    groups = defn.get("muscle_groups", [])
+                    break
+
+        for group in groups:
+            if group not in muscle_data:
+                muscle_data[group] = {"sessions": 0, "total_sets": 0, "exercises": set()}
+            muscle_data[group]["sessions"] = max(muscle_data[group]["sessions"], sessions)
+            muscle_data[group]["total_sets"] += total_sets
+            muscle_data[group]["exercises"].add(canonical)
+
+    entries = [
+        MuscleGroupEntry(
+            muscle_group=group,
+            sessions=data["sessions"],
+            total_sets=data["total_sets"],
+            exercises=sorted(data["exercises"]),
+        )
+        for group, data in sorted(muscle_data.items(), key=lambda x: x[1]["total_sets"], reverse=True)
+    ]
+
+    return MuscleGroupsResponse(muscle_groups=entries, period=period)
