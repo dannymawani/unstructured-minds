@@ -42,17 +42,30 @@ EXERCISE_SCHEMA: dict[str, Any] = {
                                 "name": {
                                     "type": "string",
                                     "description": (
-                                        "Exercise name. Use standard English names like: "
-                                        "Deadlift, Squat, Bench Press, Military Press, "
-                                        "Leg Press, Leg Curl, Leg Extension, Pulldown, "
-                                        "Barbell Row, Dumbbell Row, Incline Dumbbell Press, "
-                                        "Kettlebell Swing, Triceps Rope Extension, "
-                                        "Biceps Cable Curl, Good Mornings, Cossack Squats"
+                                        "Exercise name exactly as written by the user. "
+                                        "Preserve the user's original exercise name including any qualifiers "
+                                        "(e.g., 'Zercher Jefferson Curl', 'Biceps Preacher Cable Curl'). "
+                                        "Do not rename, simplify, or standardize exercise names."
                                     ),
                                 },
-                                "weight_kg": {"type": "number", "description": "Weight in kg"},
-                                "reps": {"type": "integer", "description": "Number of reps"},
-                                "sets": {"type": "integer", "description": "Number of sets"},
+                                "sets": {
+                                    "type": "array",
+                                    "description": (
+                                        "Individual sets performed for this exercise. "
+                                        "Each set has its own weight and reps. "
+                                        "For example, '1x8 @ 20kg, 1x8 @ 40kg, 1x6 @ 60kg' becomes three set entries. "
+                                        "If the user writes '3x8 @ 80kg', expand to three identical set entries."
+                                    ),
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "weight_kg": {"type": "number", "description": "Weight in kg for this set"},
+                                            "reps": {"type": "integer", "description": "Number of reps for this set"},
+                                        },
+                                    },
+                                },
+                                "weight_kg": {"type": "number", "description": "Weight in kg (legacy, prefer sets array)"},
+                                "reps": {"type": "integer", "description": "Number of reps (legacy, prefer sets array)"},
                                 "duration_minutes": {"type": "integer", "description": "Duration in minutes"},
                                 "distance_km": {"type": "number", "description": "Distance in km"},
                             },

@@ -78,7 +78,11 @@ def mock_claude():
                 "activity_type": "strength",
                 "duration_minutes": 60,
                 "exercises": [
-                    {"name": "Squat", "weight_kg": 100, "reps": 5, "sets": 3},
+                    {"name": "Squat", "sets": [
+                        {"weight_kg": 100, "reps": 5},
+                        {"weight_kg": 100, "reps": 5},
+                        {"weight_kg": 100, "reps": 5},
+                    ]},
                 ],
             }
         ],
@@ -239,22 +243,32 @@ class TestExtractionAPI:
 
         assert response.status_code == 404
 
-    def test_extract_requires_claude(self, client, test_settings):
+    def test_extract_requires_claude(self, test_settings):
         """Test extraction requires Claude configuration."""
-        # Create a test file
-        test_file = test_settings.vault_path / "test.md"
-        test_file.write_text("# Test")
+        from src.main import app
+        from src.api.extraction import get_claude
 
-        response = client.post(
-            "/extract",
-            json={"file_path": "test.md"},
-        )
+        # Override Claude dependency to return unconfigured client
+        unconfigured = MagicMock()
+        unconfigured.is_configured = False
+        app.dependency_overrides[get_claude] = lambda: unconfigured
 
-        assert response.status_code == 200
-        data = response.json()
-        # Should fail because Claude is not configured in test
-        assert not data["success"]
-        assert "not configured" in data["message"]
+        try:
+            with TestClient(app) as cl:
+                test_file = test_settings.vault_path / "test.md"
+                test_file.write_text("# Test")
+
+                response = cl.post(
+                    "/extract",
+                    json={"file_path": "test.md"},
+                )
+
+                assert response.status_code == 200
+                data = response.json()
+                assert not data["success"]
+                assert "not configured" in data["message"]
+        finally:
+            app.dependency_overrides.pop(get_claude, None)
 
     def test_extract_batch_endpoint_exists(self, client):
         """Test batch extraction endpoint exists."""
