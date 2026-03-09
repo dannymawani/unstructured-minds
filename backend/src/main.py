@@ -70,7 +70,28 @@ async def lifespan(app: FastAPI):
         # Postgres is the source of truth for all data.
         # DuckDB (in-memory) is a disposable analytics cache.
         # Vault/data files stored in Postgres.
-        pg = PostgresManager(settings.database_url, pool_min=settings.db_pool_min, pool_max=settings.db_pool_max)
+        if settings.use_token_auth:
+            from .db.azure_auth import get_azure_postgres_token
+
+            conninfo = (
+                f"host={settings.azure_postgres_host} "
+                f"dbname={settings.azure_postgres_db} "
+                f"user={settings.azure_postgres_user} "
+                f"sslmode=require"
+            )
+            pg = PostgresManager(
+                conninfo,
+                pool_min=settings.db_pool_min,
+                pool_max=settings.db_pool_max,
+                token_callback=get_azure_postgres_token,
+            )
+            logger.info("postgres_using_managed_identity", host=settings.azure_postgres_host)
+        else:
+            pg = PostgresManager(
+                settings.database_url,
+                pool_min=settings.db_pool_min,
+                pool_max=settings.db_pool_max,
+            )
         pg.connect()
         init_postgres_schema(pg)
         app.state.db = pg
