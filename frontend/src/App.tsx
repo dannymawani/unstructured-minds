@@ -48,8 +48,7 @@ function SignInGate() {
     <div className="h-screen flex items-center justify-center bg-background">
       <div className="text-center space-y-6 max-w-sm mx-auto px-4">
         <div className="flex items-center gap-3">
-          <img src="/um-logo.svg" alt="Unstructured Minds" className="w-8 h-8 logo-dark" />
-          <img src="/um-logo-light.svg" alt="Unstructured Minds" className="w-8 h-8 logo-light" />
+          <img src="/um-icon.svg" alt="Unstructured Minds" className="w-8 h-8 rounded" />
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">Unstructured Minds</h1>
         </div>
         <p className="text-muted-foreground">Sign in to access your notes and data.</p>
@@ -337,8 +336,7 @@ function App() {
             </Button>
           )}
           <div className="flex items-center gap-1.5 sm:gap-2">
-            <img src="/um-logo.svg" alt="" className="w-5 h-5 sm:w-6 sm:h-6 logo-dark" />
-            <img src="/um-logo-light.svg" alt="" className="w-5 h-5 sm:w-6 sm:h-6 logo-light" />
+            <img src="/um-icon.svg" alt="" className="w-5 h-5 sm:w-6 sm:h-6 rounded" />
             <h1 className="text-sm sm:text-base font-semibold tracking-tight truncate">{ui.isMobile ? 'UM' : 'Unstructured Minds'}</h1>
           </div>
           {!ui.isMobile && (
