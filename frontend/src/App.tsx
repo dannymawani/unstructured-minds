@@ -24,7 +24,6 @@ import {
   LayoutDashboard,
   FileText,
   Kanban,
-  User,
   Sun,
   Moon,
   Settings,
@@ -341,7 +340,7 @@ function App() {
           </div>
           {!ui.isMobile && (
             <div className="hidden sm:flex items-center gap-1 bg-muted rounded-lg p-1">
-              {([['editor', FileText, 'Editor'], ['dashboard', LayoutDashboard, 'Dashboard'], ['kanban', Kanban, 'Kanban'], ['profile', User, 'Profile']] as const).map(([v, Icon, label]) => (
+              {([['editor', FileText, 'Editor'], ['dashboard', LayoutDashboard, 'Dashboard'], ['kanban', Kanban, 'Kanban']] as const).map(([v, Icon, label]) => (
                 <Button key={v} variant={view === v ? 'secondary' : 'ghost'} size="sm" onClick={() => navigate(v === 'editor' ? '/editor' : `/${v}`)} className="gap-1">
                   <Icon className="w-4 h-4" /><span className="hidden lg:inline">{label}</span>
                 </Button>
