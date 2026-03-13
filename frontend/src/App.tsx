@@ -10,6 +10,7 @@ import { CommandPalette, createDefaultCommands } from '@/components/CommandPalet
 import { SearchModal } from '@/components/Search'
 import { TemplatePicker } from '@/components/TemplatePicker'
 import { QuickCapture } from '@/components/QuickCapture'
+import { QuickNotes } from '@/components/QuickNotes'
 import { DailyNoteWizard } from '@/components/DailyNoteWizard'
 import { TagsPanel } from '@/components/TagsPanel'
 import { BacklinksPanel } from '@/components/BacklinksPanel'
@@ -260,12 +261,19 @@ function App() {
           </button>
         ))}
       </div>
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden flex flex-col">
         {ui.sidebarTab === 'files' && (
-          <FileTree onFileSelect={handleFileSelect} selectedFile={file.selectedFile} apiBaseUrl={api.baseUrl}
-            onCreateDailyNote={createDailyNote} onOpenTemplatePicker={ui.openTemplatePicker}
-            onDeleteFile={file.handleDeleteFile} onRenameFile={file.handleRenameFile}
-            refreshTrigger={fileTreeRefresh} />
+          <>
+            <div className="flex-1 overflow-hidden">
+              <FileTree onFileSelect={handleFileSelect} selectedFile={file.selectedFile} apiBaseUrl={api.baseUrl}
+                onCreateDailyNote={createDailyNote} onOpenTemplatePicker={ui.openTemplatePicker}
+                onDeleteFile={file.handleDeleteFile} onRenameFile={file.handleRenameFile}
+                refreshTrigger={fileTreeRefresh} />
+            </div>
+            <div className="shrink-0 max-h-[40%] overflow-hidden flex flex-col">
+              <QuickNotes onFileSelect={handleFileSelect} selectedFile={file.selectedFile} refreshTrigger={fileTreeRefresh} />
+            </div>
+          </>
         )}
         {ui.sidebarTab === 'tags' && <TagsPanel onFileSelect={handleFileSelect} apiBaseUrl={api.baseUrl} />}
         {ui.sidebarTab === 'links' && <BacklinksPanel currentFile={file.selectedFile} onFileSelect={handleFileSelect} apiBaseUrl={api.baseUrl} />}
@@ -301,9 +309,9 @@ function App() {
           </button>
         )}
         {!ui.isMobile && !ui.isTablet && ui.isChatExpanded && (
-          <div className="h-[28rem] border-t border-border/50 flex flex-col overflow-hidden relative">
+          <div className="h-[32rem] border-t border-border/50 flex flex-col overflow-hidden relative">
             <button onClick={() => ui.setIsChatExpanded(false)}
-              className="absolute top-2 right-2 z-10 p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
+              className="absolute top-3 right-3 z-10 p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
               title="Close chat">
               <ChevronDown className="h-4 w-4" />
             </button>

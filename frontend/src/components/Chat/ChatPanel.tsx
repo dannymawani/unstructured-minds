@@ -200,27 +200,30 @@ export function ChatPanel({ apiBaseUrl = '', currentFile, currentContent, onCont
   return (
     <div className="flex flex-col h-full bg-background">
       {/* Header */}
-      <div className="px-4 py-2.5 border-b bg-card/50 backdrop-blur-sm">
-        <div className="flex items-center gap-2">
-          <div className="flex items-center justify-center h-6 w-6 rounded-md bg-teal-500/10">
-            <Sparkles className="h-3.5 w-3.5 text-teal-500" />
+      <div className="px-5 py-3 border-b bg-card/50 backdrop-blur-sm">
+        <div className="flex items-center gap-2.5">
+          <div className="flex items-center justify-center h-7 w-7 rounded-lg bg-teal-500/10">
+            <Sparkles className="h-4 w-4 text-teal-500" />
           </div>
           <div className="min-w-0">
             <h2 className="text-sm font-semibold leading-none">Chat</h2>
-            <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
-              {fileName ? `Editing ${fileName}` : 'Query, update, or catch up'}
+            <p className="text-[11px] text-muted-foreground mt-1 truncate">
+              {fileName ? `Editing ${fileName}` : 'Ask anything about your data'}
             </p>
           </div>
         </div>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-auto p-3 space-y-3">
+      <div className="flex-1 overflow-auto px-4 py-5 space-y-5">
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center px-4">
-            <div className="space-y-3 max-w-[260px]">
+            <div className="space-y-4 max-w-[300px]">
+              <div className="flex items-center justify-center h-12 w-12 rounded-2xl bg-teal-500/10 mx-auto">
+                <Sparkles className="h-6 w-6 text-teal-500" />
+              </div>
               <p className="text-sm text-muted-foreground">What can I help with?</p>
-              <div className="grid gap-1.5">
+              <div className="grid gap-2">
                 {[
                   { label: 'Catch up', example: '"BJJ Monday, rest Tuesday"' },
                   { label: 'Query data', example: '"How did I sleep last week?"' },
@@ -233,10 +236,10 @@ export function ChatPanel({ apiBaseUrl = '', currentFile, currentContent, onCont
                       setInput(hint.example.replace(/"/g, ''))
                       inputRef.current?.focus()
                     }}
-                    className="text-left px-3 py-2 rounded-lg border border-border/60 hover:border-teal-500/40 hover:bg-teal-500/5 transition-colors group"
+                    className="text-left px-4 py-3 rounded-xl border border-border/60 hover:border-teal-500/40 hover:bg-teal-500/5 transition-all group"
                   >
                     <span className="text-xs font-medium text-foreground">{hint.label}</span>
-                    <span className="block text-[11px] text-muted-foreground group-hover:text-muted-foreground/80 mt-0.5">
+                    <span className="block text-[11px] text-muted-foreground group-hover:text-muted-foreground/80 mt-1">
                       {hint.example}
                     </span>
                   </button>
@@ -250,13 +253,15 @@ export function ChatPanel({ apiBaseUrl = '', currentFile, currentContent, onCont
           ))
         )}
         {isLoading && (
-          <div className="flex items-center gap-2.5 px-3 py-2.5 text-muted-foreground">
-            <div className="flex gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-teal-500/60 animate-bounce [animation-delay:0ms]" />
-              <span className="w-1.5 h-1.5 rounded-full bg-teal-500/60 animate-bounce [animation-delay:150ms]" />
-              <span className="w-1.5 h-1.5 rounded-full bg-teal-500/60 animate-bounce [animation-delay:300ms]" />
+          <div className="flex items-center gap-3 px-2">
+            <div className="flex items-center justify-center h-8 w-8 rounded-full bg-teal-500/10 ring-1 ring-teal-500/20">
+              <div className="flex gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-bounce [animation-delay:0ms]" />
+                <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-bounce [animation-delay:150ms]" />
+                <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-bounce [animation-delay:300ms]" />
+              </div>
             </div>
-            <span className="text-xs">Thinking...</span>
+            <span className="text-xs text-muted-foreground">Thinking...</span>
           </div>
         )}
         <div ref={messagesEndRef} />
@@ -264,20 +269,20 @@ export function ChatPanel({ apiBaseUrl = '', currentFile, currentContent, onCont
 
       {/* Error */}
       {error && (
-        <div className="mx-3 mb-2 px-3 py-2 text-xs text-rose-600 dark:text-rose-400 bg-rose-500/10 rounded-lg border border-rose-500/20">
+        <div className="mx-4 mb-3 px-4 py-2.5 text-xs text-rose-600 dark:text-rose-400 bg-rose-500/10 rounded-xl border border-rose-500/20">
           {error}
         </div>
       )}
 
       {/* Pending images */}
       {pendingImages.length > 0 && (
-        <div className="px-3 py-2 border-t flex gap-2 flex-wrap">
+        <div className="px-4 py-3 border-t flex gap-2.5 flex-wrap">
           {pendingImages.map((img, i) => (
             <div key={i} className="relative group">
               <img
                 src={img.preview || `data:${img.media_type};base64,${img.data}`}
                 alt={`Pending ${i + 1}`}
-                className="h-12 w-12 object-cover rounded-lg border"
+                className="h-14 w-14 object-cover rounded-xl border"
               />
               <button
                 type="button"
@@ -292,8 +297,8 @@ export function ChatPanel({ apiBaseUrl = '', currentFile, currentContent, onCont
       )}
 
       {/* Input */}
-      <form onSubmit={handleSubmit} className="p-3 border-t bg-card/30 safe-area-bottom">
-        <div className="flex gap-2 items-end">
+      <form onSubmit={handleSubmit} className="p-4 border-t bg-card/30 safe-area-bottom">
+        <div className="flex gap-2.5 items-end">
           <input
             ref={fileInputRef}
             type="file"
@@ -308,7 +313,7 @@ export function ChatPanel({ apiBaseUrl = '', currentFile, currentContent, onCont
             size="icon"
             onClick={() => fileInputRef.current?.click()}
             title="Attach image"
-            className="min-w-[36px] min-h-[36px] h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground"
+            className="min-w-[40px] min-h-[40px] h-10 w-10 shrink-0 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/60"
           >
             <Paperclip className="h-4 w-4" />
           </Button>
@@ -318,11 +323,11 @@ export function ChatPanel({ apiBaseUrl = '', currentFile, currentContent, onCont
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
-            placeholder="Ask, update, or catch up..."
+            placeholder="Ask anything about your data..."
             className={cn(
-              'flex-1 min-h-[36px] max-h-[120px] resize-none rounded-lg border px-3 py-2 text-sm',
+              'flex-1 min-h-[40px] max-h-[120px] resize-none rounded-xl border px-4 py-2.5 text-sm',
               'focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500/50',
-              'placeholder:text-muted-foreground/60',
+              'placeholder:text-muted-foreground/50',
               'bg-background transition-shadow'
             )}
             rows={1}
@@ -334,9 +339,9 @@ export function ChatPanel({ apiBaseUrl = '', currentFile, currentContent, onCont
             disabled={(!input.trim() && pendingImages.length === 0) || isLoading}
             title="Send message"
             className={cn(
-              'min-w-[36px] min-h-[36px] h-9 w-9 shrink-0 rounded-lg transition-all',
+              'min-w-[40px] min-h-[40px] h-10 w-10 shrink-0 rounded-xl transition-all',
               input.trim() || pendingImages.length > 0
-                ? 'bg-teal-500 hover:bg-teal-600 text-white shadow-sm'
+                ? 'bg-teal-500 hover:bg-teal-600 text-white shadow-sm shadow-teal-500/25'
                 : ''
             )}
           >

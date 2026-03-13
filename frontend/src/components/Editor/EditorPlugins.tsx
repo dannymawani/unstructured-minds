@@ -11,6 +11,7 @@ import {
   insertHrCommand,
 } from '@milkdown/kit/preset/commonmark'
 import { insertTableCommand } from '@milkdown/kit/preset/gfm'
+import { editorViewCtx } from '@milkdown/kit/core'
 import { keymap } from '@milkdown/prose/keymap'
 import { TextSelection } from '@milkdown/prose/state'
 import type { EditorView } from '@milkdown/prose/view'
@@ -77,18 +78,52 @@ export const codeBlockExitPlugin = $prose(() => {
 // Slash Menu Plugin
 // ============================================================
 
+/**
+ * Insert a task list item by creating a bullet list and setting checked=false.
+ * This creates a `- [ ] ` checkbox item in the editor.
+ */
+export function insertTaskList(editor: any): void {
+  // First wrap in bullet list
+  editor.action(callCommand(wrapInBulletListCommand.key))
+  // Then set checked attribute on the current list_item
+  editor.action((ctx: any) => {
+    const view = ctx.get(editorViewCtx)
+    const { state, dispatch } = view
+    const { $head } = state.selection
+    // Walk up to find the list_item node
+    for (let d = $head.depth; d > 0; d--) {
+      const node = $head.node(d)
+      if (node.type.name === 'list_item' && node.attrs.checked == null) {
+        const pos = $head.before(d)
+        dispatch(state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, checked: false }))
+        view.focus()
+        return true
+      }
+    }
+    return false
+  })
+}
+
 function createSlashMenuElement(getEditor: () => any, hide: () => void): HTMLElement {
   const el = document.createElement('div')
   el.className = 'slash-menu rounded-md border bg-popover shadow-md p-1 w-56'
   el.style.zIndex = '50'
   el.dataset.show = 'false'
 
-  const items: { label: string; icon: string; commandFn: () => (ctx: any) => boolean }[] = [
+  type SlashItem = {
+    label: string
+    icon: string
+    commandFn?: () => (ctx: any) => boolean
+    customFn?: (editor: any) => void
+  }
+
+  const items: SlashItem[] = [
     { label: 'Heading 1', icon: 'H1', commandFn: () => callCommand(wrapInHeadingCommand.key, 1) },
     { label: 'Heading 2', icon: 'H2', commandFn: () => callCommand(wrapInHeadingCommand.key, 2) },
     { label: 'Heading 3', icon: 'H3', commandFn: () => callCommand(wrapInHeadingCommand.key, 3) },
     { label: 'Bullet List', icon: '•', commandFn: () => callCommand(wrapInBulletListCommand.key) },
     { label: 'Numbered List', icon: '1.', commandFn: () => callCommand(wrapInOrderedListCommand.key) },
+    { label: 'Task List', icon: '☐', customFn: (editor) => insertTaskList(editor) },
     { label: 'Quote', icon: '❞', commandFn: () => callCommand(wrapInBlockquoteCommand.key) },
     { label: 'Code Block', icon: '<>', commandFn: () => callCommand(createCodeBlockCommand.key) },
     { label: 'Divider', icon: '—', commandFn: () => callCommand(insertHrCommand.key) },
@@ -103,7 +138,11 @@ function createSlashMenuElement(getEditor: () => any, hide: () => void): HTMLEle
       e.preventDefault()
       const editor = getEditor()
       if (editor) {
-        editor.action(item.commandFn())
+        if (item.customFn) {
+          item.customFn(editor)
+        } else if (item.commandFn) {
+          editor.action(item.commandFn())
+        }
       }
       hide()
     })

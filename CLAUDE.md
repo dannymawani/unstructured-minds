@@ -13,11 +13,7 @@ Natural language notes → structured, queryable data via Claude + DuckDB/Postgr
 | Auth | Clerk (required for cloud mode) |
 | Deploy | Docker Compose |
 
-## Architecture
-
-For the full system reference (all endpoints, DB schemas, component inventory, env vars, auth flow, Docker config), see the `system-architecture` skill. The sections below are the essentials.
-
-### Two Modes
+## Two Modes
 
 | Mode | Trigger | Storage |
 |------|---------|---------|
@@ -26,58 +22,28 @@ For the full system reference (all endpoints, DB schemas, component inventory, e
 
 Env vars: `ANTHROPIC_API_KEY`, `USE_CLOUD`, `DATABASE_URL` (cloud only), `CLERK_SECRET_KEY` + `CLERK_DOMAIN` (cloud only).
 
-Local mode uses `LOCAL_USER_ID = "local"` (hardcoded, not configurable). Cloud mode derives user identity from Clerk JWT — no `DEFAULT_USER_ID` env var.
+## Deep Documentation → `ai_docs/`
 
-In cloud mode, per-user settings live in the Postgres `user_settings` table; vault files in `vault_files`.
+For detailed reference beyond these essentials, see the **`ai_docs/`** wiki. Start with `ai_docs/00-index.md` or use the **librarian agent** to look up specific topics.
 
-### Data Layout
-
-```
-shared/                       # Git-tracked, shared
-├── exercise_definitions.json
-└── schemas/*.json
-
-data/                         # Gitignored, per-instance
-├── unstructured.duckdb
-├── settings.json
-├── training_config.json
-└── ai_exercise_cache.json
-```
-
-### Date Formats
-
-Filenames and CSV dates: `YYYY-MM-DD`. Daily note path: `Daily-Notes/YYYY-MM/YYYY-MM-DD.md`.
-
-### DuckDB
-
-No AUTO_INCREMENT — use `DEFAULT nextval('seq')` or app-generated IDs.
-
-### Dashboard & Analytics Cache
-
-In cloud mode, dashboard endpoints use an in-memory DuckDB (analytics cache) populated from Postgres per-user. The `dashboard.py` module defines a **local `get_db`** that depends on `get_user_id` (auth + cache seeding). This local function **must be defined before all endpoint functions** in the file — Python evaluates `Depends(get_db)` default args at function definition time, so any endpoint defined before the local `get_db` would bind to the imported `dependencies.get_db` (Postgres, no auth, no user isolation).
-
-### Cloud Setup
-
-```bash
-cd backend && python3 -m scripts.setup_cloud              # Full setup
-cd backend && python3 -m scripts.setup_cloud --drop-first  # Wipe + rebuild
-cd backend && python3 -m scripts.setup_cloud --skip-seed   # Schemas only
-```
+| Doc | Covers |
+|-----|--------|
+| `01-architecture-overview` | System design, data flow, project structure |
+| `02-technology-stack` | All technologies, versions, why chosen |
+| `03-development-workflow` | Branching, commits, PRs, testing process |
+| `04-database-architecture` | All table schemas, two-mode data layer, analytics cache |
+| `05-backend` | FastAPI endpoints, DI, Python patterns, Claude integration |
+| `06-frontend` | React components, state, Milkdown, build pipeline |
+| `07-data-pipeline` | Extraction flow, exercise matching, AI classification |
+| `08-auth-and-security` | Clerk auth, JWT, CSP, SQL validation, test auth bypass |
+| `09-infrastructure` | Docker, env vars, cloud setup, backup, LAN access |
+| `10-decisions-log` | Architectural decisions (ADR, append-only) |
 
 ## Testing
 
 Run: `cd backend && pytest` (backend), `cd frontend && npm test` (frontend).
 
-### Auth in Tests
-
-The dev `.env` has Clerk/Postgres credentials, so the real `settings` object has `auth_enabled=True` and `is_cloud_mode=True`. Tests bypass this via an **autouse fixture** in `backend/tests/conftest.py` (`disable_auth`) that:
-
-1. Patches `src.api.dependencies.settings` with `auth_enabled=False`, `is_cloud_mode=False`
-2. Overrides `get_user_id` via FastAPI DI to return `LOCAL_USER_ID`
-
-This ensures all dependency functions (`get_storage`, `get_datastore`, `get_user_id`) take the local-mode path. Individual test files that need custom settings patch their own router modules (e.g., `src.api.settings.settings`) on top of this.
-
-See `docs/AUTH.md` for the full auth architecture.
+Auth bypass in tests: autouse fixture in `conftest.py` patches `settings` and overrides `get_user_id`. See `ai_docs/08-auth-and-security.md` for details.
 
 ## Workflow
 
@@ -93,60 +59,25 @@ Stage specific files (`git add <files>`), not `git add .`. Check with `git diff 
 
 ## Shell / Environment
 
-- **macOS zsh**: Always quote URLs with single quotes in `curl` commands. Unquoted `?` and `&` trigger zsh globbing errors: `curl -s 'http://localhost:8000/endpoint?param=value'`
+- **macOS zsh**: Always quote URLs with single quotes in `curl` commands. Unquoted `?` and `&` trigger zsh globbing errors.
 - Use `python3` not `python` — only `python3` is on `PATH`.
 
 ## Build Pipeline
 
-### Dev-time Type Checking
-
-`vite-plugin-checker` runs TypeScript checking in a worker thread during `npm run dev`. TS errors appear as a browser overlay — no more silent accumulation until `npm run build` fails.
-
 - `npm run dev` — dev server with live type checking overlay
-- `npm run typecheck` — standalone TS check (CI/manual use)
-- `npm run build` — runs `tsc -b && vite build` (production)
-
-### Docker Build Args
-
-`VITE_CLERK_PUBLISHABLE_KEY` must be a **build arg** (not runtime env) because Vite bakes `VITE_*` variables into the JS bundle at build time. The Dockerfile warns when it's empty (local mode works without it).
-
-### CSP Configuration
-
-Security headers (including CSP) live in `frontend/nginx/security-headers.conf`. This file is `include`d from `nginx.conf` in both the server block and the `location = /index.html` block (nginx doesn't inherit `add_header` from parent when child uses `add_header`). Update CSP in one place only.
-
-### Logo Assets
-
-| File | Purpose | Served from |
-|------|---------|-------------|
-| `um-icon.svg` | Favicon, PWA icon (brain only) | `frontend/public/` |
-| `um-logo.svg` | In-app branding (full logo) | `frontend/public/` |
-
-Source files in `assets/images/` use kebab-case to match web convention.
+- `npm run typecheck` — standalone TS check (CI/manual)
+- `npm run build` — `tsc -b && vite build` (production)
+- `VITE_CLERK_PUBLISHABLE_KEY` must be a **build arg** (Vite bakes `VITE_*` at build time)
 
 ## CSS/UI
 
 One change at a time. Verify no regressions before the next edit.
 
-## Brand
-
-See `brand-guidelines` skill. Quick ref: Teal `#14b8a6` (primary), Dark `#0f172a`, Light `#f8fafc`, Amber `#f59e0b`, Indigo `#6366f1` (links), Rose `#f43f5e` (errors).
-
 ## Keeping Documentation Current
 
-After making **structural changes** to the codebase, update the `system-architecture` skill (`.claude/skills/system-architecture/skill.md`) to reflect the change. Structural changes include:
+After **structural changes**, update the relevant `ai_docs/` file and the `system-architecture` skill. See `ai_docs/03-development-workflow.md` for what counts as structural.
 
-- Adding/removing/renaming API endpoints or routers
-- Adding/removing/renaming frontend components, hooks, or views
-- Changing database tables, columns, or indexes
-- Adding/removing environment variables or config fields
-- Changing Docker services, volumes, or build configuration
-- Modifying auth flow, middleware stack, or dependency injection
-- Adding/removing dependencies (backend or frontend)
-- Changing storage backends or data file formats
-
-**How:** Edit the relevant section in the skill file directly. Keep it concise — match the existing style (tables, short descriptions, no prose). Don't rewrite the whole file; just patch the affected section.
-
-**Skip updates for:** Bug fixes, CSS tweaks, copy changes, test additions, or refactors that don't change the public interface.
+For significant architectural decisions, append to `ai_docs/10-decisions-log.md`.
 
 ---
 
