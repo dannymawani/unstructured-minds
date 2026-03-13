@@ -8,10 +8,8 @@ Rate limits are configured per endpoint based on resource intensity:
 """
 
 from slowapi import Limiter
-from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 from starlette.requests import Request
-from starlette.responses import JSONResponse
 
 
 def _get_real_client_ip(request: Request) -> str:
@@ -49,34 +47,3 @@ RATE_LIMIT_SEARCH = "100/minute"
 RATE_LIMIT_CLAUDE_API = "30/minute"  # query/natural, chat - Claude API costs
 RATE_LIMIT_EXTRACTION = "20/minute"
 RATE_LIMIT_IMPORT = "5/minute"
-RATE_LIMIT_DEFAULT = "200/minute"  # For general endpoints
-
-
-def get_rate_limit_handler() -> callable:
-    """Get rate limit exceeded handler.
-
-    Returns:
-        Handler function for rate limit exceeded errors
-    """
-    async def rate_limit_exceeded_handler(
-        request: Request, exc: RateLimitExceeded
-    ) -> JSONResponse:
-        """Handle rate limit exceeded errors.
-
-        Args:
-            request: The request that exceeded the rate limit
-            exc: The rate limit exception
-
-        Returns:
-            JSON response with 429 status code
-        """
-        return JSONResponse(
-            status_code=429,
-            content={
-                "detail": "Rate limit exceeded",
-                "message": str(exc.detail),
-                "retry_after": exc.detail if hasattr(exc, "detail") else "60 seconds",
-            },
-        )
-
-    return rate_limit_exceeded_handler

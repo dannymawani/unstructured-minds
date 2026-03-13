@@ -137,41 +137,6 @@ def init_postgres_schema(pg) -> None:
         )
     """)
 
-    # Progress reviews table
-    pg.execute("""
-        CREATE TABLE IF NOT EXISTS progress_reviews (
-            id VARCHAR NOT NULL,
-            user_id UUID NOT NULL,
-            period_start DATE NOT NULL,
-            period_end DATE NOT NULL,
-            key_wins TEXT[],
-            challenges TEXT[],
-            work_highlights TEXT,
-            training_summary TEXT,
-            personal_wins TEXT[],
-            health_metrics JSONB,
-            goal_progress JSONB,
-            focus_next TEXT[],
-            created_at TIMESTAMPTZ DEFAULT NOW(),
-            updated_at TIMESTAMPTZ DEFAULT NOW(),
-            PRIMARY KEY (user_id, id)
-        )
-    """)
-
-    # File index table
-    pg.execute("""
-        CREATE TABLE IF NOT EXISTS file_index (
-            path VARCHAR NOT NULL,
-            user_id UUID NOT NULL,
-            filename VARCHAR NOT NULL,
-            extension VARCHAR,
-            size_bytes BIGINT,
-            modified_at TIMESTAMPTZ,
-            content_hash VARCHAR,
-            PRIMARY KEY (user_id, path)
-        )
-    """)
-
     # Extraction log table
     pg.execute("""
         CREATE TABLE IF NOT EXISTS extraction_log (
@@ -254,8 +219,6 @@ def _create_indexes(pg) -> None:
         "CREATE INDEX IF NOT EXISTS idx_pg_tasks_status ON tasks(user_id, status)",
         "CREATE INDEX IF NOT EXISTS idx_pg_kanban_status ON kanban_tasks(user_id, status)",
         "CREATE INDEX IF NOT EXISTS idx_pg_kanban_phase ON kanban_tasks(user_id, phase)",
-        "CREATE INDEX IF NOT EXISTS idx_pg_file_index_filename ON file_index(user_id, filename)",
-        "CREATE INDEX IF NOT EXISTS idx_pg_reviews_period ON progress_reviews(user_id, period_start)",
         "CREATE INDEX IF NOT EXISTS idx_pg_activities_date ON activities(user_id, date)",
         "CREATE INDEX IF NOT EXISTS idx_pg_activities_type ON activities(user_id, activity_type)",
         "CREATE INDEX IF NOT EXISTS idx_pg_kanban_updates_task ON kanban_task_updates(user_id, task_id)",

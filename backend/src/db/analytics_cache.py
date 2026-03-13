@@ -22,7 +22,6 @@ CACHE_TABLES = [
     "extraction_log",
     "kanban_tasks",
     "kanban_task_updates",
-    "progress_reviews",
 ]
 
 # DuckDB CREATE TABLE statements for the cache (no user_id — single-user local cache)
@@ -134,23 +133,6 @@ _DUCKDB_CACHE_SCHEMA = {
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """,
-    "progress_reviews": """
-        CREATE TABLE IF NOT EXISTS progress_reviews (
-            id VARCHAR PRIMARY KEY,
-            period_start DATE NOT NULL,
-            period_end DATE NOT NULL,
-            key_wins TEXT[],
-            challenges TEXT[],
-            work_highlights TEXT,
-            training_summary TEXT,
-            personal_wins TEXT[],
-            health_metrics JSON,
-            goal_progress JSON,
-            focus_next TEXT[],
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """,
 }
 
 # Columns to SELECT from Postgres for each table (excludes user_id)
@@ -163,7 +145,6 @@ _PG_SELECT_COLUMNS = {
     "extraction_log": "id, file_path, file_hash, extracted_at, success, error_message",
     "kanban_tasks": "id, title, phase, priority, status, branch, depends_on, description, content, deadline, created_at, completed_at",
     "kanban_task_updates": "id, task_id, note, created_at",
-    "progress_reviews": "id, period_start, period_end, key_wins, challenges, work_highlights, training_summary, personal_wins, health_metrics, goal_progress, focus_next, created_at, updated_at",
 }
 
 
@@ -175,10 +156,6 @@ class AnalyticsCacheManager:
         self._duckdb = duckdb
         self._user_id: Optional[str] = None
         self._refresh_task: Optional[asyncio.Task] = None
-
-    def set_user(self, user_id: str) -> None:
-        """Set the active user for cache refresh."""
-        self._user_id = user_id
 
     def init_cache_schema(self) -> None:
         """Create DuckDB tables for the analytics cache."""

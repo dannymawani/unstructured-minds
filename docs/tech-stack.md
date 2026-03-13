@@ -35,8 +35,8 @@ Unstructured Minds uses a modern, containerized web application stack that trans
 ├──────────────────────────────────────────────────────────────────┤
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐   │
 │  │ DuckDB       │  │ Anthropic    │  │ Filesystem           │   │
-│  │ (Extracted   │  │ API Client   │  │ (Watchdog for        │   │
-│  │  Data)       │  │ (Claude)     │  │  file changes)       │   │
+│  │ (Extracted   │  │ API Client   │  │ (Note storage)       │   │
+│  │  Data)       │  │ (Claude)     │  │                      │   │
 │  └──────────────┘  └──────────────┘  └──────────────────────┘   │
 └──────────────────────────────────────────────────────────────────┘
 ```
@@ -282,17 +282,6 @@ class ExerciseLog(BaseModel):
 
 **Connection**: Bulk extraction endpoint returns `text/event-stream` response. Frontend listens via `EventSource` API.
 
-### watchdog
-
-**Library**: watchdog (file system watching)
-
-**Why**: Monitor file system for changes:
-- Detect new/modified daily note files
-- Auto-ingest notes into DuckDB
-- Background thread watches `Daily-Notes/` directory
-
-**Usage**: Optional feature for auto-sync from external Obsidian vault.
-
 ---
 
 ## Infrastructure
@@ -304,7 +293,7 @@ Infrastructure spans development, testing, and production environments.
 **Version**: Compose file format v3+
 
 **Why**: Multi-container orchestration:
-- Defines services (frontend, backend, database)
+- Defines services (frontend, backend)
 - Isolates dependencies (Python venv, Node modules)
 - Development and production parity
 - Easy local development setup

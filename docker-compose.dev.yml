@@ -64,7 +64,7 @@ services:
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile
     volumes:
       # Mount source code for hot reload
       - ./frontend/src:/app/src:ro
