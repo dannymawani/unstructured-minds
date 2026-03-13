@@ -143,6 +143,7 @@ export function FileTree({
       }
       const data = await response.json()
       const tree = transformDailyNotes(buildTree(data.files), showMonthNames)
+        .filter(node => node.path !== 'Quick-Notes' && !/^\d{4}$/.test(node.name))
       setFiles(tree)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load files')
