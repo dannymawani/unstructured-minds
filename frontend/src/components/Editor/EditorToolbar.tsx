@@ -15,7 +15,8 @@ import {
 } from '@milkdown/kit/preset/commonmark'
 import { toggleStrikethroughCommand, insertTableCommand } from '@milkdown/kit/preset/gfm'
 import { isInTable, addRowAfter, addColumnAfter, deleteRow, deleteColumn, deleteTable } from '@milkdown/prose/tables'
-import { Table2, Plus, Minus, Trash2, Rows3, Columns3 } from 'lucide-react'
+import { Table2, Plus, Minus, Trash2, Rows3, Columns3, CheckSquare } from 'lucide-react'
+import { insertTaskList } from './EditorPlugins'
 
 function ToolbarButton({
   label,
@@ -226,6 +227,18 @@ export function EditorToolbar() {
       {/* Lists */}
       <ToolbarButton label="&bull;" title="Bullet List" onAction={() => runCommand(wrapInBulletListCommand.key)} />
       <ToolbarButton label="1." title="Numbered List" onAction={() => runCommand(wrapInOrderedListCommand.key)} />
+      <button
+        className="toolbar-btn"
+        title="Task List"
+        onMouseDown={(e) => {
+          e.preventDefault()
+          if (loading) return
+          const editor = getEditor()
+          if (editor) insertTaskList(editor)
+        }}
+      >
+        <CheckSquare size={14} />
+      </button>
 
       <Divider />
 

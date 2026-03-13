@@ -561,6 +561,45 @@ class ExtractionPipeline:
                 logger.warning("auto_label_insert_failed", key=key, error=str(e))
 
     @staticmethod
+    def _parse_tasks_from_markdown(content: str) -> list[dict[str, Any]]:
+        """Parse tasks directly from markdown checkbox syntax.
+
+        Only lines matching `- [ ] text` or `- [x] text` (or `[X]`) are
+        recognised as tasks.  This replaces the previous AI-based extraction
+        so the user can log freely without unintended task creation.
+
+        Optionally picks up the nearest preceding `## Heading` as a category.
+        """
+        tasks: list[dict[str, Any]] = []
+        current_heading: str | None = None
+
+        for line in content.splitlines():
+            # Track the most recent H2/H3 heading for category
+            heading_match = re.match(r"^#{2,3}\s+(.+)", line)
+            if heading_match:
+                current_heading = heading_match.group(1).strip()
+                # Strip emoji prefix if present (e.g. "🎯 Today's Focus")
+                current_heading = re.sub(r"^[\U0001f300-\U0001fad0\u2600-\u27bf]\s*", "", current_heading)
+                continue
+
+            # Match task checkboxes: - [ ] text  or  - [x] text  or  - [X] text
+            task_match = re.match(r"^[-*]\s+\[([ xX])\]\s+(.+)", line)
+            if task_match:
+                checked = task_match.group(1).lower() == "x"
+                description = task_match.group(2).strip()
+                if not description:
+                    continue
+                task: dict[str, Any] = {
+                    "description": description,
+                    "status": "done" if checked else "todo",
+                }
+                if current_heading:
+                    task["category"] = current_heading
+                tasks.append(task)
+
+        return tasks
+
+    @staticmethod
     def _normalize_task_desc(desc: str) -> str:
         """Normalize a task description for dedup comparison.
 
@@ -1034,10 +1073,13 @@ class ExtractionPipeline:
                     # Auto-classify new exercises that have no muscle groups
                     await self._auto_label_new_exercises(data["activities"])
 
-                if data.get("tasks") and self._is_daily_note(file_path):
-                    records_inserted["tasks"] = self._store_tasks(
-                        date, data["tasks"], file_path
-                    )
+                # Parse tasks directly from markdown checkboxes (not AI)
+                if self._is_daily_note(file_path):
+                    parsed_tasks = self._parse_tasks_from_markdown(clean_content)
+                    if parsed_tasks:
+                        records_inserted["tasks"] = self._store_tasks(
+                            date, parsed_tasks, file_path
+                        )
 
                 if data.get("meals"):
                     records_inserted["meals"] = self._store_meals(

@@ -117,13 +117,16 @@ class TestSchemas:
             get_schema("unknown")
 
     def test_combined_schema_has_all_fields(self):
-        """Test combined schema includes all extraction types."""
+        """Test combined schema includes all extraction types.
+
+        Tasks are parsed directly from markdown checkboxes, not by AI.
+        """
         schema = get_schema("combined")
         props = schema["properties"]
         assert "date" in props
         assert "daily_metrics" in props
         assert "activities" in props
-        assert "tasks" in props
+        assert "tasks" not in props  # parsed from markdown, not AI
         assert "meals" in props
 
 

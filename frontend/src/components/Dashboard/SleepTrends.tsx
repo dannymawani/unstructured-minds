@@ -114,13 +114,15 @@ export function SleepTrends({
 
   // Tick labels on X axis (show ~6 evenly spaced)
   const xTickCount = Math.min(6, n);
-  const xTicks = Array.from({ length: xTickCount }, (_, i) => {
-    const idx = Math.round((i / (xTickCount - 1)) * (n - 1));
-    return {
-      x: sx(idx, n),
-      label: new Date(sleepData[idx].date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-    };
-  });
+  const xTicks = xTickCount <= 1
+    ? (n > 0 ? [{ x: sx(0, n), label: new Date(sleepData[0].date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) }] : [])
+    : Array.from({ length: xTickCount }, (_, i) => {
+        const idx = Math.round((i / (xTickCount - 1)) * (n - 1));
+        return {
+          x: sx(idx, n),
+          label: new Date(sleepData[idx].date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        };
+      });
 
   const hoveredEntry = hovered !== null ? sleepData[hovered] : null;
 

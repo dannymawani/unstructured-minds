@@ -15,8 +15,9 @@ vi.mock('@tanstack/react-virtual', () => ({
   }),
 }))
 
-import { FileTree, buildTree, transformDailyNotes } from '../FileTree'
+import { FileTree, transformDailyNotes } from '../FileTree'
 import { FileTreeItem, type FileNode } from '../FileTreeItem'
+import { buildTree } from '../treeUtils'
 
 describe('FileTreeItem', () => {
   const mockFolder: FileNode = {
@@ -300,7 +301,8 @@ describe('FileTree', () => {
 
     fireEvent.click(screen.getByTitle('Refresh'))
 
-    expect(global.fetch).toHaveBeenCalledTimes(2)
+    // 3 calls: mount settings fetch + mount file fetch + refresh file fetch
+    expect(global.fetch).toHaveBeenCalledTimes(3)
   })
 })
 
@@ -367,7 +369,7 @@ describe('transformDailyNotes', () => {
   })
 
   it('uses human-readable month names as displayName', () => {
-    const result = transformDailyNotes(makeDailyNotesTree())
+    const result = transformDailyNotes(makeDailyNotesTree(), true)
     const dailyNotes = result.find((n) => n.path === 'Daily-Notes')!
     const yearNode2026 = dailyNotes.children!.find((n) => n.name === '2026')!
 
@@ -388,7 +390,7 @@ describe('transformDailyNotes', () => {
   })
 
   it('sorts years newest first, months newest first', () => {
-    const result = transformDailyNotes(makeDailyNotesTree())
+    const result = transformDailyNotes(makeDailyNotesTree(), true)
     const dailyNotes = result.find((n) => n.path === 'Daily-Notes')!
 
     // Non-month children come first, then year nodes newest-first
