@@ -2,26 +2,9 @@
 
 import logging
 import sys
-from typing import Any
 
 import structlog
-from structlog.typing import EventDict, Processor
-
-
-def add_log_level(
-    logger: logging.Logger, method_name: str, event_dict: EventDict
-) -> EventDict:
-    """Add the log level to the event dict."""
-    event_dict["level"] = method_name.upper()
-    return event_dict
-
-
-def drop_color_message_key(
-    logger: logging.Logger, method_name: str, event_dict: EventDict
-) -> EventDict:
-    """Remove color_message key that uvicorn adds."""
-    event_dict.pop("color_message", None)
-    return event_dict
+from structlog.typing import Processor
 
 
 def configure_logging(
@@ -115,24 +98,3 @@ def get_logger(name: str | None = None) -> structlog.stdlib.BoundLogger:
         Configured structlog logger
     """
     return structlog.get_logger(name)
-
-
-# Pre-configured loggers for common modules
-def get_api_logger() -> structlog.stdlib.BoundLogger:
-    """Get logger for API endpoints."""
-    return get_logger("api")
-
-
-def get_db_logger() -> structlog.stdlib.BoundLogger:
-    """Get logger for database operations."""
-    return get_logger("db")
-
-
-def get_extraction_logger() -> structlog.stdlib.BoundLogger:
-    """Get logger for data extraction."""
-    return get_logger("extraction")
-
-
-def get_watcher_logger() -> structlog.stdlib.BoundLogger:
-    """Get logger for file watcher."""
-    return get_logger("watcher")
