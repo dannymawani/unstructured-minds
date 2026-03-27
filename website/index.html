@@ -9,9 +9,9 @@
   <meta property="og:description" content="Like Apple Notes for unstructured people. Write freely, AI structures it, query everything.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://unstructuredminds.com">
-  <meta property="og:image" content="https://unstructuredminds.com/assets/images/um_logo.svg">
+  <meta property="og:image" content="https://unstructuredminds.cum-logo.svg">
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:image" content="https://unstructuredminds.com/assets/images/um_logo.svg">
+  <meta name="twitter:image" content="https://unstructuredminds.cum-logo.svg">
   <link rel="icon" type="image/svg+xml" href="um-logo.svg">
   <link rel="apple-touch-icon" href="um-logo.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -191,6 +191,7 @@
       transition: color 0.2s;
     }
     .nav-links a:hover { color: var(--text-primary); }
+    .mobile-menu-actions { display: none; }
     .nav-actions {
       display: flex;
       align-items: center;
@@ -924,17 +925,28 @@
         gap: 32px;
       }
       .nav-links { display: none; }
+      .nav-actions { display: none; }
+      section { padding: 80px 0; }
+      .see-it-section { padding: 80px 0; }
     }
     @media (max-width: 600px) {
       .hero { padding: 100px 0 60px; min-height: auto; }
       .hero h1 { font-size: 36px; }
       .hero-sub { font-size: 16px; }
-      .hero-actions { flex-direction: column; align-items: flex-start; }
+      .hero-actions { flex-direction: column; align-items: stretch; }
+      .hero-actions .btn-lg { justify-content: center; }
+      .features-grid { grid-template-columns: 1fr; }
       .use-cases-grid { flex-direction: column; }
       .cta-box { padding: 48px 24px; }
       .footer-grid { grid-template-columns: 1fr; gap: 28px; }
       .footer-bottom { flex-direction: column; gap: 12px; text-align: center; }
       .container { padding: 0 16px; }
+      section { padding: 60px 0; }
+      .see-it-section { padding: 60px 0; }
+      .section-title { font-size: 28px; }
+      .comparison-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      .comparison-table { min-width: 540px; }
+      .pricing-grid { max-width: 100%; }
     }
 
     /* ===================== MOBILE MENU ===================== */
@@ -945,9 +957,43 @@
       color: var(--text-primary);
       cursor: pointer;
       padding: 8px;
+      z-index: 101;
     }
     @media (max-width: 900px) {
       .mobile-toggle { display: block; }
+      .nav-links.show {
+        display: flex;
+        flex-direction: column;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(6, 13, 27, 0.95);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        z-index: 100;
+        align-items: center;
+        justify-content: center;
+        gap: 24px;
+        padding: 24px;
+      }
+      .nav-links.show a {
+        font-size: 20px;
+        color: var(--text-primary);
+      }
+      .nav-links.show .mobile-menu-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-top: 16px;
+        width: 100%;
+        max-width: 280px;
+      }
+      .nav-links.show .mobile-menu-actions .btn {
+        justify-content: center;
+        width: 100%;
+      }
     }
 
     /* ===================== MOCKUP STYLES ===================== */
@@ -1427,19 +1473,23 @@
         <div class="nav-logo-mark"><img src="um-logo.svg" alt="Unstructured Minds"></div>
         <span class="nav-logo-text">Unstructured Minds</span>
       </a>
-      <ul class="nav-links">
+      <ul class="nav-links" id="nav-links">
         <li><a href="#how-it-works">How It Works</a></li>
         <li><a href="#features">Features</a></li>
         <li><a href="#see-it">Demo</a></li>
         <li><a href="#compare">Compare</a></li>
         <li><a href="#pricing">Pricing</a></li>
         <li><a href="https://github.com/unstructuredminds/unstructured-minds" target="_blank" rel="noopener">GitHub</a></li>
+        <li class="mobile-menu-actions">
+          <a href="#" class="btn btn-ghost">Log in</a>
+          <a href="#" class="btn btn-primary">Get Started</a>
+        </li>
       </ul>
       <div class="nav-actions">
         <a href="#" class="btn btn-ghost">Log in</a>
         <a href="#" class="btn btn-primary">Get Started</a>
       </div>
-      <button class="mobile-toggle" onclick="document.querySelector('.nav-links').classList.toggle('show')" aria-label="Menu">
+      <button class="mobile-toggle" id="mobile-toggle" aria-label="Menu">
         <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
     </div>
@@ -2016,6 +2066,7 @@
         <p class="section-subtitle" style="margin: 0 auto;">Other tools make you choose between free-form writing and structured data. We give you both.</p>
       </div>
 
+      <div class="comparison-wrapper">
       <table class="comparison-table reveal reveal-delay-1">
         <thead>
           <tr>
@@ -2085,6 +2136,7 @@
           </tr>
         </tbody>
       </table>
+      </div>
     </div>
   </section>
 
@@ -2322,12 +2374,22 @@
       demoContent.appendChild(div);
     });
 
-    // -- SMOOTH SCROLL FOR NAV LINKS --
+    // -- MOBILE MENU --
+    const mobileToggle = document.getElementById('mobile-toggle');
+    const navLinks = document.getElementById('nav-links');
+    mobileToggle.addEventListener('click', () => {
+      navLinks.classList.toggle('show');
+      document.body.style.overflow = navLinks.classList.contains('show') ? 'hidden' : '';
+    });
+
+    // -- SMOOTH SCROLL FOR NAV LINKS (+ close mobile menu) --
     document.querySelectorAll('a[href^="#"]').forEach(anchor => {
       anchor.addEventListener('click', function(e) {
         const targetId = this.getAttribute('href');
         if (targetId === '#') return;
         e.preventDefault();
+        navLinks.classList.remove('show');
+        document.body.style.overflow = '';
         const target = document.querySelector(targetId);
         if (target) {
           target.scrollIntoView({ behavior: 'smooth', block: 'start' });
