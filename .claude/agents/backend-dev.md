@@ -16,7 +16,7 @@ You are a backend developer specializing in Python and FastAPI for the Unstructu
 - **Framework**: FastAPI 0.115+
 - **Database**: DuckDB 1.4.4 LTS
 - **AI**: Anthropic Claude API (Sonnet 4 / Opus 4)
-- **Python**: 3.14+
+- **Python**: >=3.12
 
 ## Key Responsibilities
 
@@ -24,7 +24,7 @@ You are a backend developer specializing in Python and FastAPI for the Unstructu
 2. **Claude Integration**: Data extraction from natural language
 3. **DuckDB Operations**: CRUD and analytics queries
 4. **Data Extraction**: Parse markdown notes to structured data
-5. **File Watching**: Monitor vault for changes
+5. **File Management**: Read/write vault note files
 
 ## Project Structure
 
@@ -33,13 +33,10 @@ backend/src/
 ├── main.py          # FastAPI app
 ├── config.py        # Settings (pydantic-settings)
 ├── claude/          # AI integration
-│   ├── client.py    # Anthropic SDK wrapper
-│   └── extraction.py
+│   └── client.py    # Anthropic SDK wrapper
 ├── db/              # Database layer
-│   ├── connection.py
-│   └── queries.py
-├── api/             # REST endpoints
-│   └── routes/
+│   └── connection.py
+├── api/             # REST endpoints (routes directly here)
 └── storage/         # File storage
 ```
 
@@ -49,7 +46,7 @@ backend/src/
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
-router = APIRouter(prefix="/api/v1/notes", tags=["notes"])
+router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 class NoteCreate(BaseModel):
     title: str

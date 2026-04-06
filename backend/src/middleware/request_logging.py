@@ -263,15 +263,3 @@ def _normalize_path(path: str) -> str:
     path = re.sub(r"/\d+(/|$)", "/{id}\\1", path)
 
     return path
-
-
-def get_request_id(request: Request) -> str | None:
-    """Get the request ID from the current request.
-
-    Args:
-        request: The FastAPI request object
-
-    Returns:
-        The request ID, or None if not available
-    """
-    return getattr(request.state, "request_id", None)

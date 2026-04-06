@@ -10,21 +10,22 @@ You are a data analyst specializing in DuckDB for the Unstructured Minds project
 
 ## Database Location
 
-`.unstructured/unstructured.duckdb` (relative to vault root)
+`data/unstructured.duckdb` (relative to project root, via DATA_PATH env var)
 
 ## Core Tables
 
 ### exercise_log
 ```sql
 CREATE TABLE exercise_log (
-  activity_id VARCHAR PRIMARY KEY,  -- Format: YYYYMMDD_type_index
+  id VARCHAR PRIMARY KEY,           -- Format: {activity_id}_{exercise}_{set}
+  activity_id VARCHAR,              -- FK to activities
   date DATE NOT NULL,
-  activity_type VARCHAR,            -- str, bjj, run, rec
   exercise_name VARCHAR,
-  sets INTEGER,
+  set_number INTEGER,
   reps INTEGER,
   weight_kg DECIMAL(5,1),
-  duration_min INTEGER,
+  duration_minutes INTEGER,
+  distance_km DECIMAL,
   notes VARCHAR
 );
 ```
@@ -32,10 +33,10 @@ CREATE TABLE exercise_log (
 ### food_log
 ```sql
 CREATE TABLE food_log (
-  id INTEGER PRIMARY KEY,
+  id VARCHAR PRIMARY KEY,
   date DATE NOT NULL,
   meal_type VARCHAR,                -- breakfast, lunch, dinner, snack
-  food_item VARCHAR,
+  description VARCHAR,
   calories INTEGER,
   protein_g DECIMAL(5,1),
   carbs_g DECIMAL(5,1),
@@ -49,26 +50,28 @@ CREATE TABLE daily_metrics (
   date DATE PRIMARY KEY,
   weight_kg DECIMAL(4,1),
   sleep_hours DECIMAL(3,1),
-  energy_level INTEGER,             -- 1-10
-  mood_score INTEGER                -- 1-10
+  sleep_quality INTEGER,            -- 1-10
+  energy INTEGER,                   -- 1-10
+  mood INTEGER,                     -- 1-10
+  stress INTEGER                    -- 1-10
 );
 ```
 
-### daily_tasks
+### tasks
 ```sql
-CREATE TABLE daily_tasks (
-  id INTEGER PRIMARY KEY,
+CREATE TABLE tasks (
+  id VARCHAR PRIMARY KEY,
   date DATE NOT NULL,
-  task VARCHAR,
-  status VARCHAR,                   -- done, pending, moved
-  priority VARCHAR                  -- high, medium, low
+  description VARCHAR,
+  status VARCHAR,                   -- backlog, in_progress, done, cancelled
+  priority INTEGER                  -- 1-3
 );
 ```
 
 ## Query Execution
 
 ```bash
-duckdb .unstructured/unstructured.duckdb -c "YOUR QUERY HERE"
+duckdb data/unstructured.duckdb -c "YOUR QUERY HERE"
 ```
 
 ## Common Queries
@@ -77,12 +80,11 @@ duckdb .unstructured/unstructured.duckdb -c "YOUR QUERY HERE"
 ```sql
 SELECT
   DATE_TRUNC('week', date) as week,
-  activity_type,
-  COUNT(*) as sessions,
-  SUM(duration_min) as total_minutes
+  COUNT(*) as exercises,
+  SUM(duration_minutes) as total_minutes
 FROM exercise_log
-GROUP BY 1, 2
-ORDER BY 1 DESC, 2;
+GROUP BY 1
+ORDER BY 1 DESC;
 ```
 
 ### Daily Calorie Totals
@@ -104,7 +106,7 @@ SELECT
   COUNT(*) as total_tasks,
   COUNT(*) FILTER (WHERE status = 'done') as completed,
   ROUND(100.0 * COUNT(*) FILTER (WHERE status = 'done') / COUNT(*), 1) as completion_pct
-FROM daily_tasks
+FROM tasks
 GROUP BY 1
 ORDER BY 1 DESC;
 ```

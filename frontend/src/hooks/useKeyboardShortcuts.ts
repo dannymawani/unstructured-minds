@@ -62,24 +62,3 @@ export function useKeyboardShortcuts(
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [handleKeyDown])
 }
-
-/**
- * Returns the display string for a keyboard shortcut (e.g., "Cmd+K")
- */
-export function getShortcutDisplay(shortcut: KeyboardShortcut): string {
-  const parts: string[] = []
-  const isMac = typeof navigator !== 'undefined' && navigator.platform.includes('Mac')
-
-  if (shortcut.ctrl || shortcut.meta) {
-    parts.push(isMac ? 'Cmd' : 'Ctrl')
-  }
-  if (shortcut.shift) {
-    parts.push('Shift')
-  }
-  if (shortcut.alt) {
-    parts.push(isMac ? 'Option' : 'Alt')
-  }
-  parts.push(shortcut.key.toUpperCase())
-
-  return parts.join('+')
-}

@@ -105,6 +105,4 @@ Use the chat interface to ask questions:
 
 - `README.md` - Project overview
 - `docs/` - Detailed documentation
-- `docs/api/` - API reference
-- `CONTRIBUTING.md` - Contributor guide
 - `CHANGELOG.md` - Version history

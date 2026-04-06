@@ -1,4 +1,11 @@
-import type { FileNode } from './FileTreeItem'
+export interface FileNode {
+  path: string
+  name: string
+  isDirectory: boolean
+  children?: FileNode[]
+  isVirtual?: boolean
+  displayName?: string
+}
 
 export interface FileInfo {
   path: string

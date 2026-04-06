@@ -178,25 +178,6 @@ def init_database(db_path: Path | str) -> duckdb.DuckDBPyConnection:
         )
     """)
 
-    # Progress reviews table (bi-weekly life profile reviews)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS progress_reviews (
-            id VARCHAR PRIMARY KEY,
-            period_start DATE NOT NULL,
-            period_end DATE NOT NULL,
-            key_wins TEXT[],
-            challenges TEXT[],
-            work_highlights TEXT,
-            training_summary TEXT,
-            personal_wins TEXT[],
-            health_metrics JSON,
-            goal_progress JSON,
-            focus_next TEXT[],
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-
     # Community exercises table (shared anonymous exercise contributions)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS community_exercises (
@@ -207,18 +188,6 @@ def init_database(db_path: Path | str) -> duckdb.DuckDBPyConnection:
             category VARCHAR DEFAULT 'other',
             recovery_hours INTEGER DEFAULT 48,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-
-    # File index table for fast file lookups
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS file_index (
-            path VARCHAR PRIMARY KEY,
-            filename VARCHAR NOT NULL,
-            extension VARCHAR,
-            size_bytes BIGINT,
-            modified_at TIMESTAMP,
-            content_hash VARCHAR
         )
     """)
 
@@ -297,23 +266,6 @@ def _create_indexes(conn: duckdb.DuckDBPyConnection) -> None:
     conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_kanban_phase
         ON kanban_tasks(phase)
-    """)
-
-    # Index on file_index for file search
-    conn.execute("""
-        CREATE INDEX IF NOT EXISTS idx_file_index_filename
-        ON file_index(filename)
-    """)
-
-    conn.execute("""
-        CREATE INDEX IF NOT EXISTS idx_file_index_extension
-        ON file_index(extension)
-    """)
-
-    # Index on progress_reviews for timeline queries
-    conn.execute("""
-        CREATE INDEX IF NOT EXISTS idx_reviews_period
-        ON progress_reviews(period_start)
     """)
 
     # Index on activities for dashboard queries

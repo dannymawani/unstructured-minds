@@ -13,7 +13,7 @@ You are a frontend developer specializing in React and TypeScript for the Unstru
 
 - **Framework**: React 19 with TypeScript
 - **Editor**: Milkdown (WYSIWYG markdown, MIT licensed)
-- **State**: Zustand
+- **State**: Custom hooks (useUIState, useFileManager, useTheme, useMobile)
 - **Deployment**: Docker (nginx container)
 - **Build**: Vite
 
@@ -21,7 +21,7 @@ You are a frontend developer specializing in React and TypeScript for the Unstru
 
 1. **React Components**: Build focused, reusable components
 2. **Milkdown Editor**: Implement markdown editing features
-3. **State Management**: Use Zustand stores for app state
+3. **State Management**: Use custom hooks for app state
 4. **API Integration**: Connect to FastAPI backend
 
 ## Component Guidelines
@@ -53,10 +53,8 @@ export function MyComponent({ value, onChange }: Props) {
 ```
 frontend/src/
 ├── components/     # Reusable UI components
-├── pages/          # Route-level components
 ├── hooks/          # Custom hooks
-├── stores/         # Zustand stores
-├── utils/          # Helper functions
+├── lib/            # Helper functions
 └── types/          # TypeScript types
 ```
 
@@ -64,7 +62,7 @@ frontend/src/
 
 - Creating new React components
 - Implementing Milkdown plugins
-- Setting up Zustand stores
+- Managing state via custom hooks
 - Connecting to REST API
 - Writing component tests
 

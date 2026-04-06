@@ -79,6 +79,14 @@ After **structural changes**, update the relevant `ai_docs/` file and the `syste
 
 For significant architectural decisions, append to `ai_docs/10-decisions-log.md`.
 
+## Ideas Bank → `ideas/`
+
+Future plans and feature ideas live in `ideas/`. Each idea gets its own `.md` file with status, rationale, and phased implementation notes.
+
+| Idea | Summary |
+|------|---------|
+| `multimodal-content-support` | Image paste, PDF upload, vision-based extraction, binary storage |
+
 ---
 
 Skills and agents auto-discovered from `.claude/skills/` and `.claude/agents/`.

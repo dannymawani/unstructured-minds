@@ -33,8 +33,8 @@ Plan → Approve → Implement → Test → Review → Deploy
 - No direct commits to `main`
 
 ### 4. Test
-- Run all tests before committing: `/test`
-- Backend: `pytest` in `backend/tests/`
+- Run all tests before committing
+- Backend: `cd backend && pytest`
 - Frontend: `vitest` in `frontend/`
 - Add tests for new functionality
 - Verify Docker build: `docker compose -f docker-compose.dev.yml build`
@@ -81,7 +81,7 @@ Before starting any implementation task, verify:
 
 ## Commit Conventions
 
-Use the `/commit` skill for well-structured commits. General rules:
+General rules:
 
 - Imperative mood: "Add feature" not "Added feature"
 - Short subject line (< 72 chars)
@@ -93,9 +93,9 @@ Use the `/commit` skill for well-structured commits. General rules:
 | Action | Command |
 |--------|---------|
 | Start work | `git checkout -b feature/{name}` |
-| Run tests | `/test` |
+| Run tests | `cd backend && pytest` / `cd frontend && npm test` |
 | Review code | `/code-review` |
-| Commit | `/commit` |
+| Commit | `git commit` |
 | Create PR | `gh pr create` |
 
 ## Feature Branches for Upcoming Work
