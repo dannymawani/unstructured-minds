@@ -62,7 +62,7 @@ async def note_assist(
     if not claude.is_configured:
         raise HTTPException(
             status_code=503,
-            detail="Claude API not configured. Set ANTHROPIC_API_KEY environment variable.",
+            detail="LLM not configured. Set LLM_API_KEY or ANTHROPIC_API_KEY.",
         )
 
     # Convert image models to dicts

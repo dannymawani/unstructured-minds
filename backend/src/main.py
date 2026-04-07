@@ -30,7 +30,7 @@ from .api.note_assist import router as note_assist_router
 from .api.chat import router as chat_router
 from .api.exercises import router as exercises_router
 from .api.onboarding import router as onboarding_router
-from .claude import ClaudeClient
+from .llm import LLMClient
 from .db import DatabaseManager, PostgresManager, init_postgres_schema
 from .db.analytics_cache import AnalyticsCacheManager
 from .extraction.exercise_matcher import ExerciseMatcher
@@ -57,7 +57,7 @@ async def lifespan(app: FastAPI):
         "application_starting",
         vault_path=str(settings.vault_path),
         data_path=str(settings.data_path),
-        claude_enabled=settings.claude_enabled,
+        llm_enabled=settings.llm_enabled,
         debug=settings.debug,
         mode="cloud" if settings.is_cloud_mode else "local",
     )
@@ -131,10 +131,10 @@ async def lifespan(app: FastAPI):
     app.state.datastore = DataStore(data_storage)
     app.state.analytics_cache_manager = analytics_cache_manager
 
-    # Initialize Claude client
-    claude = ClaudeClient()
-    app.state.claude = claude
-    logger.info("claude_client_initialized", configured=claude.is_configured)
+    # Initialize LLM client (supports Anthropic, OpenAI, Ollama, etc.)
+    llm = LLMClient()
+    app.state.claude = llm  # Keep attribute name for backward compat with API deps
+    logger.info("llm_client_initialized", configured=llm.is_configured, provider=llm.provider)
 
     # Initialize exercise matcher and run normalization
     from pathlib import Path
@@ -172,7 +172,7 @@ async def lifespan(app: FastAPI):
         await normalize_exercises(
             db=app.state.db,
             matcher=exercise_matcher,
-            claude=claude,
+            claude=llm,
             cache_path=settings.data_path / "ai_exercise_cache.json",
             user_settings_store=user_settings_store,
         )

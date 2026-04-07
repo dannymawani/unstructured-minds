@@ -50,7 +50,7 @@ class TestGetSettings:
         data = response.json()
         assert "vault_path" in data
         assert "data_path" in data
-        assert "claude_enabled" in data
+        assert "llm_enabled" in data
         assert "api_key_set" in data
 
     def test_api_key_not_exposed(self, client):

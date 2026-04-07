@@ -1,5 +1,8 @@
-"""Claude API client for data extraction and queries."""
+"""Claude API client — now a thin re-export from the provider-agnostic llm module."""
 
-from .client import ClaudeClient
+from ..llm import LLMClient
 
-__all__ = ["ClaudeClient"]
+# Backward compatibility alias
+ClaudeClient = LLMClient
+
+__all__ = ["ClaudeClient", "LLMClient"]

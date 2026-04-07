@@ -1,21 +1,43 @@
 # =============================================================================
-# Unstructured Minds - Production Docker Compose
+# Unstructured Minds - Docker Compose
 # =============================================================================
 #
-# Usage:
-#   docker compose up -d              # Start all services
-#   docker compose down               # Stop all services
-#   docker compose logs -f            # View logs
-#   docker compose ps                 # Check status
+# Quick Start:
+#   docker compose up                                # Local mode (DuckDB, zero deps)
+#   docker compose --profile postgres up             # With bundled Postgres
+#   docker compose up  (with DATABASE_URL in .env)   # BYO external Postgres
 #
 # Prerequisites:
 #   1. Copy .env.example to .env
-#   2. Set ANTHROPIC_API_KEY in .env (optional, for AI features)
-#   3. Configure VAULT_PATH and DATA_PATH if using custom locations
+#   2. (Optional) Set LLM_API_KEY for AI features
 #
 # =============================================================================
 
 services:
+  # ---------------------------------------------------------------------------
+  # Postgres — only starts with: docker compose --profile postgres up
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    profiles: ["postgres"]
+    container_name: unstructured-minds-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-um}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-um_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-unstructured_minds}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-um}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - app-network
+
   # ---------------------------------------------------------------------------
   # Backend - FastAPI Python Application
   # ---------------------------------------------------------------------------
@@ -32,14 +54,26 @@ services:
       # Mount data directory for DuckDB and CSVs
       - ${DATA_PATH:-./data}:/app/data:rw
     environment:
+      # AI (optional — app works without it)
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-      - USE_CLOUD=${USE_CLOUD:-true}
+      - LLM_PROVIDER=${LLM_PROVIDER:-}
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_MODEL_FAST=${LLM_MODEL_FAST:-}
+      - LLM_MODEL_SMART=${LLM_MODEL_SMART:-}
+      # Storage mode
+      - USE_CLOUD=${USE_CLOUD:-false}
       - DATABASE_URL=${DATABASE_URL:-}
+      # Paths
       - VAULT_PATH=/app/vault
       - DATA_PATH=/app/data
+      # Server
       - HOST=0.0.0.0
       - PORT=8000
       - DEBUG=${DEBUG:-false}
+      # Auth (optional)
+      - AUTH_MODE=${AUTH_MODE:-none}
+      - BASIC_AUTH_USERNAME=${BASIC_AUTH_USERNAME:-}
+      - BASIC_AUTH_PASSWORD=${BASIC_AUTH_PASSWORD:-}
       - CLERK_SECRET_KEY=${CLERK_SECRET_KEY:-}
       - CLERK_DOMAIN=${CLERK_DOMAIN:-}
     healthcheck:
@@ -86,9 +120,7 @@ networks:
     driver: bridge
 
 # =============================================================================
-# Named Volumes (optional, for Docker-managed storage)
+# Volumes
 # =============================================================================
-# Uncomment these if you prefer Docker-managed volumes over bind mounts:
-# volumes:
-#   vault-data:
-#   app-data:
+volumes:
+  pgdata:

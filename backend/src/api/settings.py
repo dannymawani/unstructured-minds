@@ -111,8 +111,8 @@ class SettingsResponse(BaseModel):
 
     vault_path: str
     data_path: str
-    claude_enabled: bool
-    claude_configured: bool
+    llm_enabled: bool
+    llm_configured: bool
     api_key_set: bool
     theme: str
     daily_note_path_template: str
@@ -143,9 +143,9 @@ async def get_settings(request: Request, user_id: str = Depends(get_user_id), da
     return SettingsResponse(
         vault_path=str(settings.vault_path),
         data_path=str(settings.data_path),
-        claude_enabled=settings.claude_enabled,
-        claude_configured=claude.is_configured if claude else False,
-        api_key_set=bool(settings.anthropic_api_key),
+        llm_enabled=settings.llm_enabled,
+        llm_configured=claude.is_configured if claude else False,
+        api_key_set=bool(settings.llm_api_key or settings.anthropic_api_key),
         theme=stored.get("theme", "dark"),
         daily_note_path_template=stored.get("daily_note_path_template", DEFAULT_DAILY_NOTE_TEMPLATE),
         show_month_names=stored.get("show_month_names", False),
@@ -177,9 +177,9 @@ async def update_settings(request: Request, update: SettingsUpdateRequest, user_
     return SettingsResponse(
         vault_path=str(settings.vault_path),
         data_path=str(settings.data_path),
-        claude_enabled=settings.claude_enabled,
-        claude_configured=claude.is_configured if claude else False,
-        api_key_set=bool(settings.anthropic_api_key),
+        llm_enabled=settings.llm_enabled,
+        llm_configured=claude.is_configured if claude else False,
+        api_key_set=bool(settings.llm_api_key or settings.anthropic_api_key),
         theme=stored.get("theme", "dark"),
         daily_note_path_template=stored.get("daily_note_path_template", DEFAULT_DAILY_NOTE_TEMPLATE),
         show_month_names=stored.get("show_month_names", False),

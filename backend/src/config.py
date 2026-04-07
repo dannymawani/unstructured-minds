@@ -38,11 +38,17 @@ class Settings(BaseSettings):
     # CORS
     cors_origins: str = "http://localhost:3000,http://localhost:5173"
 
-    # Claude API (optional)
+    # LLM provider (optional — app works without it, AI features disabled)
+    llm_provider: Optional[str] = None  # anthropic, openai, ollama, etc.
+    llm_api_key: Optional[str] = None
+    llm_model_fast: Optional[str] = None
+    llm_model_smart: Optional[str] = None
+
+    # Legacy: still works for backward compatibility
     anthropic_api_key: Optional[str] = None
 
     # Cloud mode: explicit flag + Postgres connection string
-    use_cloud: bool = True
+    use_cloud: bool = False
     database_url: Optional[str] = None
 
     # Postgres connection pool sizing
@@ -55,7 +61,12 @@ class Settings(BaseSettings):
     azure_postgres_db: str = "unstructured_minds"
     azure_postgres_user: str = "um-backend"
 
-    # Auth (Clerk) — required for cloud mode, validated at request time
+    # Auth mode: "none" (default), "basic", or "clerk"
+    auth_mode: str = "none"
+    basic_auth_username: Optional[str] = None
+    basic_auth_password: Optional[str] = None
+
+    # Clerk auth (only when auth_mode=clerk)
     clerk_secret_key: Optional[str] = None
     clerk_domain: Optional[str] = None  # e.g. "your-app.clerk.accounts.dev"
 
@@ -71,8 +82,12 @@ class Settings(BaseSettings):
 
     @property
     def auth_enabled(self) -> bool:
-        """Auth is always enabled in cloud mode, always disabled in local mode."""
-        return self.is_cloud_mode
+        """Auth is enabled when auth_mode is not 'none', or in cloud mode for backward compat."""
+        if self.auth_mode != "none":
+            return True
+        if self.is_cloud_mode and self.clerk_secret_key:
+            return True
+        return False
 
     @property
     def duckdb_path(self) -> Path:
@@ -80,9 +95,14 @@ class Settings(BaseSettings):
         return self.data_path / "unstructured.duckdb"
 
     @property
+    def llm_enabled(self) -> bool:
+        """Check if any LLM provider is configured."""
+        return bool(self.llm_api_key or self.anthropic_api_key or self.llm_provider == "ollama")
+
+    @property
     def claude_enabled(self) -> bool:
-        """Check if Claude API is configured."""
-        return self.anthropic_api_key is not None
+        """Backward compat alias."""
+        return self.llm_enabled
 
 
 settings = Settings()

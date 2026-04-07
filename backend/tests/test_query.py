@@ -25,12 +25,21 @@ def client():
     return TestClient(app)
 
 
+def _mock_llm_response(text="", tool_calls=None):
+    """Create a mock that mimics LLMResponse interface."""
+    resp = MagicMock()
+    resp.text = text
+    resp.tool_calls = tool_calls or []
+    resp.parse_tool_call = MagicMock(return_value=None)
+    return resp
+
+
 @pytest.fixture
 def mock_claude():
-    """Create mock Claude client."""
+    """Create mock LLM client."""
     mock = MagicMock()
     mock.is_configured = True
-    mock.model_fast = "claude-haiku-4-5-20251001"
+    mock.model_fast = "anthropic/claude-haiku-4-5-20251001"
     return mock
 
 
@@ -314,10 +323,7 @@ class TestInvalidQueryHandling:
 
     def test_invalid_query_response(self, client, mock_claude):
         """Test that INVALID_QUERY from Claude returns friendly message."""
-        sql_response = MagicMock()
-        sql_response.content = [MagicMock(text="INVALID_QUERY")]
-
-        mock_claude._call_with_retry = AsyncMock(return_value=sql_response)
+        mock_claude.complete = AsyncMock(return_value=_mock_llm_response("INVALID_QUERY"))
 
         with patch.object(app.state, "claude", mock_claude, create=True), \
              patch.object(app.state, "analytics_db", MagicMock(), create=True):
@@ -333,10 +339,9 @@ class TestInvalidQueryHandling:
 
     def test_invalid_query_with_explanation(self, client, mock_claude):
         """Test INVALID_QUERY with trailing explanation."""
-        sql_response = MagicMock()
-        sql_response.content = [MagicMock(text="INVALID_QUERY - This is not a data question")]
-
-        mock_claude._call_with_retry = AsyncMock(return_value=sql_response)
+        mock_claude.complete = AsyncMock(
+            return_value=_mock_llm_response("INVALID_QUERY - This is not a data question")
+        )
 
         with patch.object(app.state, "claude", mock_claude, create=True), \
              patch.object(app.state, "analytics_db", MagicMock(), create=True):
@@ -355,10 +360,9 @@ class TestLimitSafetyNet:
 
     def test_limit_added_when_missing(self, client, mock_claude):
         """Test that LIMIT is added when Claude omits it."""
-        sql_response = MagicMock()
-        sql_response.content = [MagicMock(text="SELECT * FROM daily_metrics")]
-
-        mock_claude._call_with_retry = AsyncMock(return_value=sql_response)
+        mock_claude.complete = AsyncMock(
+            return_value=_mock_llm_response("SELECT * FROM daily_metrics")
+        )
 
         mock_db = MagicMock()
         mock_result = MagicMock()
@@ -381,10 +385,9 @@ class TestLimitSafetyNet:
 
     def test_existing_limit_preserved(self, client, mock_claude):
         """Test that existing LIMIT is not double-wrapped."""
-        sql_response = MagicMock()
-        sql_response.content = [MagicMock(text="SELECT * FROM daily_metrics LIMIT 10")]
-
-        mock_claude._call_with_retry = AsyncMock(return_value=sql_response)
+        mock_claude.complete = AsyncMock(
+            return_value=_mock_llm_response("SELECT * FROM daily_metrics LIMIT 10")
+        )
 
         mock_db = MagicMock()
         mock_result = MagicMock()
@@ -438,16 +441,10 @@ class TestQueryEndpoint:
 
     def test_query_success(self, client, mock_claude):
         """Test successful query execution."""
-        # Mock the SQL generation response
-        sql_response = MagicMock()
-        sql_response.content = [MagicMock(text="SELECT date, sleep_hours FROM daily_metrics LIMIT 10")]
+        sql_response = _mock_llm_response("SELECT date, sleep_hours FROM daily_metrics LIMIT 10")
+        format_response = _mock_llm_response("You slept an average of 7 hours.")
 
-        # Mock the formatting response
-        format_response = MagicMock()
-        format_response.content = [MagicMock(text="You slept an average of 7 hours.")]
-
-        mock_claude._call_with_retry = AsyncMock(side_effect=[sql_response, format_response])
-        mock_claude._create_message = MagicMock()
+        mock_claude.complete = AsyncMock(side_effect=[sql_response, format_response])
 
         # Mock database
         mock_db = MagicMock()
@@ -479,11 +476,9 @@ class TestQueryEndpoint:
     def test_query_unsafe_sql_rejected(self, client, mock_claude):
         """Test that unsafe SQL is rejected."""
         # Mock Claude returning dangerous SQL
-        sql_response = MagicMock()
-        sql_response.content = [MagicMock(text="DROP TABLE daily_metrics")]
-
-        mock_claude._call_with_retry = AsyncMock(return_value=sql_response)
-        mock_claude._create_message = MagicMock()
+        mock_claude.complete = AsyncMock(
+            return_value=_mock_llm_response("DROP TABLE daily_metrics")
+        )
 
         with patch.object(app.state, "claude", mock_claude, create=True), \
              patch.object(app.state, "analytics_db", MagicMock(), create=True):
@@ -499,11 +494,9 @@ class TestQueryEndpoint:
 
     def test_query_database_error(self, client, mock_claude):
         """Test handling of database errors."""
-        sql_response = MagicMock()
-        sql_response.content = [MagicMock(text="SELECT * FROM daily_metrics LIMIT 100")]
-
-        mock_claude._call_with_retry = AsyncMock(return_value=sql_response)
-        mock_claude._create_message = MagicMock()
+        mock_claude.complete = AsyncMock(
+            return_value=_mock_llm_response("SELECT * FROM daily_metrics LIMIT 100")
+        )
 
         mock_db = MagicMock()
         mock_db.read_only_execute = MagicMock(side_effect=Exception("Table not found"))
@@ -523,11 +516,9 @@ class TestQueryEndpoint:
 
     def test_query_no_results(self, client, mock_claude):
         """Test query with no results."""
-        sql_response = MagicMock()
-        sql_response.content = [MagicMock(text="SELECT * FROM daily_metrics WHERE date > '2099-01-01' LIMIT 100")]
-
-        mock_claude._call_with_retry = AsyncMock(return_value=sql_response)
-        mock_claude._create_message = MagicMock()
+        mock_claude.complete = AsyncMock(
+            return_value=_mock_llm_response("SELECT * FROM daily_metrics WHERE date > '2099-01-01' LIMIT 100")
+        )
 
         mock_db = MagicMock()
         mock_result = MagicMock()
@@ -550,10 +541,9 @@ class TestQueryEndpoint:
 
     def test_query_uses_read_only_execute(self, client, mock_claude):
         """Test that the endpoint uses read_only_execute, not execute."""
-        sql_response = MagicMock()
-        sql_response.content = [MagicMock(text="SELECT * FROM daily_metrics LIMIT 10")]
-
-        mock_claude._call_with_retry = AsyncMock(return_value=sql_response)
+        mock_claude.complete = AsyncMock(
+            return_value=_mock_llm_response("SELECT * FROM daily_metrics LIMIT 10")
+        )
 
         mock_db = MagicMock()
         mock_result = MagicMock()
@@ -576,10 +566,7 @@ class TestQueryEndpoint:
 
     def test_query_uses_system_prompt(self, client, mock_claude):
         """Test that SQL generation uses system parameter, not user message."""
-        sql_response = MagicMock()
-        sql_response.content = [MagicMock(text="INVALID_QUERY")]
-
-        mock_claude._call_with_retry = AsyncMock(return_value=sql_response)
+        mock_claude.complete = AsyncMock(return_value=_mock_llm_response("INVALID_QUERY"))
 
         with patch.object(app.state, "claude", mock_claude, create=True), \
              patch.object(app.state, "analytics_db", MagicMock(), create=True):
@@ -589,7 +576,7 @@ class TestQueryEndpoint:
             )
 
         # Verify system parameter was used in the first call
-        call_kwargs = mock_claude._call_with_retry.call_args_list[0].kwargs
+        call_kwargs = mock_claude.complete.call_args_list[0].kwargs
         assert "system" in call_kwargs
         assert "CRITICAL SAFETY RULES" in call_kwargs["system"]
         # User message should be just the question, not the full prompt

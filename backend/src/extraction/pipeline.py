@@ -1011,7 +1011,7 @@ class ExtractionPipeline:
                 success=False,
                 file_path=file_path,
                 file_hash=file_hash,
-                error="Claude API not configured",
+                error="LLM not configured",
             )
 
         try:
