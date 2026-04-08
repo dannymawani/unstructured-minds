@@ -15,7 +15,7 @@ cp .env.example .env
 make dev
 ```
 
-Frontend at http://localhost:5173, backend at http://localhost:8000.
+Frontend at http://localhost:3000 (Docker) or http://localhost:5173 (direct `npm run dev`), backend at http://localhost:8000.
 
 ### Without Docker
 
@@ -101,9 +101,9 @@ unstructured-minds/
 ├── data/                 # DuckDB database (gitignored)
 ├── docs/                 # Documentation
 ├── ai_docs/              # Deep technical docs
-├── docker-compose.yml    # Production
-├── docker-compose.dev.yml # Development overrides
+├── docker-compose.yml    # Docker services (dev + prod)
 ├── Makefile              # Common commands
+├── setup.sh              # Interactive .env setup wizard
 └── .env.example          # Environment template
 ```
 

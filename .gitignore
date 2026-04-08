@@ -90,3 +90,8 @@ temp/
 # Planning scratch files
 next_step.md
 plan.md
+remove_clerk.md
+OPENSOURCE_PREP_PLAN.md
+
+# Claude Desktop personal settings (machine-specific)
+.claude/settings.local.json

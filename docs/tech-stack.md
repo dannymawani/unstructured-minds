@@ -298,23 +298,14 @@ Infrastructure spans development, testing, and production environments.
 - Development and production parity
 - Easy local development setup
 
-**Configs**:
-- `docker-compose.dev.yml`: Hot-reload for development
-  - Frontend: Vite dev server on port 5173
-  - Backend: FastAPI with `--reload` flag on port 8000
-  - Volumes: Live code reload
-- `docker-compose.yml`: Production build
-  - Frontend: Pre-built React SPA
-  - Backend: Gunicorn/Uvicorn
-  - Nginx: Reverse proxy and static file serving
+**Config**: Single `docker-compose.yml` for both dev and production.
+Set `DEBUG=true` for backend hot reload (`uvicorn --reload`).
 
 **Usage**:
 ```bash
-# Development
-docker compose -f docker-compose.dev.yml up -d
-
-# Production
-docker compose up -d
+make up          # Production
+make dev         # Development (DEBUG=true, backend hot reload)
+make dev-postgres # Development with bundled Postgres
 ```
 
 ### Nginx

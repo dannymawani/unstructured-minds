@@ -22,7 +22,6 @@ backend/Dockerfile
 frontend/Dockerfile
 frontend/Dockerfile.dev (if exists)
 docker-compose.yml
-docker-compose.dev.yml
 
 # Nginx & Security Headers
 frontend/nginx.conf

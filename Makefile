@@ -5,6 +5,13 @@
 .DEFAULT_GOAL := help
 
 # ---------------------------------------------------------------------------
+# Setup
+# ---------------------------------------------------------------------------
+
+setup: ## Interactive .env setup wizard
+	@./setup.sh
+
+# ---------------------------------------------------------------------------
 # Run
 # ---------------------------------------------------------------------------
 
@@ -17,11 +24,11 @@ up-postgres: ## Start with bundled Postgres
 down: ## Stop all services
 	docker compose --profile postgres down
 
-dev: ## Start dev mode with hot reload
-	docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+dev: ## Start with DEBUG=true (backend hot reload)
+	DEBUG=true docker compose up --build
 
-dev-postgres: ## Start dev mode with Postgres
-	docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile postgres up
+dev-postgres: ## Start with DEBUG + Postgres
+	DEBUG=true docker compose --profile postgres up --build
 
 logs: ## Tail logs from all services
 	docker compose logs -f
@@ -64,4 +71,4 @@ ps: ## Show running services
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-18s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: up up-postgres down dev dev-postgres logs build build-no-cache test test-backend test-frontend typecheck clean ps help
+.PHONY: setup up up-postgres down dev dev-postgres logs build build-no-cache test test-backend test-frontend typecheck clean ps help

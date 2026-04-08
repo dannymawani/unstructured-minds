@@ -45,7 +45,7 @@ The system runs in one of two modes, determined by environment variables:
 ## Project Structure
 
 ```
-unstructured_minds/
+unstructured-minds/
 ├── backend/                    # Python FastAPI (port 8000)
 │   ├── src/
 │   │   ├── main.py             # App entry + lifespan
@@ -69,7 +69,7 @@ unstructured_minds/
 │   │   ├── App.tsx             # Routing, layout, auth gate
 │   │   ├── main.tsx            # React root + Clerk provider
 │   │   ├── index.css           # Tailwind v4 + theme vars
-│   │   ├── components/         # 23 component directories
+│   │   ├── components/         # 19 component directories
 │   │   ├── hooks/              # 5 custom hooks
 │   │   └── lib/                # apiClient, utils
 │   ├── nginx.conf              # Production reverse proxy
@@ -84,8 +84,7 @@ unstructured_minds/
 │   └── ai_exercise_cache.json  # Claude-generated exercise aliases
 ├── vault/                      # Gitignored, markdown notes
 │   └── YYYY/MM/YYYY-MM-DD.md  # Daily notes by year/month
-├── docker-compose.yml          # Production services
-├── docker-compose.dev.yml      # Development services
+├── docker-compose.yml          # Docker services
 ├── .env                        # Secrets (gitignored)
 ├── ai_docs/                    # This wiki
 └── CLAUDE.md                   # Quick-start routing table

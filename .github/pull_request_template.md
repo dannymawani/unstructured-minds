@@ -6,15 +6,15 @@
 
 <!-- List of files/areas changed -->
 
-## Kanban Task
+## Related Issue
 
-<!-- Link to the kanban task ID this PR addresses, e.g. phase7-05-extraction-timing -->
+<!-- Link to a related issue if applicable, e.g. "Fixes #123" or "Closes #123" -->
 
 ## Test Plan
 
 - [ ] TypeScript compiles (`npx tsc --noEmit`)
 - [ ] Frontend tests pass (`npx vitest run`)
-- [ ] Backend tests pass (if applicable)
+- [ ] Backend tests pass (`cd backend && pytest`)
 - [ ] Manual testing in browser
 
 ## Screenshots

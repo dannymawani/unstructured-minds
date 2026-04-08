@@ -9,6 +9,15 @@
 </p>
 
 <p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/dannymawani/unstructured-minds" alt="License" /></a>
+  <a href="https://github.com/dannymawani/unstructured-minds/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/dannymawani/unstructured-minds/ci.yml?branch=main&label=CI" alt="CI Status" /></a>
+  <a href="https://github.com/dannymawani/unstructured-minds/stargazers"><img src="https://img.shields.io/github/stars/dannymawani/unstructured-minds?style=social" alt="GitHub Stars" /></a>
+  <img src="https://img.shields.io/badge/docker-compose-2496ED?logo=docker&logoColor=white" alt="Docker Compose" />
+  <img src="https://img.shields.io/badge/python-3.12+-3776AB?logo=python&logoColor=white" alt="Python 3.12+" />
+  <img src="https://img.shields.io/badge/react-19-61DAFB?logo=react&logoColor=black" alt="React 19" />
+</p>
+
+<p align="center">
   <a href="#quick-start">Quick Start</a> &bull;
   <a href="#features">Features</a> &bull;
   <a href="#how-it-works">How It Works</a> &bull;
@@ -17,26 +26,44 @@
 
 ---
 
-<!-- TODO: Add screenshot of the editor + dashboard side by side -->
-<!-- <p align="center"><img src="assets/images/screenshot.png" width="720" /></p> -->
+<p align="center">
+  <img src="assets/screenshots/dashboard.png" alt="Dashboard — activity heatmap, nutrition, insights" width="720" />
+</p>
+
+## Why Unstructured Minds?
+
+Most note apps let you write but not **query**. Most data tools need structure upfront. Unstructured Minds bridges the gap — write freely in markdown, and AI turns your notes into a personal data warehouse. Track workouts, food, sleep, mood, or anything else, then ask questions like *"How many times did I squat over 100kg this month?"* and get real answers backed by SQL.
+
+Everything runs on your machine. No cloud required. No vendor lock-in.
 
 ## How It Works
 
+```mermaid
+graph TD
+    A["📝 Write a Note\n'Had oatmeal for breakfast,\nthen hit the gym — squats 100kg 3x5'"]
+
+    A --> B["🤖 AI Extraction\nLiteLLM · Anthropic · OpenAI · Ollama"]
+
+    B --> C["🍽️ food_log\noatmeal · breakfast"]
+    B --> D["💪 exercise_log\nsquat · 100kg · 5 reps · 3 sets"]
+
+    C --> E[("🗄️ Personal Data Warehouse\nDuckDB · Postgres")]
+    D --> E
+
+    E --> F["❓ Ask in Plain English\n'How many times did I squat\nover 100kg this month?'"]
+
+    F --> G["✅ SQL-Backed Answer\n6 days"]
+
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style B fill:#fef3c7,stroke:#f59e0b,color:#78350f
+    style C fill:#dcfce7,stroke:#22c55e,color:#14532d
+    style D fill:#dcfce7,stroke:#22c55e,color:#14532d
+    style E fill:#ede9fe,stroke:#8b5cf6,color:#2e1065
+    style F fill:#fce7f3,stroke:#ec4899,color:#500724
+    style G fill:#dcfce7,stroke:#16a34a,color:#14532d
 ```
-"Had oatmeal for breakfast, then hit the gym — squats 100kg 3x5"
-                              |
-                        AI extracts data
-                              |
-            +-----------------+-----------------+
-            |                                   |
-    food_log: oatmeal              exercise_log: squat
-    meal: breakfast                 100kg, 5 reps, 3 sets
-            |                                   |
-            +-----------------------------------+
-                              |
-              "How many times did I squat over
-               100kg this month?"  -->  6 days
-```
+
+> **Works without an LLM** — the editor, calendar, kanban, and search all work offline. AI features (extraction and natural language queries) require an API key or a local Ollama instance.
 
 ## Features
 
@@ -73,39 +100,23 @@
 ### 1. Clone and configure
 
 ```bash
-git clone https://github.com/dannymawani/unstructured_minds.git
-cd unstructured_minds
+git clone https://github.com/dannymawani/unstructured-minds.git
+cd unstructured-minds
+
+# Interactive setup — walks you through LLM, storage, and auth
+make setup
+
+# Or do it manually
 cp .env.example .env
 ```
 
-### 2. Set your LLM provider (optional)
-
-Edit `.env` and uncomment the provider you want:
+### 2. Start
 
 ```bash
-# Anthropic
-LLM_PROVIDER=anthropic
-LLM_API_KEY=sk-ant-...
-
-# Or OpenAI
-# LLM_PROVIDER=openai
-# LLM_API_KEY=sk-...
-
-# Or Ollama (free, local)
-# LLM_PROVIDER=ollama
+docker compose up --build
 ```
 
-### 3. Start
-
-```bash
-# Development (hot reload)
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
-
-# Or production
-docker compose up -d
-```
-
-Open **http://localhost:5173** (dev) or **http://localhost:3000** (prod).
+Open **http://localhost:3000**.
 
 ### Without Docker
 
@@ -148,6 +159,16 @@ docker compose --profile postgres up -d
 | `basic` | `AUTH_MODE=basic` + username/password in `.env` | Simple password protection |
 | `clerk` | `AUTH_MODE=clerk` + Clerk keys | Multi-user SaaS deployment |
 
+## Remote Access (Tailscale)
+
+Access from your phone, tablet, or anywhere — encrypted, no port forwarding needed.
+
+1. Install [Tailscale](https://tailscale.com/) on your server + devices
+2. Add your Tailscale hostname to `CORS_ORIGINS` in `.env`
+3. Open `http://your-hostname:3000` from any device on your tailnet
+
+See [`docs/LAN_ACCESS.md`](./docs/LAN_ACCESS.md) for full setup including LAN-only access.
+
 ## Documentation
 
 | Document | Description |
@@ -158,6 +179,7 @@ docker compose --profile postgres up -d
 | [`docs/tech-stack.md`](./docs/tech-stack.md) | Technology choices and rationale |
 | [`docs/SECURITY.md`](./docs/SECURITY.md) | Security architecture and checklist |
 | [`CONTRIBUTING.md`](./CONTRIBUTING.md) | Contribution guidelines |
+| [`SUPPORT.md`](./SUPPORT.md) | Getting help and common issues |
 | [`CHANGELOG.md`](./CHANGELOG.md) | Version history |
 
 ## Contributing
@@ -173,19 +195,6 @@ make test
 
 # Submit a PR
 ```
-
-## Roadmap
-
-- [x] Markdown editor with WYSIWYG + AI extraction
-- [x] Natural language queries over personal data
-- [x] Dashboards (charts, heatmaps, correlations)
-- [x] Personal kanban + calendar + daily wizard
-- [x] Cloud deployment + multi-user
-- [x] Provider-agnostic AI (LiteLLM)
-- [x] Three-mode auth (none / basic / clerk)
-- [ ] Multimodal content (images, PDFs)
-- [ ] Mobile-friendly PWA
-- [ ] Plugin system
 
 ## License
 

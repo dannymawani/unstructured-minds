@@ -61,7 +61,7 @@ Browser                     Frontend (React)              Backend (FastAPI)     
 
 | File | Role |
 |------|------|
-| `config.py` | `LOCAL_USER_ID` constant; `auth_enabled` = `is_cloud_mode` (cloud always means auth) |
+| `config.py` | `LOCAL_USER_ID` constant; `auth_enabled` checks `auth_mode != "none"` or (cloud mode + Clerk secrets) |
 | `middleware/clerk_auth.py` | `verify_clerk_token()` — fetches JWKS from Clerk, verifies RS256 JWT, returns payload |
 | `api/dependencies.py` | `get_user_id()` — local: returns `LOCAL_USER_ID`; cloud: verifies JWT, maps `sub` to UUID |
 
