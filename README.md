@@ -67,17 +67,64 @@ graph TD
 
 ## Features
 
-- **Markdown Editor** — Milkdown WYSIWYG with toolbar, templates, and raw toggle
-- **AI Extraction** — Write freely, AI extracts food logs, workouts, metrics, and tasks
-- **Natural Language Queries** — Ask questions in plain English, get SQL-backed answers
-- **Dashboards** — Activity heatmaps, exercise progress, sleep trends, mood correlations, nutrition
-- **Daily Note Wizard** — One-click daily notes with structured creation flow
-- **Personal Kanban** — Drag-and-drop task board synced with daily note checkboxes
-- **Calendar View** — Visual calendar with daily note navigation
-- **Note Assistant** — AI chat for editing notes with context
-- **Full-Text Search** — Search across all vault notes with snippets and scoring
-- **Command Palette** — `Cmd+K` for quick actions
-- **Local-First** — All data stays on your machine. Optionally sync to Postgres for multi-user.
+<table>
+<tr>
+<td align="center" width="33%">
+<h3>Markdown Editor</h3>
+<p>Milkdown WYSIWYG with toolbar, templates, and raw toggle. Write naturally — no special syntax needed.</p>
+</td>
+<td align="center" width="33%">
+<h3>AI Extraction</h3>
+<p>Write freely about your day. AI extracts food logs, workouts, metrics, and tasks into structured tables.</p>
+</td>
+<td align="center" width="33%">
+<h3>Natural Language Queries</h3>
+<p>Ask questions in plain English. Get real answers backed by SQL against your personal data warehouse.</p>
+</td>
+</tr>
+<tr>
+<td align="center">
+<h3>Dashboards</h3>
+<p>Activity heatmaps, exercise progress, sleep trends, mood correlations, and nutrition tracking.</p>
+</td>
+<td align="center">
+<h3>Daily Note Wizard</h3>
+<p>One-click daily notes with structured creation flow. Templates for training, meals, and journaling.</p>
+</td>
+<td align="center">
+<h3>Personal Kanban</h3>
+<p>Drag-and-drop task board. Tasks sync two-way with checkboxes in your daily notes.</p>
+</td>
+</tr>
+<tr>
+<td align="center">
+<h3>Calendar View</h3>
+<p>Visual calendar with daily note navigation. See your activity at a glance across months.</p>
+</td>
+<td align="center">
+<h3>Note Assistant</h3>
+<p>AI chat that understands your note context. Edit, expand, or restructure notes conversationally.</p>
+</td>
+<td align="center">
+<h3>Full-Text Search</h3>
+<p>Search across all vault notes with highlighted snippets and relevance scoring.</p>
+</td>
+</tr>
+<tr>
+<td align="center">
+<h3>Command Palette</h3>
+<p><code>Cmd+K</code> for quick actions. Navigate, create, search — all from the keyboard.</p>
+</td>
+<td align="center">
+<h3>Local-First</h3>
+<p>All data stays on your machine. No cloud required. Optionally sync to Postgres for multi-user.</p>
+</td>
+<td align="center">
+<h3>Any LLM Provider</h3>
+<p>Anthropic, OpenAI, Ollama, or 100+ providers via LiteLLM. Bring your own key — or run fully offline.</p>
+</td>
+</tr>
+</table>
 
 ## Tech Stack
 
