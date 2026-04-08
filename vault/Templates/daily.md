@@ -1,41 +1,36 @@
----
-date: {{date}}
-type: daily-note
-description: Daily note template
-tags:
-  - daily
-  - journal
----
+## 📝 Adhoc Notes
 
-# {{date:dddd, MMMM DD, YYYY}}
+## 🎯 Today's Focus
 
-## Adhoc Notes
--
+* \[ ]
 
-## Today's Focus
-- [ ]
-- [ ]
+* \[ ]
 
-## Work
+## 💼 Work
 
+## 🤷🏽 Personal
 
-## Personal
+## 🏋️ Training & Health
 
-
-## Training & Health
 ### Workout
-- **Type**:
-- **Focus**:
+
+* **Type**:
+
+* **Focus**:
 
 ### Energy & Recovery
-- Sleep: /10
-- Energy Level: /10
-- Nutrition: /10
 
-## End of Day
-- Mood: /10
-- What went well:
-- What could improve:
+* Sleep:
 
----
-*Created at {{time}}*
+* Energy Level:
+
+* Mood:
+
+* Nutrition:
+
+### 🍽️ Food Log
+
+* **Breakfast**:
+* **Lunch**:
+* **Dinner**:
+* **Snacks**:

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, type FormEvent, type ClipboardEvent, type ChangeEvent } from 'react'
-import { Send, Loader2, Database, MessageSquare, FileText, Paperclip, X } from 'lucide-react'
+import { Send, Loader2, Paperclip, X, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { ChatMessage, type Message, type QueryData, type ImageAttachment } from './ChatMessage'
+import { ChatMessage, type Message, type QueryData, type ImageAttachment, type CreatedNoteInfo } from './ChatMessage'
 import { cn } from '@/lib/utils'
 
 interface ChatPanelProps {
@@ -9,53 +9,9 @@ interface ChatPanelProps {
   currentFile?: string
   currentContent?: string
   onContentUpdate?: (content: string) => void
+  onNotesCreated?: () => void
+  onOpenNote?: (path: string) => void
   initialMessage?: string
-}
-
-type ChatMode = 'chat' | 'query' | 'note'
-
-// Keywords that suggest a data query
-const DATA_QUERY_KEYWORDS = [
-  'how much',
-  'how many',
-  'show me',
-  'show my',
-  'what was',
-  'what is',
-  'what are',
-  'when did',
-  'list',
-  'average',
-  'total',
-  'sum',
-  'count',
-  'max',
-  'min',
-  'heaviest',
-  'lightest',
-  'longest',
-  'shortest',
-  'last week',
-  'this week',
-  'last month',
-  'this month',
-  'yesterday',
-  'today',
-  'exercise',
-  'workout',
-  'sleep',
-  'food',
-  'calories',
-  'weight',
-  'task',
-  'squat',
-  'bench',
-  'deadlift',
-]
-
-function isLikelyDataQuery(input: string): boolean {
-  const lowerInput = input.toLowerCase()
-  return DATA_QUERY_KEYWORDS.some((keyword) => lowerInput.includes(keyword))
 }
 
 function fileToBase64(file: File): Promise<string> {
@@ -63,7 +19,6 @@ function fileToBase64(file: File): Promise<string> {
     const reader = new FileReader()
     reader.onload = () => {
       const result = reader.result as string
-      // Strip the data URL prefix (data:image/png;base64,...)
       resolve(result.split(',')[1])
     }
     reader.onerror = reject
@@ -71,31 +26,21 @@ function fileToBase64(file: File): Promise<string> {
   })
 }
 
-export function ChatPanel({ apiBaseUrl = '', currentFile, currentContent, onContentUpdate, initialMessage }: ChatPanelProps) {
+export function ChatPanel({ apiBaseUrl = '', currentFile, currentContent, onContentUpdate, onNotesCreated, onOpenNote, initialMessage }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [mode, setMode] = useState<ChatMode>(currentFile ? 'note' : 'query')
   const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const initialMessageSentRef = useRef<string | null>(null)
 
-  // Auto-select note mode when a file is open
-  useEffect(() => {
-    if (currentFile) {
-      setMode('note')
-    }
-  }, [currentFile])
-
-  // Send initial message when provided (e.g., new daily note wizard)
   useEffect(() => {
     if (initialMessage && initialMessage !== initialMessageSentRef.current && currentFile && !isLoading) {
       initialMessageSentRef.current = initialMessage
       setInput(initialMessage)
-      // Trigger submit on next tick so state has settled
       setTimeout(() => {
         inputRef.current?.form?.requestSubmit()
       }, 100)
@@ -152,7 +97,6 @@ export function ChatPanel({ apiBaseUrl = '', currentFile, currentContent, onCont
   const handleFilePickerChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (files) addImages(Array.from(files))
-    // Reset so the same file can be selected again
     e.target.value = ''
   }, [addImages])
 
@@ -177,105 +121,65 @@ export function ChatPanel({ apiBaseUrl = '', currentFile, currentContent, onCont
     setIsLoading(true)
 
     try {
-      if (mode === 'note') {
-        // Use note-assist endpoint
-        const body: Record<string, unknown> = {
-          message: userMessage.content,
-          file_path: currentFile || null,
-          file_content: currentContent || null,
-        }
-        if (currentImages) {
-          body.images = currentImages.map(img => ({
-            data: img.data,
-            media_type: img.media_type,
-          }))
-        }
-
-        const response = await fetch(`${apiBaseUrl}/chat/note-assist`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        })
-
-        if (!response.ok) {
-          const data = await response.json().catch(() => ({}))
-          throw new Error(data.detail || 'Failed to get response')
-        }
-
-        const data = await response.json()
-        const didUpdate = !!data.updated_content
-
-        if (didUpdate && onContentUpdate) {
-          onContentUpdate(data.updated_content)
-        }
-
-        const assistantMessage: Message = {
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          content: data.reply,
-          timestamp: new Date(),
-          noteUpdated: didUpdate,
-        }
-
-        setMessages((prev) => [...prev, assistantMessage])
-      } else if (mode === 'query' || isLikelyDataQuery(userMessage.content)) {
-        // Use natural language query endpoint
-        const response = await fetch(`${apiBaseUrl}/query/natural`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ question: userMessage.content }),
-        })
-
-        if (!response.ok) {
-          const data = await response.json().catch(() => ({}))
-          throw new Error(data.detail || 'Failed to get response')
-        }
-
-        const data = await response.json()
-
-        const queryData: QueryData | undefined =
-          data.data && data.columns
-            ? {
-                columns: data.columns,
-                data: data.data,
-                sql: data.sql,
-                rowCount: data.row_count,
-              }
-            : undefined
-
-        const assistantMessage: Message = {
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          content: data.answer,
-          timestamp: new Date(),
-          queryData,
-        }
-
-        setMessages((prev) => [...prev, assistantMessage])
-      } else {
-        // Use regular chat endpoint
-        const response = await fetch(`${apiBaseUrl}/chat`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: userMessage.content }),
-        })
-
-        if (!response.ok) {
-          const data = await response.json().catch(() => ({}))
-          throw new Error(data.detail || 'Failed to get response')
-        }
-
-        const data = await response.json()
-
-        const assistantMessage: Message = {
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          content: data.message.content,
-          timestamp: new Date(),
-        }
-
-        setMessages((prev) => [...prev, assistantMessage])
+      const body: Record<string, unknown> = {
+        message: userMessage.content,
+        file_path: currentFile || null,
+        file_content: currentContent || null,
       }
+      if (currentImages) {
+        body.images = currentImages.map(img => ({
+          data: img.data,
+          media_type: img.media_type,
+        }))
+      }
+
+      const response = await fetch(`${apiBaseUrl}/chat/message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.detail || 'Failed to get response')
+      }
+
+      const data = await response.json()
+
+      if (data.note_update && onContentUpdate) {
+        onContentUpdate(data.note_update)
+      }
+
+      if (data.created_notes && data.created_notes.length > 0) {
+        onNotesCreated?.()
+      }
+
+      const queryData: QueryData | undefined =
+        data.query_data && data.query_data.columns
+          ? {
+              columns: data.query_data.columns,
+              data: data.query_data.data,
+              sql: data.query_data.sql,
+              rowCount: data.query_data.row_count,
+            }
+          : undefined
+
+      const createdNotes: CreatedNoteInfo[] | undefined =
+        data.created_notes && data.created_notes.length > 0
+          ? data.created_notes
+          : undefined
+
+      const assistantMessage: Message = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: data.reply,
+        timestamp: new Date(),
+        noteUpdated: !!data.note_update,
+        queryData,
+        createdNotes,
+      }
+
+      setMessages((prev) => [...prev, assistantMessage])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
@@ -294,107 +198,78 @@ export function ChatPanel({ apiBaseUrl = '', currentFile, currentContent, onCont
   const fileName = currentFile?.split('/').pop()
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="px-3 py-2 border-b">
-        <div className="flex items-center justify-between">
-          <div className="min-w-0">
-            <h2 className="text-sm font-medium">
-              {mode === 'note' ? 'Note Assist' : mode === 'query' ? 'Data Query' : 'Chat'}
-            </h2>
-            <p className="text-xs text-muted-foreground truncate">
-              {mode === 'note' && fileName
-                ? `Editing: ${fileName}`
-                : mode === 'note'
-                  ? 'Open a file to get started'
-                  : mode === 'query'
-                    ? 'Ask questions about your data'
-                    : 'General conversation'}
-            </p>
+    <div className="flex flex-col h-full bg-background">
+      {/* Header */}
+      <div className="px-4 py-2.5 border-b bg-card/50 backdrop-blur-sm">
+        <div className="flex items-center gap-2">
+          <div className="flex items-center justify-center h-6 w-6 rounded-md bg-teal-500/10">
+            <Sparkles className="h-3.5 w-3.5 text-teal-500" />
           </div>
-          <div className="flex gap-1 shrink-0">
-            <Button
-              variant={mode === 'note' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setMode('note')}
-              className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 h-10 sm:h-7 px-3 sm:px-2"
-              title="Note Assist Mode"
-            >
-              <FileText className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
-            </Button>
-            <Button
-              variant={mode === 'query' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setMode('query')}
-              className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 h-10 sm:h-7 px-3 sm:px-2"
-              title="Data Query Mode"
-            >
-              <Database className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
-            </Button>
-            <Button
-              variant={mode === 'chat' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setMode('chat')}
-              className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 h-10 sm:h-7 px-3 sm:px-2"
-              title="Chat Mode"
-            >
-              <MessageSquare className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
-            </Button>
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold leading-none">Chat</h2>
+            <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
+              {fileName ? `Editing ${fileName}` : 'Query, update, or catch up'}
+            </p>
           </div>
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto p-2 space-y-2">
+      {/* Messages */}
+      <div className="flex-1 overflow-auto p-3 space-y-3">
         {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm space-y-4">
-            <p>
-              {mode === 'note'
-                ? currentFile
-                  ? 'Ask me to update your note'
-                  : 'Open a file to get started'
-                : mode === 'query'
-                  ? 'Ask questions about your data'
-                  : 'Start a conversation'}
-            </p>
-            {mode === 'note' && currentFile && (
-              <div className="text-xs space-y-1 text-center max-w-[250px]">
-                <p className="font-medium text-foreground">Try:</p>
-                <p>"Add a task: buy groceries"</p>
-                <p>"Log lunch: chicken salad, 450 cal"</p>
-                <p>Or paste a screenshot to extract data</p>
+          <div className="flex flex-col items-center justify-center h-full text-center px-4">
+            <div className="space-y-3 max-w-[260px]">
+              <p className="text-sm text-muted-foreground">What can I help with?</p>
+              <div className="grid gap-1.5">
+                {[
+                  { label: 'Catch up', example: '"BJJ Monday, rest Tuesday"' },
+                  { label: 'Query data', example: '"How did I sleep last week?"' },
+                  ...(currentFile ? [{ label: 'Edit note', example: '"Add task: buy groceries"' }] : []),
+                ].map((hint) => (
+                  <button
+                    key={hint.label}
+                    type="button"
+                    onClick={() => {
+                      setInput(hint.example.replace(/"/g, ''))
+                      inputRef.current?.focus()
+                    }}
+                    className="text-left px-3 py-2 rounded-lg border border-border/60 hover:border-teal-500/40 hover:bg-teal-500/5 transition-colors group"
+                  >
+                    <span className="text-xs font-medium text-foreground">{hint.label}</span>
+                    <span className="block text-[11px] text-muted-foreground group-hover:text-muted-foreground/80 mt-0.5">
+                      {hint.example}
+                    </span>
+                  </button>
+                ))}
               </div>
-            )}
-            {mode === 'query' && (
-              <div className="text-xs space-y-1 text-center max-w-[250px]">
-                <p className="font-medium text-foreground">Try asking:</p>
-                <p>"How much did I sleep last week?"</p>
-                <p>"What was my heaviest squat?"</p>
-                <p>"Show my exercise frequency"</p>
-              </div>
-            )}
+            </div>
           </div>
         ) : (
           messages.map((message) => (
-            <ChatMessage key={message.id} message={message} />
+            <ChatMessage key={message.id} message={message} onOpenNote={onOpenNote} />
           ))
         )}
         {isLoading && (
-          <div className="flex items-center gap-2 p-3 text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span className="text-sm">
-              {mode === 'note' ? 'Updating note...' : mode === 'query' ? 'Querying data...' : 'Thinking...'}
-            </span>
+          <div className="flex items-center gap-2.5 px-3 py-2.5 text-muted-foreground">
+            <div className="flex gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-teal-500/60 animate-bounce [animation-delay:0ms]" />
+              <span className="w-1.5 h-1.5 rounded-full bg-teal-500/60 animate-bounce [animation-delay:150ms]" />
+              <span className="w-1.5 h-1.5 rounded-full bg-teal-500/60 animate-bounce [animation-delay:300ms]" />
+            </div>
+            <span className="text-xs">Thinking...</span>
           </div>
         )}
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Error */}
       {error && (
-        <div className="px-3 py-2 text-sm text-destructive bg-destructive/10">
+        <div className="mx-3 mb-2 px-3 py-2 text-xs text-rose-600 dark:text-rose-400 bg-rose-500/10 rounded-lg border border-rose-500/20">
           {error}
         </div>
       )}
 
-      {/* Pending image thumbnails */}
+      {/* Pending images */}
       {pendingImages.length > 0 && (
         <div className="px-3 py-2 border-t flex gap-2 flex-wrap">
           {pendingImages.map((img, i) => (
@@ -402,7 +277,7 @@ export function ChatPanel({ apiBaseUrl = '', currentFile, currentContent, onCont
               <img
                 src={img.preview || `data:${img.media_type};base64,${img.data}`}
                 alt={`Pending ${i + 1}`}
-                className="h-14 w-14 object-cover rounded-md border"
+                className="h-12 w-12 object-cover rounded-lg border"
               />
               <button
                 type="button"
@@ -416,48 +291,39 @@ export function ChatPanel({ apiBaseUrl = '', currentFile, currentContent, onCont
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="p-3 border-t safe-area-bottom">
-        <div className="flex gap-2">
-          {mode === 'note' && (
-            <>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                className="hidden"
-                onChange={handleFilePickerChange}
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => fileInputRef.current?.click()}
-                title="Attach image"
-                className="min-w-[44px] min-h-[44px] shrink-0"
-              >
-                <Paperclip className="h-4 w-4" />
-              </Button>
-            </>
-          )}
+      {/* Input */}
+      <form onSubmit={handleSubmit} className="p-3 border-t bg-card/30 safe-area-bottom">
+        <div className="flex gap-2 items-end">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={handleFilePickerChange}
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={() => fileInputRef.current?.click()}
+            title="Attach image"
+            className="min-w-[36px] min-h-[36px] h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground"
+          >
+            <Paperclip className="h-4 w-4" />
+          </Button>
           <textarea
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            onPaste={mode === 'note' ? handlePaste : undefined}
-            placeholder={
-              mode === 'note'
-                ? 'Update your note...'
-                : mode === 'query'
-                  ? 'Ask about your data...'
-                  : 'Ask a question...'
-            }
+            onPaste={handlePaste}
+            placeholder="Ask, update, or catch up..."
             className={cn(
-              'flex-1 min-h-[44px] max-h-[120px] resize-none rounded-md border px-3 py-2 text-base sm:text-sm',
-              'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1',
-              'placeholder:text-muted-foreground',
-              'bg-background'
+              'flex-1 min-h-[36px] max-h-[120px] resize-none rounded-lg border px-3 py-2 text-sm',
+              'focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500/50',
+              'placeholder:text-muted-foreground/60',
+              'bg-background transition-shadow'
             )}
             rows={1}
             disabled={isLoading}
@@ -467,7 +333,12 @@ export function ChatPanel({ apiBaseUrl = '', currentFile, currentContent, onCont
             size="icon"
             disabled={(!input.trim() && pendingImages.length === 0) || isLoading}
             title="Send message"
-            className="min-w-[44px] min-h-[44px]"
+            className={cn(
+              'min-w-[36px] min-h-[36px] h-9 w-9 shrink-0 rounded-lg transition-all',
+              input.trim() || pendingImages.length > 0
+                ? 'bg-teal-500 hover:bg-teal-600 text-white shadow-sm'
+                : ''
+            )}
           >
             {isLoading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -477,8 +348,6 @@ export function ChatPanel({ apiBaseUrl = '', currentFile, currentContent, onCont
           </Button>
         </div>
       </form>
-
-      {/* Hidden file input for image picker */}
     </div>
   )
 }

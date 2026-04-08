@@ -71,6 +71,37 @@ class TestLocalFilesystem:
         await storage.write("test.md", b"content")
         assert await storage.exists("test.md")
 
+    async def test_rename(self, storage: LocalFilesystem) -> None:
+        """Test renaming a file."""
+        await storage.write("old.md", b"# Old")
+        await storage.rename("old.md", "new.md")
+
+        assert not await storage.exists("old.md")
+        assert await storage.exists("new.md")
+        content = await storage.read("new.md")
+        assert content == b"# Old"
+
+    async def test_rename_nonexistent(self, storage: LocalFilesystem) -> None:
+        """Test renaming a file that doesn't exist."""
+        with pytest.raises(FileNotFoundError):
+            await storage.rename("nonexistent.md", "new.md")
+
+    async def test_rename_dest_exists(self, storage: LocalFilesystem) -> None:
+        """Test renaming to an existing destination."""
+        await storage.write("a.md", b"a")
+        await storage.write("b.md", b"b")
+
+        with pytest.raises(FileExistsError):
+            await storage.rename("a.md", "b.md")
+
+    async def test_rename_creates_parent_dirs(self, storage: LocalFilesystem) -> None:
+        """Test that rename creates parent directories for destination."""
+        await storage.write("flat.md", b"content")
+        await storage.rename("flat.md", "nested/dir/flat.md")
+
+        assert not await storage.exists("flat.md")
+        assert await storage.exists("nested/dir/flat.md")
+
     async def test_path_traversal_blocked(self, storage: LocalFilesystem) -> None:
         """Test that path traversal is blocked."""
         with pytest.raises(ValueError, match="escapes base directory"):

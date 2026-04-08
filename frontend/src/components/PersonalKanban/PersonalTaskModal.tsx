@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { X, FileText, ArrowRight, Pencil, Check, Clock } from 'lucide-react'
+import { X, FileText, ArrowRight, Pencil, Check, Clock, Trash2, StickyNote } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { Task } from './PersonalTaskCard'
@@ -11,6 +11,7 @@ interface PersonalTaskModalProps {
   onMove: (taskId: string, newStatus: string) => void
   onOpenNote?: (path: string) => void
   onTaskUpdated?: (updated: Task) => void
+  onTaskDeleted?: (taskId: string) => void
 }
 
 const statusButtons = [
@@ -41,11 +42,15 @@ export function PersonalTaskModal({
   onMove,
   onOpenNote,
   onTaskUpdated,
+  onTaskDeleted,
 }: PersonalTaskModalProps) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(task.description)
   const [categoryDraft, setCategoryDraft] = useState(task.category || '')
   const [saving, setSaving] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [notesDraft, setNotesDraft] = useState(task.notes || '')
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   const handleKeyDown = useCallback(
@@ -251,12 +256,43 @@ export function PersonalTaskModal({
           ))}
         </div>
 
-        {/* Source file link */}
-        {onOpenNote && (
-          <div className="p-4">
+        {/* Notes */}
+        <div className="px-4 py-3 border-b border-border">
+          <div className="flex items-center gap-2 mb-2">
+            <StickyNote className="w-4 h-4 text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">Notes</span>
+          </div>
+          <textarea
+            value={notesDraft}
+            onChange={(e) => setNotesDraft(e.target.value)}
+            onBlur={async () => {
+              const val = notesDraft.trim() || ''
+              if (val === (task.notes || '')) return
+              try {
+                const res = await fetch(`${apiUrl}/tasks/${task.id}`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ notes: val || null }),
+                })
+                if (res.ok) {
+                  const updated: Task = await res.json()
+                  onTaskUpdated?.(updated)
+                }
+              } catch (err) {
+                console.error('Failed to update notes:', err)
+              }
+            }}
+            placeholder="Add notes..."
+            rows={3}
+            className="w-full bg-muted border border-border rounded px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground resize-y focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+        </div>
+
+        {/* Source file link + Delete */}
+        <div className="p-4 flex items-center justify-between">
+          {onOpenNote ? (
             <button
               onClick={() => {
-                // Use source_file if it's a markdown note, otherwise build from date
                 let notePath: string
                 if (task.source_file && task.source_file.endsWith('.md')) {
                   notePath = task.source_file
@@ -271,8 +307,55 @@ export function PersonalTaskModal({
               <FileText className="w-4 h-4" />
               Open in Daily Note
             </button>
-          </div>
-        )}
+          ) : (
+            <div />
+          )}
+
+          {onTaskDeleted && !confirmingDelete && (
+            <button
+              onClick={() => setConfirmingDelete(true)}
+              className="flex items-center gap-1.5 text-sm text-red-400 hover:text-red-300 transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+              Delete
+            </button>
+          )}
+
+          {confirmingDelete && (
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-muted-foreground">Are you sure?</span>
+              <button
+                onClick={async () => {
+                  setDeleting(true)
+                  try {
+                    const res = await fetch(`${apiUrl}/tasks/${task.id}`, {
+                      method: 'DELETE',
+                    })
+                    if (res.ok || res.status === 204) {
+                      onTaskDeleted?.(task.id)
+                      onClose()
+                    }
+                  } catch (err) {
+                    console.error('Failed to delete task:', err)
+                  } finally {
+                    setDeleting(false)
+                    setConfirmingDelete(false)
+                  }
+                }}
+                disabled={deleting}
+                className="px-2 py-1 rounded bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
+              >
+                {deleting ? 'Deleting...' : 'Confirm'}
+              </button>
+              <button
+                onClick={() => setConfirmingDelete(false)}
+                className="px-2 py-1 rounded bg-muted text-muted-foreground hover:bg-muted/80 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

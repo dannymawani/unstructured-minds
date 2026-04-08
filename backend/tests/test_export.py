@@ -2,29 +2,57 @@
 
 import io
 import json
-import tempfile
 import zipfile
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
 
-from src.main import app
-from src.config import settings
+from src.config import LOCAL_USER_ID
 
 
 @pytest.fixture
-def client():
-    """Create test client."""
+def test_settings(tmp_path: Path):
+    """Create test settings with temp paths."""
+    with patch("src.config.Settings") as mock_settings_cls:
+        mock_settings = MagicMock()
+        mock_settings.vault_path = tmp_path / "vault"
+        mock_settings.data_path = tmp_path / "data"
+        mock_settings.duckdb_path = tmp_path / "data" / "test.duckdb"
+        mock_settings.host = "0.0.0.0"
+        mock_settings.port = 8000
+        mock_settings.debug = False
+        mock_settings.anthropic_api_key = "test-key"
+        mock_settings.claude_enabled = True
+        mock_settings.database_url = None
+        mock_settings.is_cloud_mode = False
+        mock_settings.cors_origins = "http://localhost:3000"
+
+        mock_settings.vault_path.mkdir(parents=True, exist_ok=True)
+        mock_settings.data_path.mkdir(parents=True, exist_ok=True)
+
+        with (
+            patch("src.main.settings", mock_settings),
+            patch("src.api.settings.settings", mock_settings),
+            patch("src.api.export.settings", mock_settings),
+        ):
+            yield mock_settings
+
+
+@pytest.fixture
+def client(test_settings):
+    """Create test client with mocked settings."""
+    from src.main import app
+
     with TestClient(app) as client:
         yield client
 
 
 @pytest.fixture
-def temp_vault(tmp_path):
-    """Create a temporary vault with test files."""
-    vault_path = tmp_path / "vault"
-    vault_path.mkdir()
+def temp_vault(test_settings):
+    """Create test files in the vault."""
+    vault_path = test_settings.vault_path
 
     # Create some test files
     (vault_path / "note1.md").write_text("# Test Note 1\nSome content here.")
@@ -41,11 +69,8 @@ def temp_vault(tmp_path):
 class TestExportVault:
     """Tests for vault export endpoint."""
 
-    def test_export_vault_success(self, client, temp_vault, monkeypatch):
+    def test_export_vault_success(self, client, temp_vault):
         """Test successful vault export."""
-        # Temporarily override vault path
-        monkeypatch.setattr(settings, "vault_path", temp_vault)
-
         response = client.get("/export/vault")
 
         assert response.status_code == 200
@@ -60,14 +85,14 @@ class TestExportVault:
             assert "note2.md" in names
             assert "Daily-Notes/2024-01-15.md" in names
 
-    def test_export_vault_not_found(self, client, tmp_path, monkeypatch):
-        """Test export when vault doesn't exist."""
-        nonexistent = tmp_path / "nonexistent"
-        monkeypatch.setattr(settings, "vault_path", nonexistent)
-
+    def test_export_vault_empty(self, client):
+        """Test export with empty vault returns empty ZIP."""
         response = client.get("/export/vault")
 
-        assert response.status_code == 404
+        assert response.status_code == 200
+        zip_buffer = io.BytesIO(response.content)
+        with zipfile.ZipFile(zip_buffer, "r") as zf:
+            assert zf.namelist() == []
 
 
 class TestExportData:
@@ -117,12 +142,9 @@ class TestExportData:
 class TestImportVault:
     """Tests for vault import endpoint."""
 
-    def test_import_vault_success(self, client, tmp_path, monkeypatch):
+    def test_import_vault_success(self, client, test_settings):
         """Test successful vault import."""
-        # Create a temporary vault path
-        vault_path = tmp_path / "vault"
-        vault_path.mkdir()
-        monkeypatch.setattr(settings, "vault_path", vault_path)
+        vault_path = test_settings.vault_path
 
         # Create a ZIP file to import
         zip_buffer = io.BytesIO()
@@ -142,7 +164,7 @@ class TestImportVault:
         assert data["success"] is True
         assert data["files_imported"] == 2
 
-        # Verify files were extracted
+        # Verify files were written to vault
         assert (vault_path / "imported_note.md").exists()
         assert (vault_path / "subdir" / "another.md").exists()
 
@@ -164,12 +186,8 @@ class TestImportVault:
 
         assert response.status_code == 400
 
-    def test_import_vault_path_traversal(self, client, tmp_path, monkeypatch):
+    def test_import_vault_path_traversal(self, client, test_settings):
         """Test that path traversal attacks are blocked."""
-        vault_path = tmp_path / "vault"
-        vault_path.mkdir()
-        monkeypatch.setattr(settings, "vault_path", vault_path)
-
         # Create a ZIP with path traversal attempt
         zip_buffer = io.BytesIO()
         with zipfile.ZipFile(zip_buffer, "w") as zf:

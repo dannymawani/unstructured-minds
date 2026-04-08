@@ -47,10 +47,13 @@ describe('Dashboard', () => {
       ok: true,
       json: async () => ({
         total_activities: 10,
-        total_exercises: 50,
+        total_daily_notes: 5,
         streak_days: 5,
         last_activity_date: '2026-02-01',
+        last_daily_note_date: '2026-02-01',
         activities: [],
+        groups: [],
+        total_entries: 0,
         metrics: [],
         progress: [],
         summary: { current_max: null, all_time_max: null, total_volume: 0, total_sessions: 0 },
@@ -60,7 +63,7 @@ describe('Dashboard', () => {
     render(<Dashboard />);
 
     expect(screen.getByText('Dashboard')).toBeInTheDocument();
-    expect(screen.getByTestId('exercise-select')).toBeInTheDocument();
+    expect(screen.getByTestId('dashboard')).toBeInTheDocument();
   });
 });
 
@@ -78,9 +81,10 @@ describe('DashboardSummary', () => {
       ok: true,
       json: async () => ({
         total_activities: 10,
-        total_exercises: 50,
+        total_daily_notes: 8,
         streak_days: 5,
         last_activity_date: '2026-02-01',
+        last_daily_note_date: '2026-02-01',
       }),
     });
 
@@ -91,7 +95,7 @@ describe('DashboardSummary', () => {
     });
 
     expect(screen.getByText('10')).toBeInTheDocument();
-    expect(screen.getByText('50')).toBeInTheDocument();
+    expect(screen.getByText('8')).toBeInTheDocument();
     expect(screen.getByText('5')).toBeInTheDocument();
   });
 
@@ -118,12 +122,17 @@ describe('WeeklyActivityChart', () => {
   });
 
   it('displays empty state when no data', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        activities: [],
-        total_duration_minutes: 0,
-      }),
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes('activity-groups')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ groups: [], total_entries: 0, period: '7d' }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ activities: [], total_duration_minutes: 0 }),
+      });
     });
 
     render(<WeeklyActivityChart />);
@@ -136,15 +145,30 @@ describe('WeeklyActivityChart', () => {
   });
 
   it('displays chart with data', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        activities: [
-          { activity_type: 'strength', count: 3, total_duration_minutes: 180 },
-          { activity_type: 'cardio', count: 2, total_duration_minutes: 60 },
-        ],
-        total_duration_minutes: 240,
-      }),
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes('activity-groups')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            groups: [
+              { group_name: 'Strength Training', entry_count: 3, subtypes: ['strength'] },
+              { group_name: 'Running / Cardio', entry_count: 2, subtypes: ['cardio'] },
+            ],
+            total_entries: 5,
+            period: '7d',
+          }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          activities: [
+            { activity_type: 'strength', count: 3, total_duration_minutes: 180 },
+            { activity_type: 'cardio', count: 2, total_duration_minutes: 60 },
+          ],
+          total_duration_minutes: 240,
+        }),
+      });
     });
 
     render(<WeeklyActivityChart />);

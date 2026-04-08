@@ -12,13 +12,17 @@ EXERCISE_SCHEMA: dict[str, Any] = {
     "properties": {
         "activities": {
             "type": "array",
-            "description": "List of workout activities found in the note",
+            "description": (
+                "List of workout activities ACTUALLY PERFORMED as logged in the note. "
+                "Ignore any exercises in blockquotes (> prefix) — those are suggestions, not completed workouts. "
+                "Only extract exercises the user explicitly logged with weights, reps, and sets."
+            ),
             "items": {
                 "type": "object",
                 "properties": {
                     "activity_type": {
                         "type": "string",
-                        "enum": ["strength", "bjj", "cardio", "yoga", "walk", "recovery", "other"],
+                        "enum": ["strength", "bjj", "cardio", "running", "cycling", "swimming", "yoga", "walk", "recovery", "other"],
                         "description": "Type of activity",
                     },
                     "duration_minutes": {
@@ -35,10 +39,33 @@ EXERCISE_SCHEMA: dict[str, Any] = {
                         "items": {
                             "type": "object",
                             "properties": {
-                                "name": {"type": "string", "description": "Exercise name"},
-                                "weight_kg": {"type": "number", "description": "Weight in kg"},
-                                "reps": {"type": "integer", "description": "Number of reps"},
-                                "sets": {"type": "integer", "description": "Number of sets"},
+                                "name": {
+                                    "type": "string",
+                                    "description": (
+                                        "Exercise name exactly as written by the user. "
+                                        "Preserve the user's original exercise name including any qualifiers "
+                                        "(e.g., 'Zercher Jefferson Curl', 'Biceps Preacher Cable Curl'). "
+                                        "Do not rename, simplify, or standardize exercise names."
+                                    ),
+                                },
+                                "sets": {
+                                    "type": "array",
+                                    "description": (
+                                        "Individual sets performed for this exercise. "
+                                        "Each set has its own weight and reps. "
+                                        "For example, '1x8 @ 20kg, 1x8 @ 40kg, 1x6 @ 60kg' becomes three set entries. "
+                                        "If the user writes '3x8 @ 80kg', expand to three identical set entries."
+                                    ),
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "weight_kg": {"type": "number", "description": "Weight in kg for this set"},
+                                            "reps": {"type": "integer", "description": "Number of reps for this set"},
+                                        },
+                                    },
+                                },
+                                "weight_kg": {"type": "number", "description": "Weight in kg (legacy, prefer sets array)"},
+                                "reps": {"type": "integer", "description": "Number of reps (legacy, prefer sets array)"},
                                 "duration_minutes": {"type": "integer", "description": "Duration in minutes"},
                                 "distance_km": {"type": "number", "description": "Distance in km"},
                             },
@@ -85,6 +112,10 @@ DAILY_METRICS_SCHEMA: dict[str, Any] = {
             "minimum": 1,
             "maximum": 10,
             "description": "Stress level rating 1-10",
+        },
+        "weight_kg": {
+            "type": "number",
+            "description": "Body weight in kilograms, if mentioned",
         },
         "notes": {
             "type": "string",
@@ -138,7 +169,13 @@ FOOD_LOG_SCHEMA: dict[str, Any] = {
     "properties": {
         "meals": {
             "type": "array",
-            "description": "List of meals/food entries",
+            "description": (
+                "List of meals/food entries. For EVERY meal, you MUST estimate "
+                "calories and macronutrients (protein, carbs, fat) based on the "
+                "food description, even if the user did not provide numbers. "
+                "Use your nutritional knowledge to provide reasonable estimates "
+                "for typical serving sizes."
+            ),
             "items": {
                 "type": "object",
                 "properties": {
@@ -153,30 +190,43 @@ FOOD_LOG_SCHEMA: dict[str, Any] = {
                     },
                     "description": {
                         "type": "string",
-                        "description": "What was eaten",
+                        "description": "What was eaten — include all items mentioned",
                     },
                     "calories": {
                         "type": "integer",
-                        "description": "Estimated calories",
+                        "description": (
+                            "Total estimated calories for this meal. "
+                            "ALWAYS provide an estimate even if the user didn't specify — "
+                            "use standard nutritional data for typical serving sizes."
+                        ),
                     },
                     "protein_g": {
                         "type": "integer",
-                        "description": "Protein in grams",
+                        "description": (
+                            "Estimated protein in grams. "
+                            "ALWAYS estimate based on the foods described."
+                        ),
                     },
                     "carbs_g": {
                         "type": "integer",
-                        "description": "Carbohydrates in grams",
+                        "description": (
+                            "Estimated carbohydrates in grams. "
+                            "ALWAYS estimate based on the foods described."
+                        ),
                     },
                     "fat_g": {
                         "type": "integer",
-                        "description": "Fat in grams",
+                        "description": (
+                            "Estimated fat in grams. "
+                            "ALWAYS estimate based on the foods described."
+                        ),
                     },
                     "notes": {
                         "type": "string",
                         "description": "Additional notes",
                     },
                 },
-                "required": ["description"],
+                "required": ["description", "calories", "protein_g", "carbs_g", "fat_g"],
             },
         },
     },
@@ -202,7 +252,7 @@ COMBINED_EXTRACTION_SCHEMA: dict[str, Any] = {
         "tasks": TASKS_SCHEMA["properties"]["tasks"],
         "meals": FOOD_LOG_SCHEMA["properties"]["meals"],
     },
-    "required": ["date"],
+    "required": [],
 }
 
 

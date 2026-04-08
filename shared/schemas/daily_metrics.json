@@ -1,0 +1,50 @@
+{
+  "name": "daily_metrics",
+  "description": "Daily health and wellness tracking",
+  "columns": [
+    {
+      "name": "date",
+      "type": "date",
+      "required": true,
+      "format": "YYYY-MM-DD"
+    },
+    {
+      "name": "weight_kg",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "sleep_rating",
+      "type": "integer",
+      "required": false,
+      "min": 1,
+      "max": 10
+    },
+    {
+      "name": "energy_rating",
+      "type": "integer",
+      "required": false,
+      "min": 1,
+      "max": 10
+    },
+    {
+      "name": "nutrition_rating",
+      "type": "integer",
+      "required": false,
+      "min": 1,
+      "max": 10
+    },
+    {
+      "name": "mood_rating",
+      "type": "integer",
+      "required": false,
+      "min": 1,
+      "max": 10
+    },
+    {
+      "name": "notes",
+      "type": "string",
+      "required": false
+    }
+  ]
+}

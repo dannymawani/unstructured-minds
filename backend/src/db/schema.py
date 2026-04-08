@@ -56,6 +56,7 @@ def init_database(db_path: Path | str) -> duckdb.DuckDBPyConnection:
             energy INTEGER,
             mood INTEGER,
             stress INTEGER,
+            weight_kg DECIMAL(4,1),
             notes VARCHAR,
             source_file VARCHAR,
             extracted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -92,6 +93,7 @@ def init_database(db_path: Path | str) -> duckdb.DuckDBPyConnection:
             priority INTEGER,
             source_file VARCHAR,
             deadline DATE,
+            notes TEXT,
             extracted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
@@ -125,6 +127,18 @@ def init_database(db_path: Path | str) -> duckdb.DuckDBPyConnection:
         conn.execute("SELECT deadline FROM tasks LIMIT 0")
     except duckdb.BinderException:
         conn.execute("ALTER TABLE tasks ADD COLUMN deadline DATE")
+
+    # Migration: add notes column to personal tasks if missing
+    try:
+        conn.execute("SELECT notes FROM tasks LIMIT 0")
+    except duckdb.BinderException:
+        conn.execute("ALTER TABLE tasks ADD COLUMN notes TEXT")
+
+    # Migration: add weight_kg column to daily_metrics if missing
+    try:
+        conn.execute("SELECT weight_kg FROM daily_metrics LIMIT 0")
+    except duckdb.BinderException:
+        conn.execute("ALTER TABLE daily_metrics ADD COLUMN weight_kg DECIMAL(4,1)")
 
     # Migration: normalize task statuses to new kanban values
     conn.execute("UPDATE tasks SET status = 'backlog' WHERE status IN ('pending', 'todo')")
@@ -160,6 +174,38 @@ def init_database(db_path: Path | str) -> duckdb.DuckDBPyConnection:
             id INTEGER PRIMARY KEY,
             task_id VARCHAR NOT NULL,
             note TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Progress reviews table (bi-weekly life profile reviews)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS progress_reviews (
+            id VARCHAR PRIMARY KEY,
+            period_start DATE NOT NULL,
+            period_end DATE NOT NULL,
+            key_wins TEXT[],
+            challenges TEXT[],
+            work_highlights TEXT,
+            training_summary TEXT,
+            personal_wins TEXT[],
+            health_metrics JSON,
+            goal_progress JSON,
+            focus_next TEXT[],
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Community exercises table (shared anonymous exercise contributions)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS community_exercises (
+            exercise_key VARCHAR PRIMARY KEY,
+            display_name VARCHAR NOT NULL,
+            aliases VARCHAR DEFAULT '[]',
+            muscle_groups VARCHAR DEFAULT '[]',
+            category VARCHAR DEFAULT 'other',
+            recovery_hours INTEGER DEFAULT 48,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
@@ -264,6 +310,12 @@ def _create_indexes(conn: duckdb.DuckDBPyConnection) -> None:
         ON file_index(extension)
     """)
 
+    # Index on progress_reviews for timeline queries
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_reviews_period
+        ON progress_reviews(period_start)
+    """)
+
     # Index on activities for dashboard queries
     conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_activities_date
@@ -273,6 +325,27 @@ def _create_indexes(conn: duckdb.DuckDBPyConnection) -> None:
     conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_activities_type
         ON activities(activity_type)
+    """)
+
+    # Composite indexes for common query patterns
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_exercise_name_date
+        ON exercise_log(exercise_name, date)
+    """)
+
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_tasks_date_status
+        ON tasks(date, status)
+    """)
+
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_activities_date_type
+        ON activities(date, activity_type)
+    """)
+
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_food_date_type
+        ON food_log(date, meal_type)
     """)
 
 

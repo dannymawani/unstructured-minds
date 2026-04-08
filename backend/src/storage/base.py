@@ -57,6 +57,19 @@ class StorageBackend(Protocol):
         """
         ...
 
+    async def rename(self, old_path: str, new_path: str) -> None:
+        """Rename/move a file.
+
+        Args:
+            old_path: Current relative path
+            new_path: New relative path
+
+        Raises:
+            FileNotFoundError: If source file doesn't exist
+            FileExistsError: If destination file already exists
+        """
+        ...
+
     async def exists(self, path: str) -> bool:
         """Check if file exists.
 

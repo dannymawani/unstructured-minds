@@ -4,6 +4,7 @@ import { commonmark } from '@milkdown/kit/preset/commonmark'
 import { gfm } from '@milkdown/kit/preset/gfm'
 import { history } from '@milkdown/kit/plugin/history'
 import { listener, listenerCtx } from '@milkdown/kit/plugin/listener'
+import { tableBlock, tableBlockConfig } from '@milkdown/kit/component/table-block'
 import { Milkdown, MilkdownProvider, useEditor } from '@milkdown/react'
 import { slash, useSlashPlugin, codeBlockExitPlugin } from './EditorPlugins'
 import { EditorToolbar } from './EditorToolbar'
@@ -54,11 +55,29 @@ function EditorContent({
       })
       .use(commonmark)
       .use(gfm)
+      .use(tableBlock)
       .use(history)
       .use(listener)
       .use(slash)
       .use(codeBlockExitPlugin)
       .config((ctx) => {
+        ctx.update(tableBlockConfig.key, (defaultConfig) => ({
+          ...defaultConfig,
+          renderButton: (renderType: string) => {
+            switch (renderType) {
+              case 'add_row': return '+'
+              case 'add_col': return '+'
+              case 'delete_row': return '×'
+              case 'delete_col': return '×'
+              case 'align_col_left': return '←'
+              case 'align_col_center': return '↔'
+              case 'align_col_right': return '→'
+              case 'col_drag_handle': return '⠿'
+              case 'row_drag_handle': return '⠿'
+              default: return ''
+            }
+          },
+        }))
         ctx.get(listenerCtx).markdownUpdated((_ctx, markdown) => {
           onChangeRef.current(markdown)
           isDirtyRef.current = true
@@ -94,7 +113,7 @@ interface MarkdownEditorProps {
 
 export function MarkdownEditor(props: MarkdownEditorProps) {
   return (
-    <div className="milkdown-editor h-full max-w-none">
+    <div className="milkdown-editor min-h-full max-w-none bg-card">
       <MilkdownProvider>
         <EditorContent {...props} />
       </MilkdownProvider>

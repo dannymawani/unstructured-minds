@@ -1,5 +1,6 @@
 """API routes for vault file operations."""
 
+import logging
 import re
 from datetime import datetime
 
@@ -12,6 +13,10 @@ from ..middleware import validate_file_path, PathValidationError
 from ..middleware.validation import MAX_FILE_PATH_LENGTH, MAX_QUERY_LENGTH
 from ..storage import StorageBackend
 from ..templates.daily_note import render_daily_note
+from .dependencies import get_storage as _dep_get_storage, get_user_id
+from .settings import resolve_daily_note_path
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -64,6 +69,21 @@ class FileDeleteResponse(BaseModel):
     success: bool
 
 
+class FileRenameRequest(BaseModel):
+    """Request to rename a file."""
+
+    old_path: str = Field(..., max_length=MAX_FILE_PATH_LENGTH)
+    new_path: str = Field(..., max_length=MAX_FILE_PATH_LENGTH)
+
+
+class FileRenameResponse(BaseModel):
+    """Response for file rename."""
+
+    old_path: str
+    new_path: str
+    success: bool
+
+
 class QuickCaptureRequest(BaseModel):
     """Request for quick capture."""
 
@@ -78,14 +98,71 @@ class QuickCaptureResponse(BaseModel):
     timestamp: str
 
 
+async def _add_also_worked_on(
+    storage: StorageBackend, file_path: str
+) -> None:
+    """Add a reference to a modified file in today's daily note.
+
+    Appends to an '## Also worked on' section at the bottom of the daily note.
+    Only adds if the file is not already referenced.
+    """
+    now = datetime.now()
+    date_str = now.strftime("%Y-%m-%d")
+    daily_path = resolve_daily_note_path(date_str)
+
+    # Don't add self-references
+    if file_path == daily_path:
+        return
+
+    # Check if daily note exists
+    if not await storage.exists(daily_path):
+        return
+
+    try:
+        content_bytes = await storage.read(daily_path)
+        content = content_bytes.decode("utf-8")
+
+        # Check if file is already referenced as a wikilink
+        if f"[[{file_path}]]" in content:
+            return
+
+        # Find or create "Also worked on" section
+        section_header = "## Also worked on"
+        if section_header in content:
+            # Append to existing section
+            idx = content.index(section_header) + len(section_header)
+            # Find end of line after header
+            newline_idx = content.index("\n", idx) if "\n" in content[idx:] else len(content)
+            entry = f"\n- [[{file_path}]]"
+            content = content[:newline_idx] + entry + content[newline_idx:]
+        else:
+            # Add new section at end
+            content = content.rstrip() + f"\n\n{section_header}\n- [[{file_path}]]\n"
+
+        await storage.write(daily_path, content.encode("utf-8"))
+    except Exception:
+        logger.debug("Failed to update daily note with 'also worked on' reference", exc_info=True)
+
+
+def _is_daily_note_path(file_path: str) -> bool:
+    """Check if a file path looks like a daily note."""
+    filename = file_path.split("/")[-1].replace(".md", "")
+    clean_name = re.sub(r"-daily-note$", "", filename)
+    try:
+        datetime.strptime(clean_name, "%Y-%m-%d")
+        return True
+    except ValueError:
+        return False
+
+
 def get_db(request: Request) -> DatabaseManager:
     """Get database manager from app state."""
     return request.app.state.db
 
 
 def get_storage(request: Request) -> StorageBackend:
-    """Get storage backend from app state."""
-    return request.app.state.storage
+    """Get storage backend (user-scoped in cloud mode)."""
+    return _dep_get_storage(request)
 
 
 # =============================================================================
@@ -201,6 +278,7 @@ async def write_file(
     body: FileWriteRequest,
     extract: bool = Query(True, description="Whether to trigger Claude extraction after save"),
     storage: StorageBackend = Depends(get_storage),
+    user_id: str = Depends(get_user_id),
 ) -> FileWriteResponse:
     """Write a file to the vault.
 
@@ -230,11 +308,28 @@ async def write_file(
                 db = request.app.state.db
                 if claude.is_configured:
                     from ..extraction import ExtractionPipeline
-                    pipeline = ExtractionPipeline(db, claude)
+                    pipeline = ExtractionPipeline(db, claude, user_id=user_id)
                     result = await pipeline.extract(body.path, body.content)
                     did_extract = result.success
+
+                    # Clean up demo data for the extracted date
+                    if did_extract:
+                        try:
+                            from ..onboarding.lifecycle import cleanup_demo_for_date
+                            extracted_date = pipeline._extract_date_from_path(body.path)
+                            if extracted_date:
+                                cleanup_demo_for_date(db, extracted_date, user_id)
+                        except Exception:
+                            pass  # Demo cleanup failure shouldn't fail the save
             except Exception:
                 pass  # Extraction failure shouldn't fail the save
+
+            # Add "also worked on" reference for non-daily-note files
+            if not _is_daily_note_path(body.path):
+                try:
+                    await _add_also_worked_on(storage, body.path)
+                except Exception:
+                    pass
 
         return FileWriteResponse(path=body.path, success=True, extracted=did_extract)
     except ValueError as e:
@@ -275,6 +370,121 @@ async def delete_file(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.patch("/vault/file", response_model=FileRenameResponse)
+async def rename_file(
+    body: FileRenameRequest,
+    storage: StorageBackend = Depends(get_storage),
+) -> FileRenameResponse:
+    """Rename a file in the vault.
+
+    Args:
+        body: Old and new file paths
+
+    Returns:
+        Success status with old and new paths
+    """
+    # Validate both paths for security
+    try:
+        validate_file_path(body.old_path, allow_any_extension=True)
+        validate_file_path(body.new_path, allow_any_extension=True)
+    except PathValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    try:
+        await storage.rename(body.old_path, body.new_path)
+        invalidate_all()
+
+        return FileRenameResponse(
+            old_path=body.old_path, new_path=body.new_path, success=True
+        )
+    except FileNotFoundError:
+        raise HTTPException(
+            status_code=404, detail=f"File not found: {body.old_path}"
+        )
+    except FileExistsError:
+        raise HTTPException(
+            status_code=409, detail=f"File already exists: {body.new_path}"
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# =============================================================================
+# Daily Note Migration Endpoint
+# =============================================================================
+
+
+class MigrateResponse(BaseModel):
+    """Response for migration."""
+
+    success: bool
+    moved: int
+    details: list[str]
+
+
+@router.post("/vault/migrate-daily-notes", response_model=MigrateResponse)
+async def migrate_daily_notes(
+    storage: StorageBackend = Depends(get_storage),
+) -> MigrateResponse:
+    """Migrate daily notes from Daily-Notes/YYYY-MM/ to the configured template path.
+
+    Moves files matching YYYY-MM-DD.md from the old structure to the new one.
+    Also moves Life-Profile.md to root if found.
+    """
+    from .settings import get_daily_note_template
+
+    template = get_daily_note_template()
+    details: list[str] = []
+    moved = 0
+
+    try:
+        all_files = await storage.list("Daily-Notes")
+    except Exception:
+        return MigrateResponse(success=True, moved=0, details=["No Daily-Notes directory found"])
+
+    for file_path in all_files:
+        if not file_path.endswith(".md"):
+            continue
+
+        filename = file_path.split("/")[-1]
+        basename = filename.replace(".md", "")
+
+        # Move date-based files to new template path
+        try:
+            datetime.strptime(basename, "%Y-%m-%d")
+        except ValueError:
+            # Non-date file (e.g. Life-Profile.md) — move to root
+            new_path = filename
+            try:
+                if not await storage.exists(new_path):
+                    await storage.rename(file_path, new_path)
+                    details.append(f"{file_path} -> {new_path}")
+                    moved += 1
+            except Exception as e:
+                details.append(f"Error moving {file_path}: {e}")
+            continue
+
+        # Date-based file — compute new path from template
+        new_path = resolve_daily_note_path(basename)
+        if new_path == file_path:
+            continue
+
+        try:
+            if await storage.exists(new_path):
+                details.append(f"Skipped {file_path} (target exists: {new_path})")
+                continue
+            await storage.rename(file_path, new_path)
+            details.append(f"{file_path} -> {new_path}")
+            moved += 1
+        except Exception as e:
+            details.append(f"Error moving {file_path}: {e}")
+
+    invalidate_all()
+    return MigrateResponse(success=True, moved=moved, details=details)
+
+
 # =============================================================================
 # Quick Capture Endpoint
 # =============================================================================
@@ -300,10 +510,9 @@ async def quick_capture(
     now = datetime.now()
     date_str = now.strftime("%Y-%m-%d")
     time_str = now.strftime("%H:%M")
-    year_month = now.strftime("%Y-%m")
 
-    # Build the file path: Daily-Notes/YYYY-MM/YYYY-MM-DD.md
-    file_path = f"Daily-Notes/{year_month}/{date_str}.md"
+    # Build the file path using configurable template
+    file_path = resolve_daily_note_path(date_str)
 
     # Format the quick note entry
     quick_note_entry = f"- {time_str} - {request.text}"
@@ -346,8 +555,12 @@ async def quick_capture(
 
             await storage.write(file_path, new_content.encode("utf-8"))
         else:
-            # Create new daily note from shared template, then append quick capture
-            content = render_daily_note(date_str)
+            # Create new daily note from vault template (or hardcoded fallback)
+            try:
+                tpl_bytes = await storage.read("Templates/daily.md")
+                content = tpl_bytes.decode("utf-8")
+            except Exception:
+                content = render_daily_note()
             # Insert quick note entry under the Adhoc Notes section
             adhoc_match = re.search(r"(## .*Adhoc Notes\n)", content)
             if adhoc_match:

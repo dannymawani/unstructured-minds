@@ -58,6 +58,7 @@ frontend/build/
 data/*.duckdb
 data/*.duckdb.wal
 data/*.csv
+data/ai_exercise_cache.json
 !data/.gitkeep
 
 # Backend runtime data
@@ -66,8 +67,9 @@ backend/data/*.duckdb.wal
 backend/data/*.json
 !backend/data/.gitkeep
 
-# User vault - personal notes
-vault/
+# User vault - personal notes (but track templates)
+vault/*
+!vault/Templates/
 
 # Docker
 .docker/

@@ -1,0 +1,77 @@
+{
+  "name": "exercise_log",
+  "description": "Training activities including strength, BJJ, cardio, etc.",
+  "columns": [
+    {
+      "name": "date",
+      "type": "date",
+      "required": true,
+      "format": "YYYY-MM-DD"
+    },
+    {
+      "name": "activity_id",
+      "type": "string",
+      "required": true,
+      "description": "Unique activity identifier: YYYYMMDD_type_index (e.g., 20260103_str_1)"
+    },
+    {
+      "name": "time",
+      "type": "time",
+      "required": false,
+      "format": "HH:MM"
+    },
+    {
+      "name": "activity_type",
+      "type": "string",
+      "required": true,
+      "allowed_values": [
+        "strength",
+        "bjj",
+        "cardio",
+        "running",
+        "cycling",
+        "swimming",
+        "yoga",
+        "walk",
+        "recovery",
+        "other"
+      ]
+    },
+    {
+      "name": "exercise_name",
+      "type": "string",
+      "required": false
+    },
+    {
+      "name": "weight_kg",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "reps",
+      "type": "integer",
+      "required": false
+    },
+    {
+      "name": "set_number",
+      "type": "integer",
+      "required": false,
+      "description": "Sequential set number per exercise per activity"
+    },
+    {
+      "name": "duration_minutes",
+      "type": "integer",
+      "required": false
+    },
+    {
+      "name": "distance_km",
+      "type": "decimal",
+      "required": false
+    },
+    {
+      "name": "notes",
+      "type": "string",
+      "required": false
+    }
+  ]
+}

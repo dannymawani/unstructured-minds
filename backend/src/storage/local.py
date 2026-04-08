@@ -107,6 +107,28 @@ class LocalFilesystem:
 
         return sorted(files)
 
+    async def rename(self, old_path: str, new_path: str) -> None:
+        """Rename/move a file.
+
+        Args:
+            old_path: Current relative path
+            new_path: New relative path
+
+        Raises:
+            FileNotFoundError: If source file doesn't exist
+            FileExistsError: If destination file already exists
+        """
+        old_full = self._resolve_path(old_path)
+        new_full = self._resolve_path(new_path)
+
+        if not old_full.exists():
+            raise FileNotFoundError(f"File not found: {old_path}")
+        if new_full.exists():
+            raise FileExistsError(f"File already exists: {new_path}")
+
+        new_full.parent.mkdir(parents=True, exist_ok=True)
+        await aiofiles.os.rename(old_full, new_full)
+
     async def exists(self, path: str) -> bool:
         """Check if file exists.
 

@@ -23,6 +23,8 @@ def test_settings(tmp_path: Path):
         mock_settings.debug = False
         mock_settings.anthropic_api_key = None
         mock_settings.claude_enabled = False
+        mock_settings.database_url = None
+        mock_settings.is_cloud_mode = False
 
         # Create directories
         mock_settings.vault_path.mkdir(parents=True, exist_ok=True)
@@ -67,12 +69,11 @@ class TestDailyNoteSkill:
         result = await skill.execute(context)
 
         assert result.success
-        assert result.file_path == "Daily-Notes/2026-02/2026-02-02.md"
+        assert result.file_path == "2026/02/2026-02-02-daily-note.md"
         mock_storage.write.assert_called_once()
         content = mock_storage.write.call_args[0][1].decode("utf-8")
-        assert "date: 2026-02-02" in content
-        assert "[[2026-02-01]]" in content  # Previous day link
-        assert "[[2026-02-03]]" in content  # Next day link
+        assert "## 🎯 Today's Focus" in content
+        assert "## 💼 Work" in content
 
     @pytest.mark.asyncio
     async def test_uses_today_when_no_date(self, mock_storage):
@@ -187,7 +188,7 @@ class TestSkillsAPI:
         assert response.status_code == 200
         data = response.json()
         assert data["success"]
-        assert "Daily-Notes/2026-02/2026-02-02.md" in data["file_path"]
+        assert "2026/02/2026-02-02-daily-note.md" in data["file_path"]
 
     def test_execute_unknown_skill(self, client):
         """Test error when executing unknown skill."""

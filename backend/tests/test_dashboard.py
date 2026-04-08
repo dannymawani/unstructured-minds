@@ -21,6 +21,8 @@ def test_settings(tmp_path: Path):
         mock_settings.debug = False
         mock_settings.anthropic_api_key = None
         mock_settings.claude_enabled = False
+        mock_settings.database_url = None
+        mock_settings.is_cloud_mode = False
 
         mock_settings.vault_path.mkdir(parents=True, exist_ok=True)
         mock_settings.data_path.mkdir(parents=True, exist_ok=True)
@@ -251,3 +253,199 @@ class TestDashboardSummary:
         assert "total_exercises" in data
         assert "streak_days" in data
         assert "last_activity_date" in data
+
+
+class TestEnduranceCreate:
+    """Tests for endurance activity creation endpoint."""
+
+    def test_create_running_activity(self, client):
+        """Test creating a running activity."""
+        response = client.post(
+            "/dashboard/endurance",
+            json={
+                "date": str(date.today()),
+                "sport": "running",
+                "distance_km": 5.0,
+                "duration_minutes": 25,
+                "notes": "Easy pace",
+            },
+        )
+        assert response.status_code == 201
+        data = response.json()
+        assert data["message"] == "Running activity logged successfully"
+        assert "activity_id" in data
+        assert "exercise_id" in data
+
+    def test_create_cycling_activity(self, client):
+        """Test creating a cycling activity."""
+        response = client.post(
+            "/dashboard/endurance",
+            json={"date": str(date.today()), "sport": "cycling", "distance_km": 30.0, "duration_minutes": 60},
+        )
+        assert response.status_code == 201
+
+    def test_create_swimming_activity(self, client):
+        """Test creating a swimming activity without distance."""
+        response = client.post(
+            "/dashboard/endurance",
+            json={"date": str(date.today()), "sport": "swimming", "duration_minutes": 45},
+        )
+        assert response.status_code == 201
+
+    def test_invalid_sport_rejected(self, client):
+        """Test that invalid sport type is rejected."""
+        response = client.post(
+            "/dashboard/endurance",
+            json={"date": str(date.today()), "sport": "hiking"},
+        )
+        assert response.status_code == 422
+
+
+@pytest.fixture
+def db_with_endurance(client):
+    """Seed database with endurance test data."""
+    from src.main import app
+    db = app.state.db
+
+    today = date.today()
+    for i in range(5):
+        day = today - timedelta(days=i * 2)
+        activity_id = f"run_{i}"
+        db.execute(
+            "INSERT INTO activities (id, date, activity_type, duration_minutes, notes) VALUES (?, ?, ?, ?, ?)",
+            [activity_id, str(day), "running", 25 + i * 5, f"Run {i}"],
+        )
+        db.execute(
+            """INSERT INTO exercise_log (id, activity_id, date, exercise_name, distance_km, duration_minutes, source_file, extracted_at)
+            VALUES (?, ?, ?, 'Running', ?, ?, 'manual_entry', CURRENT_TIMESTAMP)""",
+            [f"ex_run_{i}", activity_id, str(day), 5.0 + i * 0.5, 25 + i * 5],
+        )
+
+    # Add a cycling session
+    db.execute(
+        "INSERT INTO activities (id, date, activity_type, duration_minutes) VALUES (?, ?, 'cycling', 60)",
+        ["cycle_0", str(today)],
+    )
+    db.execute(
+        """INSERT INTO exercise_log (id, activity_id, date, exercise_name, distance_km, duration_minutes, source_file, extracted_at)
+        VALUES (?, ?, ?, 'Cycling', 30.0, 60, 'manual_entry', CURRENT_TIMESTAMP)""",
+        ["ex_cycle_0", "cycle_0", str(today)],
+    )
+    return db
+
+
+class TestEnduranceTable:
+    """Tests for endurance table endpoint."""
+
+    def test_returns_all_endurance_entries(self, client, db_with_endurance):
+        response = client.get("/dashboard/endurance-table")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total_count"] == 6  # 5 runs + 1 cycle
+        assert len(data["entries"]) == 6
+
+    def test_filter_by_sport(self, client, db_with_endurance):
+        response = client.get("/dashboard/endurance-table?sport=running")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total_count"] == 5
+        assert all(e["sport"] == "running" for e in data["entries"])
+
+    def test_pace_calculated(self, client, db_with_endurance):
+        response = client.get("/dashboard/endurance-table?sport=running")
+        data = response.json()
+        entry = data["entries"][0]
+        assert entry["pace_min_per_km"] is not None
+        assert entry["speed_kmh"] is not None
+
+    def test_pagination(self, client, db_with_endurance):
+        response = client.get("/dashboard/endurance-table?limit=2&offset=0")
+        data = response.json()
+        assert len(data["entries"]) == 2
+        assert data["total_count"] == 6
+
+    def test_empty_db(self, client):
+        response = client.get("/dashboard/endurance-table")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["entries"] == []
+        assert data["total_count"] == 0
+
+
+class TestEnduranceProgress:
+    """Tests for endurance progress endpoint."""
+
+    def test_returns_progress_for_sport(self, client, db_with_endurance):
+        response = client.get("/dashboard/endurance-progress?sport=running")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["sport"] == "running"
+        assert len(data["progress"]) == 5
+
+    def test_summary_stats(self, client, db_with_endurance):
+        response = client.get("/dashboard/endurance-progress?sport=running")
+        data = response.json()
+        summary = data["summary"]
+        assert summary["total_sessions"] == 5
+        assert summary["total_distance_km"] > 0
+        assert summary["total_duration_minutes"] > 0
+        assert summary["best_pace_min_per_km"] is not None
+        assert summary["longest_distance_km"] is not None
+
+    def test_invalid_sport(self, client):
+        response = client.get("/dashboard/endurance-progress?sport=hiking")
+        assert response.status_code == 400
+
+    def test_sport_required(self, client):
+        response = client.get("/dashboard/endurance-progress")
+        assert response.status_code == 422
+
+    def test_empty_sport(self, client, db_with_endurance):
+        response = client.get("/dashboard/endurance-progress?sport=swimming")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["progress"] == []
+        assert data["summary"]["total_sessions"] == 0
+
+
+@pytest.fixture
+def db_with_weight(client):
+    """Seed database with body weight test data."""
+    from src.main import app
+    db = app.state.db
+
+    today = date.today()
+    for i in range(5):
+        day = today - timedelta(days=i * 7)
+        db.execute(
+            "INSERT INTO daily_metrics (date, weight_kg, source_file) VALUES (?, ?, ?)",
+            [str(day), 82.0 - i * 0.3, f"notes/{day}.md"],
+        )
+    return db
+
+
+class TestBodyWeight:
+    """Tests for body weight endpoint."""
+
+    def test_returns_weight_data(self, client, db_with_weight):
+        response = client.get("/dashboard/body-weight")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["entries"]) == 5
+        assert data["current_kg"] is not None
+        assert data["period_change_kg"] is not None
+
+    def test_empty_db(self, client):
+        response = client.get("/dashboard/body-weight")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["entries"] == []
+        assert data["current_kg"] is None
+        assert data["period_change_kg"] is None
+
+    def test_period_change_calculation(self, client, db_with_weight):
+        response = client.get("/dashboard/body-weight?days=90")
+        data = response.json()
+        entries = data["entries"]
+        expected_change = round(entries[-1]["weight_kg"] - entries[0]["weight_kg"], 1)
+        assert data["period_change_kg"] == expected_change

@@ -1,7 +1,7 @@
-import { useRef } from 'react'
+import { memo, useRef } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Clock, FileText } from 'lucide-react'
+import { Clock, FileText, StickyNote } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export interface Task {
@@ -14,6 +14,7 @@ export interface Task {
   priority: number | null
   source_file: string | null
   deadline: string | null
+  notes: string | null
 }
 
 interface PersonalTaskCardProps {
@@ -40,7 +41,7 @@ function getFilename(path: string): string {
   return parts[parts.length - 1] || path
 }
 
-export function PersonalTaskCard({ task, onTaskClick }: PersonalTaskCardProps) {
+export const PersonalTaskCard = memo(function PersonalTaskCard({ task, onTaskClick }: PersonalTaskCardProps) {
   const mouseStart = useRef<{ x: number; y: number } | null>(null)
 
   const {
@@ -119,6 +120,11 @@ export function PersonalTaskCard({ task, onTaskClick }: PersonalTaskCardProps) {
             {new Date(task.deadline + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
           </span>
         )}
+        {task.notes && (
+          <span className="flex items-center text-xs text-muted-foreground" title="Has notes">
+            <StickyNote className="w-3 h-3" />
+          </span>
+        )}
       </div>
 
       <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -134,4 +140,4 @@ export function PersonalTaskCard({ task, onTaskClick }: PersonalTaskCardProps) {
       </div>
     </div>
   )
-}
+})

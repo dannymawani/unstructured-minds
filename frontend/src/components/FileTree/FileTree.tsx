@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react'
+import { createPortal } from 'react-dom'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { Plus, FolderPlus, RefreshCw, FileText, CalendarDays, LayoutTemplate, ChevronDown } from 'lucide-react'
+import { Plus, FolderPlus, RefreshCw, FileText, CalendarDays, LayoutTemplate, ChevronDown, Trash2, Pencil, CaseSensitive } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { FileTreeItem, type FileNode } from './FileTreeItem'
 
@@ -16,6 +17,9 @@ interface FileTreeProps {
   apiBaseUrl?: string
   onCreateDailyNote?: () => void
   onOpenTemplatePicker?: () => void
+  onDeleteFile?: (path: string) => void
+  onRenameFile?: (oldPath: string, newPath: string) => void
+  refreshTrigger?: number
 }
 
 interface FlattenedNode {
@@ -29,50 +33,63 @@ const MONTH_NAMES = [
 ]
 
 /**
- * Transform Daily-Notes children from flat YYYY-MM folders
- * into a year > month hierarchy with human-readable month names.
+ * Transform daily note folder structures for display.
+ * When showMonthNames is true, renames month folders to human-readable names.
  */
-export function transformDailyNotes(roots: FileNode[]): FileNode[] {
+export function transformDailyNotes(roots: FileNode[], showMonthNames = false): FileNode[] {
+  // Handle legacy Daily-Notes/YYYY-MM structure
   const dailyNotes = roots.find(
     (n) => n.path === 'Daily-Notes' && n.isDirectory
   )
-  if (!dailyNotes || !dailyNotes.children) return roots
+  if (dailyNotes && dailyNotes.children) {
+    const monthPattern = /^(\d{4})-(\d{2})$/
+    const yearMap = new Map<string, FileNode[]>()
+    const otherChildren: FileNode[] = []
 
-  // Separate month folders (YYYY-MM) from other children (e.g. Life-Profile.md)
-  const monthPattern = /^(\d{4})-(\d{2})$/
-  const yearMap = new Map<string, FileNode[]>()
-  const otherChildren: FileNode[] = []
-
-  for (const child of dailyNotes.children) {
-    const match = child.name.match(monthPattern)
-    if (match && child.isDirectory) {
-      const year = match[1]
-      const monthIdx = parseInt(match[2], 10) - 1
-      const displayName = MONTH_NAMES[monthIdx] || child.name
-      const transformed: FileNode = {
-        ...child,
-        displayName,
+    for (const child of dailyNotes.children) {
+      const match = child.name.match(monthPattern)
+      if (match && child.isDirectory) {
+        const year = match[1]
+        if (showMonthNames) {
+          const monthIdx = parseInt(match[2], 10) - 1
+          child.displayName = MONTH_NAMES[monthIdx] || child.name
+        }
+        if (!yearMap.has(year)) yearMap.set(year, [])
+        yearMap.get(year)!.push(child)
+      } else {
+        otherChildren.push(child)
       }
-      if (!yearMap.has(year)) yearMap.set(year, [])
-      yearMap.get(year)!.push(transformed)
-    } else {
-      otherChildren.push(child)
     }
+
+    const yearNodes: FileNode[] = [...yearMap.entries()]
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([year, months]) => ({
+        path: `Daily-Notes/__year__/${year}`,
+        name: year,
+        isDirectory: true,
+        isVirtual: true,
+        children: months.sort((a, b) => b.path.localeCompare(a.path)),
+      }))
+
+    dailyNotes.children = [...otherChildren, ...yearNodes]
   }
 
-  // Build virtual year nodes, sorted newest first
-  const yearNodes: FileNode[] = [...yearMap.entries()]
-    .sort((a, b) => b[0].localeCompare(a[0]))
-    .map(([year, months]) => ({
-      path: `Daily-Notes/__year__/${year}`,
-      name: year,
-      isDirectory: true,
-      isVirtual: true,
-      children: months.sort((a, b) => b.path.localeCompare(a.path)),
-    }))
-
-  // Non-month children first (files), then year nodes
-  dailyNotes.children = [...otherChildren, ...yearNodes]
+  // Handle new YYYY/MM structure: optionally rename month folders
+  if (showMonthNames) {
+    const yearPattern = /^\d{4}$/
+    const monthFolderPattern = /^(\d{2})$/
+    for (const root of roots) {
+      if (root.isDirectory && yearPattern.test(root.name) && root.children) {
+        for (const child of root.children) {
+          const match = child.name.match(monthFolderPattern)
+          if (match && child.isDirectory) {
+            const monthIdx = parseInt(match[1], 10) - 1
+            child.displayName = MONTH_NAMES[monthIdx] || child.name
+          }
+        }
+      }
+    }
+  }
 
   return roots
 }
@@ -81,10 +98,17 @@ export function buildTree(files: FileInfo[]): FileNode[] {
   const nodeMap = new Map<string, FileNode>()
   const roots: FileNode[] = []
 
-  // Sort: directories first, then newest first (reverse alpha for date-based names)
+  // Sort: directories first (shallow before deep to ensure parents exist in nodeMap),
+  // then newest first (reverse alpha for date-based names)
   const sortedFiles = [...files].sort((a, b) => {
     if (a.is_directory !== b.is_directory) {
       return a.is_directory ? -1 : 1
+    }
+    // For directories, sort shallow-first so parents are processed before children
+    if (a.is_directory && b.is_directory) {
+      const depthA = a.path.split('/').length
+      const depthB = b.path.split('/').length
+      if (depthA !== depthB) return depthA - depthB
     }
     // Reverse sort so newest dates appear first
     return b.path.localeCompare(a.path)
@@ -151,17 +175,38 @@ export function FileTree({
   apiBaseUrl = '',
   onCreateDailyNote,
   onOpenTemplatePicker,
+  onDeleteFile,
+  onRenameFile,
+  refreshTrigger,
 }: FileTreeProps) {
   const [files, setFiles] = useState<FileNode[]>([])
+  const [showMonthNames, setShowMonthNames] = useState(false)
+
+  // Fetch month name preference from settings on mount
+  useEffect(() => {
+    fetch(`${apiBaseUrl}/settings`)
+      .then(r => r.json())
+      .then(data => {
+        if (typeof data.show_month_names === 'boolean') {
+          setShowMonthNames(data.show_month_names)
+        }
+      })
+      .catch(() => {})
+  }, [apiBaseUrl])
+
   const [expanded, setExpanded] = useState<Set<string>>(() => {
-    // Auto-expand Daily-Notes, current year, and current month folder on first load
+    // Auto-expand current year and month folders on first load (both structures)
     const now = new Date()
     const year = String(now.getFullYear())
-    const month = `${year}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    const monthStr = String(now.getMonth() + 1).padStart(2, '0')
     return new Set([
+      // Legacy Daily-Notes structure
       'Daily-Notes',
       `Daily-Notes/__year__/${year}`,
-      `Daily-Notes/${month}`,
+      `Daily-Notes/${year}-${monthStr}`,
+      // New YYYY/MM structure
+      year,
+      `${year}/${monthStr}`,
     ])
   })
   const [loading, setLoading] = useState(true)
@@ -179,18 +224,27 @@ export function FileTree({
         throw new Error(`Failed to fetch files: ${response.statusText}`)
       }
       const data = await response.json()
-      const tree = transformDailyNotes(buildTree(data.files))
+      const tree = transformDailyNotes(buildTree(data.files), showMonthNames)
       setFiles(tree)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load files')
     } finally {
       setLoading(false)
     }
-  }, [apiBaseUrl])
+  }, [apiBaseUrl, showMonthNames])
 
   useEffect(() => {
     fetchFiles()
   }, [fetchFiles])
+
+  // Refresh when triggered externally (e.g. after catchup creates notes)
+  const refreshTriggerRef = useRef(refreshTrigger)
+  useEffect(() => {
+    if (refreshTrigger !== refreshTriggerRef.current) {
+      refreshTriggerRef.current = refreshTrigger
+      fetchFiles()
+    }
+  }, [refreshTrigger, fetchFiles])
 
   // Memoize toggle handler to prevent re-renders
   const handleToggle = useCallback((path: string) => {
@@ -255,6 +309,156 @@ export function FileTree({
       setError(err instanceof Error ? err.message : 'Failed to create folder')
     }
   }, [apiBaseUrl, fetchFiles])
+
+  // Context menu state for file deletion
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; path: string } | null>(null)
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const contextMenuRef = useRef<HTMLDivElement>(null)
+
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent, path: string) => {
+      setContextMenu({ x: e.clientX, y: e.clientY, path })
+      setDeleteConfirm(null)
+    },
+    []
+  )
+
+  const handleDeleteFile = useCallback(
+    async (path: string) => {
+      try {
+        const response = await fetch(`${apiBaseUrl}/vault/file?path=${encodeURIComponent(path)}`, {
+          method: 'DELETE',
+        })
+        if (!response.ok) {
+          throw new Error('Failed to delete file')
+        }
+        await fetchFiles()
+        onDeleteFile?.(path)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to delete file')
+      } finally {
+        setContextMenu(null)
+        setDeleteConfirm(null)
+      }
+    },
+    [apiBaseUrl, fetchFiles, onDeleteFile]
+  )
+
+  // Rename state
+  const [renamingFile, setRenamingFile] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
+
+  const handleStartRename = useCallback((path: string) => {
+    const fileName = path.split('/').pop() || ''
+    setRenamingFile(path)
+    setRenameValue(fileName)
+    setContextMenu(null)
+  }, [])
+
+  const handleRenameSubmit = useCallback(async () => {
+    if (!renamingFile || !renameValue.trim()) {
+      setRenamingFile(null)
+      return
+    }
+
+    const oldPath = renamingFile
+    const parts = oldPath.split('/')
+    parts[parts.length - 1] = renameValue.trim()
+    const newPath = parts.join('/')
+
+    if (newPath === oldPath) {
+      setRenamingFile(null)
+      return
+    }
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/vault/file`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ old_path: oldPath, new_path: newPath }),
+      })
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.detail || 'Failed to rename file')
+      }
+      await fetchFiles()
+      onRenameFile?.(oldPath, newPath)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to rename file')
+    } finally {
+      setRenamingFile(null)
+    }
+  }, [renamingFile, renameValue, apiBaseUrl, fetchFiles, onRenameFile])
+
+  const handleRenameCancel = useCallback(() => {
+    setRenamingFile(null)
+  }, [])
+
+  // Toggle month name display
+  const handleToggleMonthNames = useCallback(async () => {
+    const newVal = !showMonthNames
+    setShowMonthNames(newVal)
+    try {
+      await fetch(`${apiBaseUrl}/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ show_month_names: newVal }),
+      })
+    } catch {
+      // Ignore save errors
+    }
+  }, [showMonthNames, apiBaseUrl])
+
+  // Drag and drop: move file to a new folder
+  const handleMoveFile = useCallback(
+    async (sourcePath: string, targetFolderPath: string) => {
+      const fileName = sourcePath.split('/').pop()
+      if (!fileName) return
+
+      const newPath = `${targetFolderPath}/${fileName}`
+      if (newPath === sourcePath) return
+
+      try {
+        const response = await fetch(`${apiBaseUrl}/vault/file`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ old_path: sourcePath, new_path: newPath }),
+        })
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}))
+          throw new Error(data.detail || 'Failed to move file')
+        }
+        await fetchFiles()
+        onRenameFile?.(sourcePath, newPath)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to move file')
+      }
+    },
+    [apiBaseUrl, fetchFiles, onRenameFile]
+  )
+
+  // Close context menu on click outside or Escape
+  useEffect(() => {
+    if (!contextMenu) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
+        setContextMenu(null)
+        setDeleteConfirm(null)
+      }
+    }
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setContextMenu(null)
+        setDeleteConfirm(null)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [contextMenu])
 
   // Close new menu on click outside
   useEffect(() => {
@@ -349,6 +553,15 @@ export function FileTree({
           <Button
             variant="ghost"
             size="icon"
+            className={`h-10 w-10 sm:h-6 sm:w-6 ${showMonthNames ? 'text-primary' : ''}`}
+            onClick={handleToggleMonthNames}
+            title={showMonthNames ? 'Show month numbers' : 'Show month names'}
+          >
+            <CaseSensitive className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
             className="h-10 w-10 sm:h-6 sm:w-6"
             onClick={fetchFiles}
             title="Refresh"
@@ -404,6 +617,13 @@ export function FileTree({
                     selected={selectedFile === node.path}
                     onToggle={handleToggle}
                     onSelect={handleSelect}
+                    onContextMenu={handleContextMenu}
+                    onMoveFile={handleMoveFile}
+                    isRenaming={renamingFile === node.path}
+                    renameValue={renamingFile === node.path ? renameValue : undefined}
+                    onRenameChange={setRenameValue}
+                    onRenameSubmit={handleRenameSubmit}
+                    onRenameCancel={handleRenameCancel}
                   />
                 </div>
               )
@@ -411,6 +631,55 @@ export function FileTree({
           </div>
         )}
       </div>
+
+      {/* Context menu portal */}
+      {contextMenu && createPortal(
+        <div
+          ref={contextMenuRef}
+          className="fixed z-[9999] min-w-[160px] rounded-md border bg-popover shadow-md"
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+        >
+          {deleteConfirm === contextMenu.path ? (
+            <div className="p-2">
+              <p className="text-sm mb-2 px-1">
+                Delete <span className="font-medium">{contextMenu.path.split('/').pop()}</span>?
+              </p>
+              <div className="flex gap-1">
+                <button
+                  className="flex-1 px-2 py-1 text-xs rounded hover:bg-accent"
+                  onClick={() => { setContextMenu(null); setDeleteConfirm(null) }}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="flex-1 px-2 py-1 text-xs rounded bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  onClick={() => handleDeleteFile(contextMenu.path)}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="py-1">
+              <button
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-sm hover:bg-accent"
+                onClick={() => handleStartRename(contextMenu.path)}
+              >
+                <Pencil className="h-4 w-4" />
+                Rename
+              </button>
+              <button
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-sm hover:bg-accent text-destructive"
+                onClick={() => setDeleteConfirm(contextMenu.path)}
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </button>
+            </div>
+          )}
+        </div>,
+        document.body
+      )}
     </div>
   )
 }

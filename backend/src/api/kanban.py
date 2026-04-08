@@ -7,6 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from ..db import DatabaseManager
+from ..db.sql_compat import get_dialect, placeholder, user_filter
+from .dependencies import get_db as _dep_get_db, get_user_id
 
 router = APIRouter(prefix="/kanban", tags=["kanban"])
 
@@ -85,8 +87,8 @@ COLUMNS = [
 ]
 
 
-def get_db(request: Request) -> DatabaseManager:
-    return request.app.state.db
+def get_db(request: Request):
+    return _dep_get_db(request)
 
 
 def _row_to_task(row: tuple, columns: list[str]) -> KanbanTask:
@@ -115,13 +117,18 @@ def _row_to_task(row: tuple, columns: list[str]) -> KanbanTask:
 async def get_kanban_board(
     phase: Optional[str] = Query(None, description="Filter by phase"),
     db: DatabaseManager = Depends(get_db),
+    user_id: str = Depends(get_user_id),
 ) -> KanbanBoard:
     """Get the full kanban board. Single SQL query instead of filesystem scan."""
-    conditions = []
+    dialect = get_dialect(db)
+    ph = placeholder(dialect)
+    conditions: list[str] = []
     params: list = []
 
+    user_filter(dialect, user_id, conditions, params)
+
     if phase:
-        conditions.append("phase LIKE ?")
+        conditions.append(f"phase LIKE {ph}")
         params.append(f"%{phase}%")
 
     where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
@@ -151,9 +158,15 @@ async def get_kanban_board(
 async def get_task(
     task_id: str,
     db: DatabaseManager = Depends(get_db),
+    user_id: str = Depends(get_user_id),
 ) -> KanbanTask:
     """Get a specific task by ID."""
-    result = db.execute("SELECT * FROM kanban_tasks WHERE id = ?", [task_id])
+    dialect = get_dialect(db)
+    ph = placeholder(dialect)
+    conditions = [f"id = {ph}"]
+    params: list = [task_id]
+    user_filter(dialect, user_id, conditions, params)
+    result = db.execute(f"SELECT * FROM kanban_tasks WHERE {' AND '.join(conditions)}", params)
     col_names = [desc[0] for desc in result.description]
     row = result.fetchone()
     if not row:
@@ -166,19 +179,29 @@ async def move_task(
     task_id: str,
     new_status: str = Query(..., description="Target status"),
     db: DatabaseManager = Depends(get_db),
+    user_id: str = Depends(get_user_id),
 ) -> dict:
     """Move a task to a different status column."""
     if new_status not in ("not_started", "in_progress", "done"):
         raise HTTPException(status_code=400, detail="Invalid status")
 
-    result = db.execute("SELECT id FROM kanban_tasks WHERE id = ?", [task_id])
+    dialect = get_dialect(db)
+    ph = placeholder(dialect)
+    conditions = [f"id = {ph}"]
+    params: list = [task_id]
+    user_filter(dialect, user_id, conditions, params)
+
+    result = db.execute(f"SELECT id FROM kanban_tasks WHERE {' AND '.join(conditions)}", params)
     if not result.fetchone():
         raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
 
     completed_at = datetime.now().isoformat() if new_status == "done" else None
+    update_conds = [f"id = {ph}"]
+    update_params: list = [new_status, completed_at, task_id]
+    user_filter(dialect, user_id, update_conds, update_params)
     db.execute(
-        "UPDATE kanban_tasks SET status = ?, completed_at = ? WHERE id = ?",
-        [new_status, completed_at, task_id],
+        f"UPDATE kanban_tasks SET status = {ph}, completed_at = {ph} WHERE {' AND '.join(update_conds)}",
+        update_params,
     )
 
     return {"success": True, "task_id": task_id, "new_status": new_status}
@@ -188,24 +211,36 @@ async def move_task(
 async def create_task(
     request: KanbanTaskCreate,
     db: DatabaseManager = Depends(get_db),
+    user_id: str = Depends(get_user_id),
 ) -> KanbanTask:
     """Create a new kanban task."""
+    dialect = get_dialect(db)
+    ph = placeholder(dialect)
+
     # Generate ID from title
     task_id = request.title.lower().replace(" ", "-").replace("/", "-")[:60]
 
     # Check for duplicate
-    result = db.execute("SELECT id FROM kanban_tasks WHERE id = ?", [task_id])
+    dup_conds = [f"id = {ph}"]
+    dup_params: list = [task_id]
+    user_filter(dialect, user_id, dup_conds, dup_params)
+    result = db.execute(f"SELECT id FROM kanban_tasks WHERE {' AND '.join(dup_conds)}", dup_params)
     if result.fetchone():
         raise HTTPException(status_code=409, detail=f"Task with id '{task_id}' already exists")
 
-    db.execute(
-        """INSERT INTO kanban_tasks (id, title, phase, priority, status, branch, depends_on, description, content, deadline)
-           VALUES (?, ?, ?, ?, 'not_started', ?, ?, ?, ?, ?)""",
-        [task_id, request.title, request.phase, request.priority, request.branch,
-         request.depends_on, request.description, request.content, request.deadline],
-    )
+    cols = ["id", "title", "phase", "priority", "status", "branch", "depends_on", "description", "content", "deadline"]
+    vals: list = [task_id, request.title, request.phase, request.priority, "not_started",
+                  request.branch, request.depends_on, request.description, request.content, request.deadline]
+    if dialect == "postgres":
+        cols.append("user_id")
+        vals.append(user_id)
+    placeholders = ", ".join([ph] * len(cols))
+    db.execute(f"INSERT INTO kanban_tasks ({', '.join(cols)}) VALUES ({placeholders})", vals)
 
-    result = db.execute("SELECT * FROM kanban_tasks WHERE id = ?", [task_id])
+    fetch_conds = [f"id = {ph}"]
+    fetch_params: list = [task_id]
+    user_filter(dialect, user_id, fetch_conds, fetch_params)
+    result = db.execute(f"SELECT * FROM kanban_tasks WHERE {' AND '.join(fetch_conds)}", fetch_params)
     col_names = [desc[0] for desc in result.description]
     row = result.fetchone()
     return _row_to_task(row, col_names)
@@ -216,9 +251,16 @@ async def update_task(
     task_id: str,
     request: KanbanTaskUpdate,
     db: DatabaseManager = Depends(get_db),
+    user_id: str = Depends(get_user_id),
 ) -> KanbanTask:
     """Update a kanban task's fields."""
-    result = db.execute("SELECT id FROM kanban_tasks WHERE id = ?", [task_id])
+    dialect = get_dialect(db)
+    ph = placeholder(dialect)
+
+    check_conds = [f"id = {ph}"]
+    check_params: list = [task_id]
+    user_filter(dialect, user_id, check_conds, check_params)
+    result = db.execute(f"SELECT id FROM kanban_tasks WHERE {' AND '.join(check_conds)}", check_params)
     if not result.fetchone():
         raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
 
@@ -227,20 +269,25 @@ async def update_task(
     for field in ("title", "phase", "priority", "status", "branch", "depends_on", "description", "content", "deadline"):
         val = getattr(request, field, None)
         if val is not None:
-            updates.append(f"{field} = ?")
+            updates.append(f"{field} = {ph}")
             values.append(val)
 
     if request.status == "done":
-        updates.append("completed_at = ?")
+        updates.append(f"completed_at = {ph}")
         values.append(datetime.now().isoformat())
 
     if not updates:
         raise HTTPException(status_code=400, detail="No fields to update")
 
+    where_conds = [f"id = {ph}"]
     values.append(task_id)
-    db.execute(f"UPDATE kanban_tasks SET {', '.join(updates)} WHERE id = ?", values)
+    user_filter(dialect, user_id, where_conds, values)
+    db.execute(f"UPDATE kanban_tasks SET {', '.join(updates)} WHERE {' AND '.join(where_conds)}", values)
 
-    result = db.execute("SELECT * FROM kanban_tasks WHERE id = ?", [task_id])
+    fetch_conds = [f"id = {ph}"]
+    fetch_params: list = [task_id]
+    user_filter(dialect, user_id, fetch_conds, fetch_params)
+    result = db.execute(f"SELECT * FROM kanban_tasks WHERE {' AND '.join(fetch_conds)}", fetch_params)
     col_names = [desc[0] for desc in result.description]
     row = result.fetchone()
     return _row_to_task(row, col_names)
@@ -250,14 +297,28 @@ async def update_task(
 async def delete_task(
     task_id: str,
     db: DatabaseManager = Depends(get_db),
+    user_id: str = Depends(get_user_id),
 ) -> dict:
     """Delete a kanban task."""
-    result = db.execute("SELECT id FROM kanban_tasks WHERE id = ?", [task_id])
+    dialect = get_dialect(db)
+    ph = placeholder(dialect)
+
+    check_conds = [f"id = {ph}"]
+    check_params: list = [task_id]
+    user_filter(dialect, user_id, check_conds, check_params)
+    result = db.execute(f"SELECT id FROM kanban_tasks WHERE {' AND '.join(check_conds)}", check_params)
     if not result.fetchone():
         raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
 
-    db.execute("DELETE FROM kanban_tasks WHERE id = ?", [task_id])
-    db.execute("DELETE FROM kanban_task_updates WHERE task_id = ?", [task_id])
+    del_conds = [f"id = {ph}"]
+    del_params: list = [task_id]
+    user_filter(dialect, user_id, del_conds, del_params)
+    db.execute(f"DELETE FROM kanban_tasks WHERE {' AND '.join(del_conds)}", del_params)
+
+    upd_conds = [f"task_id = {ph}"]
+    upd_params: list = [task_id]
+    user_filter(dialect, user_id, upd_conds, upd_params)
+    db.execute(f"DELETE FROM kanban_task_updates WHERE {' AND '.join(upd_conds)}", upd_params)
     return {"success": True, "task_id": task_id}
 
 
@@ -265,11 +326,17 @@ async def delete_task(
 async def list_task_updates(
     task_id: str,
     db: DatabaseManager = Depends(get_db),
+    user_id: str = Depends(get_user_id),
 ) -> list[TaskNote]:
     """List all status updates / notes for a task, newest first."""
+    dialect = get_dialect(db)
+    ph = placeholder(dialect)
+    conditions = [f"task_id = {ph}"]
+    params: list = [task_id]
+    user_filter(dialect, user_id, conditions, params)
     result = db.execute(
-        "SELECT id, task_id, note, created_at FROM kanban_task_updates WHERE task_id = ? ORDER BY created_at DESC",
-        [task_id],
+        f"SELECT id, task_id, note, created_at FROM kanban_task_updates WHERE {' AND '.join(conditions)} ORDER BY created_at DESC",
+        params,
     )
     return [
         TaskNote(id=row[0], task_id=row[1], note=row[2], created_at=str(row[3]))
@@ -282,25 +349,39 @@ async def add_task_update(
     task_id: str,
     request: TaskNoteCreate,
     db: DatabaseManager = Depends(get_db),
+    user_id: str = Depends(get_user_id),
 ) -> TaskNote:
     """Add a status update / note to a task."""
+    dialect = get_dialect(db)
+    ph = placeholder(dialect)
+
     # Verify task exists
-    check = db.execute("SELECT id FROM kanban_tasks WHERE id = ?", [task_id])
+    check_conds = [f"id = {ph}"]
+    check_params: list = [task_id]
+    user_filter(dialect, user_id, check_conds, check_params)
+    check = db.execute(f"SELECT id FROM kanban_tasks WHERE {' AND '.join(check_conds)}", check_params)
     if not check.fetchone():
         raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
 
-    # Get next ID
-    max_id = db.execute("SELECT COALESCE(MAX(id), 0) FROM kanban_task_updates").fetchone()[0]
-    new_id = max_id + 1
+    if dialect == "postgres":
+        cols = ["task_id", "note", "user_id"]
+        vals = [task_id, request.note, user_id]
+        result = db.execute(
+            "INSERT INTO kanban_task_updates (task_id, note, user_id) VALUES (%s, %s, %s) RETURNING id, task_id, note, created_at",
+            vals,
+        )
+        row = result.fetchone()
+    else:
+        max_id = db.execute("SELECT COALESCE(MAX(id), 0) FROM kanban_task_updates").fetchone()[0]
+        new_id = max_id + 1
+        db.execute(
+            "INSERT INTO kanban_task_updates (id, task_id, note) VALUES (?, ?, ?)",
+            [new_id, task_id, request.note],
+        )
+        result = db.execute(
+            "SELECT id, task_id, note, created_at FROM kanban_task_updates WHERE id = ?",
+            [new_id],
+        )
+        row = result.fetchone()
 
-    db.execute(
-        "INSERT INTO kanban_task_updates (id, task_id, note) VALUES (?, ?, ?)",
-        [new_id, task_id, request.note],
-    )
-
-    result = db.execute(
-        "SELECT id, task_id, note, created_at FROM kanban_task_updates WHERE id = ?",
-        [new_id],
-    )
-    row = result.fetchone()
     return TaskNote(id=row[0], task_id=row[1], note=row[2], created_at=str(row[3]))

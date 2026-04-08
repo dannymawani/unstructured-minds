@@ -5,6 +5,8 @@ interface HeatmapDay {
   date: string;
   count: number;
   duration_minutes: number;
+  has_note: boolean;
+  has_workout: boolean;
 }
 
 interface HeatmapData {
@@ -16,21 +18,25 @@ interface HeatmapData {
 
 interface ActivityHeatmapProps {
   apiUrl?: string;
-  year?: number;
   onDayClick?: (date: string, data: HeatmapDay | null) => void;
 }
 
-// Color scale based on activity intensity (using duration)
-const INTENSITY_COLORS = [
-  'bg-muted',                              // 0 - no activity
-  'bg-green-900/60 dark:bg-green-900/60', // 1 - light
-  'bg-green-700/70 dark:bg-green-700/70', // 2 - moderate
-  'bg-green-500/80 dark:bg-green-500/80', // 3 - active
-  'bg-green-400 dark:bg-green-400',       // 4 - very active
+// Green intensity scale for active days (has workout)
+const ACTIVE_COLORS = [
+  'bg-muted',                   // 0 - no activity
+  'bg-green-900/60',            // 1 - light
+  'bg-green-700/70',            // 2 - moderate
+  'bg-green-500/80',            // 3 - active
+  'bg-green-400',               // 4 - very active
 ];
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+function formatLocalDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
 
 function getIntensityLevel(duration: number, maxDuration: number): number {
   if (duration === 0 || maxDuration === 0) return 0;
@@ -41,6 +47,24 @@ function getIntensityLevel(duration: number, maxDuration: number): number {
   return 4;
 }
 
+function getDayColor(day: HeatmapDay | null, maxDuration: number): string {
+  if (!day) return ACTIVE_COLORS[0];
+  if (day.has_workout) {
+    return ACTIVE_COLORS[getIntensityLevel(day.duration_minutes, maxDuration)];
+  }
+  if (day.has_note) {
+    return 'bg-blue-500/50';
+  }
+  return ACTIVE_COLORS[0];
+}
+
+function getDayTypeLabel(day: HeatmapDay | null): string {
+  if (!day) return 'No entries';
+  if (day.has_workout) return 'Active';
+  if (day.has_note) return 'Note only';
+  return 'No entries';
+}
+
 interface TooltipState {
   visible: boolean;
   x: number;
@@ -48,11 +72,11 @@ interface TooltipState {
   date: string;
   duration: number;
   count: number;
+  dayType: string;
 }
 
 export function ActivityHeatmap({
   apiUrl = 'http://localhost:8000',
-  year = new Date().getFullYear(),
   onDayClick,
 }: ActivityHeatmapProps) {
   const [data, setData] = useState<HeatmapData | null>(null);
@@ -65,16 +89,46 @@ export function ActivityHeatmap({
     date: '',
     duration: 0,
     count: 0,
+    dayType: '',
   });
+
+  // Rolling 4-month window: 3 months back + current month
+  const { windowStart, windowEnd, yearsNeeded } = useMemo(() => {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0); // last day of current month
+    const years = new Set([start.getFullYear(), end.getFullYear()]);
+    return { windowStart: start, windowEnd: end, yearsNeeded: Array.from(years) };
+  }, []);
 
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
       try {
-        const response = await fetch(`${apiUrl}/dashboard/heatmap?year=${year}`);
-        if (!response.ok) throw new Error('Failed to fetch heatmap data');
-        const result = await response.json();
-        setData(result);
+        const allDays: HeatmapDay[] = [];
+        let maxCount = 0;
+        let maxDuration = 0;
+
+        for (const y of yearsNeeded) {
+          const response = await fetch(`${apiUrl}/dashboard/heatmap?year=${y}`);
+          if (!response.ok) throw new Error('Failed to fetch heatmap data');
+          const result: HeatmapData = await response.json();
+          allDays.push(...result.days);
+          maxCount = Math.max(maxCount, result.max_count);
+          maxDuration = Math.max(maxDuration, result.max_duration);
+        }
+
+        // Filter to only days within the 4-month window
+        const startStr = formatLocalDate(windowStart);
+        const endStr = formatLocalDate(windowEnd);
+        const filtered = allDays.filter(d => d.date >= startStr && d.date <= endStr);
+
+        setData({
+          days: filtered,
+          year: windowEnd.getFullYear(),
+          max_count: maxCount,
+          max_duration: maxDuration,
+        });
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
@@ -82,34 +136,38 @@ export function ActivityHeatmap({
       }
     }
     fetchData();
-  }, [apiUrl, year]);
+  }, [apiUrl, yearsNeeded, windowStart, windowEnd]);
 
-  // Create a map of date -> data for quick lookup
+  // Map date string -> data for quick lookup
   const dayMap = useMemo(() => {
     if (!data) return new Map<string, HeatmapDay>();
     return new Map(data.days.map((d) => [d.date, d]));
   }, [data]);
 
-  // Generate all days for the year organized by week
+  // Generate weeks for the 4-month window only
   const weeks = useMemo(() => {
     const result: { date: Date; data: HeatmapDay | null }[][] = [];
-    const startDate = new Date(year, 0, 1);
-    const endDate = new Date(year, 11, 31);
 
-    // Adjust to start from the first Sunday before or on Jan 1
-    const firstDay = new Date(startDate);
+    // Start from the Sunday before or on windowStart
+    const firstDay = new Date(windowStart);
     firstDay.setDate(firstDay.getDate() - firstDay.getDay());
+
+    // End at the Saturday after or on windowEnd
+    const lastDay = new Date(windowEnd);
+    if (lastDay.getDay() < 6) {
+      lastDay.setDate(lastDay.getDate() + (6 - lastDay.getDay()));
+    }
 
     const currentDate = new Date(firstDay);
     let currentWeek: { date: Date; data: HeatmapDay | null }[] = [];
 
-    while (currentDate <= endDate || (currentWeek.length > 0 && currentWeek.length < 7)) {
-      const dateStr = currentDate.toISOString().split('T')[0];
-      const isInYear = currentDate.getFullYear() === year;
+    while (currentDate <= lastDay) {
+      const dateStr = formatLocalDate(currentDate);
+      const inRange = currentDate >= windowStart && currentDate <= windowEnd;
 
       currentWeek.push({
         date: new Date(currentDate),
-        data: isInYear ? dayMap.get(dateStr) || null : null,
+        data: inRange ? dayMap.get(dateStr) || null : null,
       });
 
       if (currentWeek.length === 7) {
@@ -125,33 +183,33 @@ export function ActivityHeatmap({
     }
 
     return result;
-  }, [year, dayMap]);
+  }, [windowStart, windowEnd, dayMap]);
 
-  // Calculate month labels with their starting week positions
+  // Month labels positioned at the first week that falls in each month
   const monthLabels = useMemo(() => {
-    const labels: { month: string; weekIndex: number }[] = [];
+    const labels: { weekIdx: number; label: string }[] = [];
     let lastMonth = -1;
-
-    weeks.forEach((week, weekIndex) => {
-      // Find the first day of the week that's in our target year
-      const firstDayInYear = week.find((d) => d.date.getFullYear() === year);
-      if (firstDayInYear) {
-        const month = firstDayInYear.date.getMonth();
-        if (month !== lastMonth) {
-          labels.push({ month: MONTHS[month], weekIndex });
-          lastMonth = month;
-        }
+    weeks.forEach((week, weekIdx) => {
+      // Use the first in-range day of the week to determine month
+      const representative = week.find(d => d.date >= windowStart && d.date <= windowEnd);
+      if (!representative) return;
+      const month = representative.date.getMonth();
+      if (month !== lastMonth) {
+        labels.push({
+          weekIdx,
+          label: representative.date.toLocaleDateString('en-US', { month: 'short' }),
+        });
+        lastMonth = month;
       }
     });
-
     return labels;
-  }, [weeks, year]);
+  }, [weeks, windowStart, windowEnd]);
 
   const handleMouseEnter = (
     e: React.MouseEvent<HTMLDivElement>,
     day: { date: Date; data: HeatmapDay | null }
   ) => {
-    if (day.date.getFullYear() !== year) return;
+    if (day.date < windowStart || day.date > windowEnd) return;
 
     const rect = e.currentTarget.getBoundingClientRect();
     setTooltip({
@@ -166,6 +224,7 @@ export function ActivityHeatmap({
       }),
       duration: day.data?.duration_minutes || 0,
       count: day.data?.count || 0,
+      dayType: getDayTypeLabel(day.data),
     });
   };
 
@@ -174,8 +233,8 @@ export function ActivityHeatmap({
   };
 
   const handleDayClick = (day: { date: Date; data: HeatmapDay | null }) => {
-    if (day.date.getFullYear() !== year) return;
-    const dateStr = day.date.toISOString().split('T')[0];
+    if (day.date < windowStart || day.date > windowEnd) return;
+    const dateStr = formatLocalDate(day.date);
     onDayClick?.(dateStr, day.data);
   };
 
@@ -193,73 +252,57 @@ export function ActivityHeatmap({
     );
   }
 
-  const totalActivities = data?.days.reduce((sum, d) => sum + d.count, 0) || 0;
-  const totalDuration = data?.days.reduce((sum, d) => sum + d.duration_minutes, 0) || 0;
+  const activeDays = data?.days.filter((d) => d.has_note || d.has_workout).length || 0;
 
   return (
-    <div className="bg-card rounded-md shadow-sm p-4" data-testid="activity-heatmap">
+    <div className="bg-card shadow-sm px-3 sm:px-5 py-4 w-full" data-testid="activity-heatmap">
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center gap-2">
           <Grid3x3 className="w-5 h-5 text-green-400" />
           <h3 className="text-lg font-semibold text-foreground">Activity Heatmap</h3>
         </div>
-        <div className="flex gap-4 text-sm text-muted-foreground">
-          <span>{totalActivities} activities</span>
-          <span>{Math.round(totalDuration / 60)} hrs total</span>
+        <div className="text-sm text-muted-foreground">
+          <span>{activeDays} active days</span>
         </div>
       </div>
 
       {/* Month labels */}
-      <div className="flex mb-1 ml-8">
-        {monthLabels.map((label, idx) => (
-          <div
-            key={idx}
-            className="text-xs text-muted-foreground"
-            style={{
-              position: 'relative',
-              left: `${label.weekIndex * 14}px`,
-              marginRight: idx < monthLabels.length - 1 ? '-14px' : 0,
-            }}
-          >
-            {label.month}
-          </div>
-        ))}
+      <div className="flex gap-[2px] mb-1 ml-[28px]">
+        {weeks.map((_, weekIdx) => {
+          const label = monthLabels.find(m => m.weekIdx === weekIdx);
+          return (
+            <div key={weekIdx} className="flex-1 min-w-0 text-[10px] text-muted-foreground">
+              {label ? label.label : ''}
+            </div>
+          );
+        })}
       </div>
 
-      {/* Heatmap grid */}
-      <div className="flex gap-1 overflow-x-auto pb-2">
-        {/* Day labels */}
-        <div className="flex flex-col gap-[3px] mr-1 flex-shrink-0">
-          {DAYS.map((day, idx) => (
-            <div
-              key={day}
-              className="text-xs text-muted-foreground h-[12px] flex items-center"
-              style={{ visibility: idx % 2 === 0 ? 'hidden' : 'visible' }}
-            >
-              {day.slice(0, 3)}
+      {/* Heatmap grid with day-of-week labels */}
+      <div className="flex gap-[2px] w-full">
+        {/* Day-of-week labels */}
+        <div className="flex flex-col gap-[2px] shrink-0 w-[26px] mr-px">
+          {['', 'Mon', '', 'Wed', '', 'Fri', ''].map((label, i) => (
+            <div key={i} className="aspect-square flex items-center">
+              <span className="text-[9px] text-muted-foreground leading-none">{label}</span>
             </div>
           ))}
         </div>
 
         {/* Weeks */}
-        <div className="flex gap-[3px]">
+        <div className="flex gap-[2px] flex-1 min-w-0">
           {weeks.map((week, weekIdx) => (
-            <div key={weekIdx} className="flex flex-col gap-[3px]">
+            <div key={weekIdx} className="flex flex-col gap-[2px] flex-1 min-w-0">
               {week.map((day, dayIdx) => {
-                const isInYear = day.date.getFullYear() === year;
-                const intensity = isInYear
-                  ? getIntensityLevel(
-                      day.data?.duration_minutes || 0,
-                      data?.max_duration || 1
-                    )
-                  : 0;
+                const inRange = day.date >= windowStart && day.date <= windowEnd;
+                const color = inRange
+                  ? getDayColor(day.data, data?.max_duration || 1)
+                  : 'bg-transparent';
 
                 return (
                   <div
                     key={dayIdx}
-                    className={`w-[12px] h-[12px] rounded-sm cursor-pointer transition-all hover:ring-1 hover:ring-muted-foreground ${
-                      isInYear ? INTENSITY_COLORS[intensity] : 'bg-transparent'
-                    }`}
+                    className={`aspect-square w-full rounded-sm cursor-pointer transition-all hover:ring-1 hover:ring-muted-foreground ${color}`}
                     onMouseEnter={(e) => handleMouseEnter(e, day)}
                     onMouseLeave={handleMouseLeave}
                     onClick={() => handleDayClick(day)}
@@ -272,12 +315,25 @@ export function ActivityHeatmap({
       </div>
 
       {/* Legend */}
-      <div className="flex items-center gap-2 mt-3 text-xs text-muted-foreground">
-        <span>Less</span>
-        {INTENSITY_COLORS.map((color, idx) => (
-          <div key={idx} className={`w-[12px] h-[12px] rounded-sm ${color}`} />
-        ))}
-        <span>More</span>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mt-3 pt-3 border-t border-border text-xs text-muted-foreground">
+        {/* Note only indicator */}
+        <div className="flex items-center gap-1.5">
+          <div className="w-2.5 h-2.5 rounded-sm bg-blue-500/50" />
+          <span>Note only</span>
+        </div>
+
+        {/* Activity intensity gradient */}
+        <div className="flex items-center gap-1.5">
+          <span>Less active</span>
+          <div className="flex gap-[2px]">
+            <div className="w-2.5 h-2.5 rounded-sm bg-muted" />
+            <div className="w-2.5 h-2.5 rounded-sm bg-green-900/60" />
+            <div className="w-2.5 h-2.5 rounded-sm bg-green-700/70" />
+            <div className="w-2.5 h-2.5 rounded-sm bg-green-500/80" />
+            <div className="w-2.5 h-2.5 rounded-sm bg-green-400" />
+          </div>
+          <span>More active</span>
+        </div>
       </div>
 
       {/* Tooltip */}
@@ -287,12 +343,11 @@ export function ActivityHeatmap({
           style={{ left: tooltip.x, top: tooltip.y }}
         >
           <div className="font-medium text-foreground">{tooltip.date}</div>
-          {tooltip.count > 0 ? (
+          <div className="text-muted-foreground">{tooltip.dayType}</div>
+          {tooltip.duration > 0 && (
             <div className="text-muted-foreground">
-              {tooltip.count} {tooltip.count === 1 ? 'activity' : 'activities'} ({tooltip.duration} min)
+              {tooltip.duration} min
             </div>
-          ) : (
-            <div className="text-muted-foreground">No activities</div>
           )}
         </div>
       )}

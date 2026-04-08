@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import re
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -11,6 +12,8 @@ from typing import Any, Optional
 from ..claude import ClaudeClient
 from ..config import settings
 from ..db import DatabaseManager
+from ..db.sql_compat import upsert, get_dialect
+from .exercise_matcher import ExerciseMatcher
 from .schemas import COMBINED_EXTRACTION_SCHEMA, EXTRACTION_SCHEMAS
 
 
@@ -33,16 +36,28 @@ class ExtractionPipeline:
         self,
         db: DatabaseManager,
         claude: Optional[ClaudeClient] = None,
+        user_id: Optional[str] = None,
     ) -> None:
         """Initialize extraction pipeline.
 
         Args:
             db: Database manager for storing extracted data
             claude: Claude client for AI extraction (optional)
+            user_id: Authenticated user's UUID (used for Postgres inserts)
         """
         self.db = db
         self.claude = claude
-        self._schemas_dir = settings.data_path / "schemas"
+        self.user_id = user_id
+        # Try shared/ schemas first (checked into git), fall back to data/schemas/
+        project_root = Path(__file__).resolve().parents[3]
+        shared_schemas = project_root / "shared" / "schemas"
+        self._schemas_dir = shared_schemas if shared_schemas.exists() else settings.data_path / "schemas"
+
+        # Try shared/ exercise defs first
+        shared_defs = project_root / "shared" / "exercise_definitions.json"
+        exercise_defs_path = shared_defs if shared_defs.exists() else settings.data_path / "exercise_definitions.json"
+        self._exercise_matcher = ExerciseMatcher(exercise_defs_path)
+        self._exercise_matcher.load_ai_cache(settings.data_path / "ai_exercise_cache.json")
 
     def _load_custom_schema(self, name: str) -> Optional[dict[str, Any]]:
         """Load a custom schema from disk and convert to JSON Schema format.
@@ -168,13 +183,16 @@ class ExtractionPipeline:
         Returns:
             True if extraction needed
         """
+        dialect = get_dialect(self.db)
+        ph = "%s" if dialect == "postgres" else "?"
+        conditions = [f"file_path = {ph}", f"success = TRUE"]
+        params: list = [file_path]
+        if dialect == "postgres" and self.user_id:
+            conditions.append(f"user_id = {ph}")
+            params.append(self.user_id)
         result = self.db.execute(
-            """
-            SELECT file_hash FROM extraction_log
-            WHERE file_path = ? AND success = TRUE
-            ORDER BY extracted_at DESC LIMIT 1
-            """,
-            [file_path],
+            f"SELECT file_hash FROM extraction_log WHERE {' AND '.join(conditions)} ORDER BY extracted_at DESC LIMIT 1",
+            params,
         ).fetchall()
         if not result:
             return True
@@ -195,18 +213,24 @@ class ExtractionPipeline:
             success: Whether extraction succeeded
             error: Error message if failed
         """
+        dialect = get_dialect(self.db)
+        ph = "%s" if dialect == "postgres" else "?"
+        cols = ["file_path", "file_hash", "success", "error_message"]
+        vals: list = [file_path, file_hash, success, error]
+        if dialect == "postgres" and self.user_id:
+            cols.append("user_id")
+            vals.append(self.user_id)
+        placeholders = ", ".join([ph] * len(cols))
         self.db.execute(
-            """
-            INSERT INTO extraction_log (file_path, file_hash, success, error_message)
-            VALUES (?, ?, ?, ?)
-            """,
-            [file_path, file_hash, success, error],
+            f"INSERT INTO extraction_log ({', '.join(cols)}) VALUES ({placeholders})",
+            vals,
         )
 
     def _extract_date_from_path(self, file_path: str) -> Optional[str]:
         """Try to extract date from file path.
 
         Expects format like Daily-Notes/YYYY-MM/YYYY-MM-DD.md
+        or YYYY/MM/YYYY-MM-DD-daily-note.md
 
         Args:
             file_path: Path to the file
@@ -218,14 +242,49 @@ class ExtractionPipeline:
         parts = file_path.replace("\\", "/").split("/")
         filename = parts[-1].replace(".md", "")
 
-        # Check if filename is a date
+        # Strip known suffixes like -daily-note
+        clean_name = re.sub(r"-daily-note$", "", filename)
+
+        # Check if filename (or cleaned name) is a date
+        for name in [filename, clean_name]:
+            try:
+                datetime.strptime(name, "%Y-%m-%d")
+                return name
+            except ValueError:
+                pass
+
+        return None
+
+    def _is_daily_note(self, file_path: str) -> bool:
+        """Check if a file is a daily note based on path patterns.
+
+        Daily notes match patterns like:
+        - Daily-Notes/YYYY-MM/YYYY-MM-DD.md
+        - YYYY/MM/YYYY-MM-DD-daily-note.md
+        - Any file whose name (minus extension and -daily-note suffix) is a valid date
+
+        Args:
+            file_path: Path to the file
+
+        Returns:
+            True if the file is a daily note
+        """
+        parts = file_path.replace("\\", "/").split("/")
+        filename = parts[-1].replace(".md", "")
+
+        # Check known daily note directory prefixes
+        if file_path.startswith("Daily-Notes/"):
+            return True
+
+        # Check if filename contains a date pattern (with optional suffix)
+        clean_name = re.sub(r"-daily-note$", "", filename)
         try:
-            datetime.strptime(filename, "%Y-%m-%d")
-            return filename
+            datetime.strptime(clean_name, "%Y-%m-%d")
+            return True
         except ValueError:
             pass
 
-        return None
+        return False
 
     def _generate_id(self) -> str:
         """Generate a unique ID.
@@ -254,24 +313,27 @@ class ExtractionPipeline:
         if not metrics:
             return 0
 
-        # Use REPLACE to handle updates
-        self.db.execute(
-            """
-            INSERT OR REPLACE INTO daily_metrics
-            (date, sleep_hours, sleep_quality, energy, mood, stress, notes, source_file)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            [
-                date,
-                metrics.get("sleep_hours"),
-                metrics.get("sleep_quality"),
-                metrics.get("energy"),
-                metrics.get("mood"),
-                metrics.get("stress"),
-                metrics.get("notes"),
-                source_file,
-            ],
-        )
+        dialect = get_dialect(self.db)
+        cols = ["date", "sleep_hours", "sleep_quality", "energy", "mood", "stress", "weight_kg", "notes", "source_file"]
+        conflict_cols = ["date"]
+        vals: list = [
+            date,
+            metrics.get("sleep_hours"),
+            metrics.get("sleep_quality"),
+            metrics.get("energy"),
+            metrics.get("mood"),
+            metrics.get("stress"),
+            metrics.get("weight_kg"),
+            metrics.get("notes"),
+            source_file,
+        ]
+        if dialect == "postgres" and self.user_id:
+            cols.append("user_id")
+            conflict_cols.append("user_id")
+            vals.append(self.user_id)
+
+        sql = upsert("daily_metrics", cols, conflict_cols, dialect=dialect)
+        self.db.execute(sql, vals)
         return 1
 
     def _store_activities(
@@ -293,54 +355,130 @@ class ExtractionPipeline:
         if not activities:
             return 0
 
+        dialect = get_dialect(self.db)
+        ph = "%s" if dialect == "postgres" else "?"
+
+        # Delete old exercise + activity records for this date/source so
+        # re-extraction doesn't leave stale rows behind.
+        if dialect == "postgres" and self.user_id:
+            self.db.execute(
+                f"DELETE FROM exercise_log WHERE date = {ph} AND source_file = {ph} AND user_id = {ph}",
+                [date, source_file, self.user_id],
+            )
+            self.db.execute(
+                f"DELETE FROM activities WHERE date = {ph} AND source_file = {ph} AND user_id = {ph}",
+                [date, source_file, self.user_id],
+            )
+        else:
+            self.db.execute(
+                f"DELETE FROM exercise_log WHERE date = {ph} AND source_file = {ph}",
+                [date, source_file],
+            )
+            self.db.execute(
+                f"DELETE FROM activities WHERE date = {ph} AND source_file = {ph}",
+                [date, source_file],
+            )
+
         records = 0
         for i, activity in enumerate(activities):
             activity_id = f"{date.replace('-', '')}_{activity.get('activity_type', 'other')}_{i+1}"
 
             # Insert activity record
-            self.db.execute(
-                """
-                INSERT OR REPLACE INTO activities
-                (id, date, activity_type, duration_minutes, notes, source_file)
-                VALUES (?, ?, ?, ?, ?, ?)
-                """,
-                [
-                    activity_id,
-                    date,
-                    activity.get("activity_type", "other"),
-                    activity.get("duration_minutes"),
-                    activity.get("notes"),
-                    source_file,
-                ],
-            )
+            act_cols = ["id", "date", "activity_type", "duration_minutes", "notes", "source_file"]
+            act_vals: list = [
+                activity_id, date,
+                activity.get("activity_type", "other"),
+                activity.get("duration_minutes"),
+                activity.get("notes"),
+                source_file,
+            ]
+            if dialect == "postgres" and self.user_id:
+                act_cols.append("user_id")
+                act_vals.append(self.user_id)
 
-            # Insert exercise records
-            for j, exercise in enumerate(activity.get("exercises", [])):
-                exercise_id = self._generate_id()
-                self.db.execute(
-                    """
-                    INSERT OR REPLACE INTO exercise_log
-                    (id, activity_id, date, exercise_name, weight_kg, reps, set_number,
-                     duration_minutes, distance_km, notes, source_file)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    [
-                        exercise_id,
-                        activity_id,
-                        date,
-                        exercise.get("name", "unknown"),
+            act_conflict = ["id", "user_id"] if (dialect == "postgres" and self.user_id) else ["id"]
+            activity_sql = upsert("activities", act_cols, act_conflict, dialect=dialect)
+            self.db.execute(activity_sql, act_vals)
+
+            # Insert exercise records — one row per set
+            global_set_num = 0
+            for exercise in activity.get("exercises", []):
+                raw_name = exercise.get("name", "unknown")
+                if exercise.get("_name_from_note"):
+                    # Name was restored from the original note — use it directly
+                    # (only apply exact/alias/AI-cache matches, skip fuzzy to prevent mis-mapping)
+                    canonical, confidence = self._exercise_matcher.match(raw_name)
+                    exercise_name = canonical if confidence >= 0.95 else raw_name.strip().title()
+                else:
+                    exercise_name = self._exercise_matcher.match(raw_name)[0]
+
+                sets_data = exercise.get("sets", [])
+                if sets_data and isinstance(sets_data, list) and isinstance(sets_data[0], dict):
+                    # New format: per-set array with individual weights/reps
+                    for set_entry in sets_data:
+                        global_set_num += 1
+                        exercise_id = self._generate_id()
+                        ex_cols = ["id", "activity_id", "date", "exercise_name", "weight_kg", "reps", "set_number",
+                                   "duration_minutes", "distance_km", "notes", "source_file"]
+                        ex_vals: list = [
+                            exercise_id, activity_id, date, exercise_name,
+                            set_entry.get("weight_kg"),
+                            set_entry.get("reps"),
+                            global_set_num,
+                            exercise.get("duration_minutes"),
+                            exercise.get("distance_km"),
+                            exercise.get("notes"),
+                            source_file,
+                        ]
+                        if dialect == "postgres" and self.user_id:
+                            ex_cols.append("user_id")
+                            ex_vals.append(self.user_id)
+
+                        ex_conflict = ["id", "user_id"] if (dialect == "postgres" and self.user_id) else ["id"]
+                        exercise_sql = upsert("exercise_log", ex_cols, ex_conflict, dialect=dialect)
+                        self.db.execute(exercise_sql, ex_vals)
+                        records += 1
+                else:
+                    # Legacy format: single row with top-level weight_kg/reps
+                    global_set_num += 1
+                    exercise_id = self._generate_id()
+                    ex_cols = ["id", "activity_id", "date", "exercise_name", "weight_kg", "reps", "set_number",
+                               "duration_minutes", "distance_km", "notes", "source_file"]
+                    ex_vals = [
+                        exercise_id, activity_id, date, exercise_name,
                         exercise.get("weight_kg"),
                         exercise.get("reps"),
-                        j + 1,
+                        global_set_num,
                         exercise.get("duration_minutes"),
                         exercise.get("distance_km"),
                         exercise.get("notes"),
                         source_file,
-                    ],
-                )
-                records += 1
+                    ]
+                    if dialect == "postgres" and self.user_id:
+                        ex_cols.append("user_id")
+                        ex_vals.append(self.user_id)
+
+                    ex_conflict = ["id", "user_id"] if (dialect == "postgres" and self.user_id) else ["id"]
+                    exercise_sql = upsert("exercise_log", ex_cols, ex_conflict, dialect=dialect)
+                    self.db.execute(exercise_sql, ex_vals)
+                    records += 1
 
         return records
+
+    @staticmethod
+    def _normalize_task_desc(desc: str) -> str:
+        """Normalize a task description for dedup comparison.
+
+        Strips whitespace, lowercases, and removes minor punctuation differences
+        so that Claude re-extracting the same task with slight wording changes
+        still matches the existing record.
+        """
+        desc = desc.strip().lower()
+        # Collapse whitespace
+        desc = re.sub(r"\s+", " ", desc)
+        # Remove trailing punctuation that doesn't change meaning
+        desc = desc.rstrip(".,;:!?")
+        return desc
 
     def _store_tasks(
         self,
@@ -351,10 +489,14 @@ class ExtractionPipeline:
         """Store tasks in database, respecting previously completed tasks.
 
         On re-extraction:
-        1. Load existing tasks for this source_file
-        2. Skip any task whose description already exists (regardless of status)
+        1. Check ALL existing tasks (globally, not just this file) for dedup
+        2. Skip any task whose normalized description already exists anywhere
         3. Remove stale backlog tasks from this file that are no longer in the note
         4. Insert genuinely new tasks
+        5. Update source_file on existing tasks if this note is newer
+
+        Uses normalized descriptions to prevent duplicates when the same task
+        appears in multiple daily notes (e.g. rolled-over tasks).
 
         Args:
             date: Date string
@@ -375,30 +517,68 @@ class ExtractionPipeline:
             "cancelled": "cancelled",
         }
 
-        # Load all existing tasks for this source file
-        existing_rows = self.db.execute(
-            "SELECT id, description, status FROM tasks WHERE source_file = ?",
-            [source_file],
+        dialect = get_dialect(self.db)
+        ph = "%s" if dialect == "postgres" else "?"
+
+        # Load ALL existing tasks for this user (global dedup, not per-file)
+        global_conds: list[str] = []
+        global_params: list = []
+        if dialect == "postgres" and self.user_id:
+            global_conds.append(f"user_id = {ph}")
+            global_params.append(self.user_id)
+        global_where = f"WHERE {' AND '.join(global_conds)}" if global_conds else ""
+        global_rows = self.db.execute(
+            f"SELECT id, description, status, source_file, date FROM tasks {global_where}",
+            global_params,
         ).fetchall()
-        existing_by_desc: dict[str, tuple[str, str]] = {
-            row[1]: (row[0], row[2]) for row in existing_rows  # desc -> (id, status)
+        # Build lookup by normalized description -> (id, status, source_file, date)
+        global_by_norm: dict[str, tuple[str, str, str, str]] = {
+            self._normalize_task_desc(row[1]): (row[0], row[2], row[3], str(row[4]))
+            for row in global_rows
         }
 
-        # Collect descriptions from current extraction
-        new_descriptions = {task.get("description", "") for task in tasks}
+        # Also build per-file lookup for stale task cleanup
+        file_by_norm: dict[str, tuple[str, str]] = {
+            self._normalize_task_desc(row[1]): (row[0], row[2])
+            for row in global_rows
+            if row[3] == source_file
+        }
 
-        # Remove stale backlog tasks that are no longer in the note
-        # (keep done/cancelled/in_progress — those were acted on by the user)
-        for desc, (task_id, status) in existing_by_desc.items():
-            if desc not in new_descriptions and status == "backlog":
-                self.db.execute("DELETE FROM tasks WHERE id = ?", [task_id])
+        # Collect normalized descriptions from current extraction
+        new_norm_descriptions = {
+            self._normalize_task_desc(task.get("description", ""))
+            for task in tasks
+        }
+
+        # Remove stale backlog tasks from THIS file that are no longer in the note
+        for norm_desc, (task_id, status) in file_by_norm.items():
+            if norm_desc not in new_norm_descriptions and status == "backlog":
+                del_conds = [f"id = {ph}"]
+                del_params: list = [task_id]
+                if dialect == "postgres" and self.user_id:
+                    del_conds.append(f"user_id = {ph}")
+                    del_params.append(self.user_id)
+                self.db.execute(f"DELETE FROM tasks WHERE {' AND '.join(del_conds)}", del_params)
 
         records = 0
         for task in tasks:
             description = task.get("description", "")
+            norm_desc = self._normalize_task_desc(description)
 
-            # Skip if this task already exists for this source file
-            if description in existing_by_desc:
+            # Skip if this task already exists ANYWHERE for this user
+            if norm_desc in global_by_norm:
+                existing_id, existing_status, existing_file, existing_date = global_by_norm[norm_desc]
+                # Update source_file to the latest note if this note is newer
+                if date > existing_date and existing_file != source_file:
+                    upd_conds = [f"id = {ph}"]
+                    upd_params: list = [existing_id]
+                    if dialect == "postgres" and self.user_id:
+                        upd_conds.append(f"user_id = {ph}")
+                        upd_params.append(self.user_id)
+                    self.db.execute(
+                        f"UPDATE tasks SET source_file = {ph}, date = {ph} WHERE {' AND '.join(upd_conds)}",
+                        [source_file, date] + upd_params,
+                    )
                 continue
 
             task_id = self._generate_id()
@@ -406,23 +586,23 @@ class ExtractionPipeline:
             status = STATUS_MAP.get(raw_status, raw_status)
             completed_at = datetime.now() if status in ("done", "cancelled") else None
 
+            cols = ["id", "date", "description", "status", "completed_at", "category", "priority", "source_file"]
+            vals: list = [
+                task_id, date, description, status, completed_at,
+                task.get("category"), task.get("priority"), source_file,
+            ]
+            if dialect == "postgres" and self.user_id:
+                cols.append("user_id")
+                vals.append(self.user_id)
+
+            placeholders = ", ".join([ph] * len(cols))
             self.db.execute(
-                """
-                INSERT INTO tasks
-                (id, date, description, status, completed_at, category, priority, source_file)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                [
-                    task_id,
-                    date,
-                    description,
-                    status,
-                    completed_at,
-                    task.get("category"),
-                    task.get("priority"),
-                    source_file,
-                ],
+                f"INSERT INTO tasks ({', '.join(cols)}) VALUES ({placeholders})",
+                vals,
             )
+            # Track newly inserted tasks in global lookup to prevent
+            # duplicates within the same extraction batch
+            global_by_norm[norm_desc] = (task_id, status, source_file, date)
             records += 1
 
         return records
@@ -446,29 +626,46 @@ class ExtractionPipeline:
         if not meals:
             return 0
 
+        dialect = get_dialect(self.db)
+        ph = "%s" if dialect == "postgres" else "?"
+
+        # Delete old meal records for this date/source so re-extraction
+        # doesn't leave duplicates.
+        if dialect == "postgres" and self.user_id:
+            self.db.execute(
+                f"DELETE FROM food_log WHERE date = {ph} AND source_file = {ph} AND user_id = {ph}",
+                [date, source_file, self.user_id],
+            )
+        else:
+            self.db.execute(
+                f"DELETE FROM food_log WHERE date = {ph} AND source_file = {ph}",
+                [date, source_file],
+            )
+
         records = 0
         for meal in meals:
             meal_id = self._generate_id()
+            cols = ["id", "date", "meal_type", "time", "description", "calories",
+                    "protein_g", "carbs_g", "fat_g", "notes", "source_file"]
+            vals: list = [
+                meal_id, date,
+                meal.get("meal_type"),
+                meal.get("time"),
+                meal.get("description", ""),
+                meal.get("calories"),
+                meal.get("protein_g"),
+                meal.get("carbs_g"),
+                meal.get("fat_g"),
+                meal.get("notes"),
+                source_file,
+            ]
+            if dialect == "postgres" and self.user_id:
+                cols.append("user_id")
+                vals.append(self.user_id)
+            placeholders = ", ".join([ph] * len(cols))
             self.db.execute(
-                """
-                INSERT INTO food_log
-                (id, date, meal_type, time, description, calories,
-                 protein_g, carbs_g, fat_g, notes, source_file)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                [
-                    meal_id,
-                    date,
-                    meal.get("meal_type"),
-                    meal.get("time"),
-                    meal.get("description", ""),
-                    meal.get("calories"),
-                    meal.get("protein_g"),
-                    meal.get("carbs_g"),
-                    meal.get("fat_g"),
-                    meal.get("notes"),
-                    source_file,
-                ],
+                f"INSERT INTO food_log ({', '.join(cols)}) VALUES ({placeholders})",
+                vals,
             )
             records += 1
 
@@ -499,37 +696,151 @@ class ExtractionPipeline:
             return 0
 
         extraction_id = self._generate_id()
+        dialect = get_dialect(self.db)
+        ph = "%s" if dialect == "postgres" else "?"
 
-        # Ensure custom_extractions table exists
-        self.db.execute(
-            """
-            CREATE TABLE IF NOT EXISTS custom_extractions (
-                id VARCHAR PRIMARY KEY,
-                schema_name VARCHAR NOT NULL,
-                date DATE,
-                data JSON NOT NULL,
-                source_file VARCHAR,
-                extracted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        # Ensure custom_extractions table exists (DuckDB only; Postgres schema managed separately)
+        if dialect != "postgres":
+            self.db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS custom_extractions (
+                    id VARCHAR PRIMARY KEY,
+                    schema_name VARCHAR NOT NULL,
+                    date DATE,
+                    data JSON NOT NULL,
+                    source_file VARCHAR,
+                    extracted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """
             )
-            """
-        )
 
+        cols = ["id", "schema_name", "date", "data", "source_file"]
+        vals: list = [extraction_id, schema_name, date, json.dumps(data), source_file]
+        if dialect == "postgres" and self.user_id:
+            cols.append("user_id")
+            vals.append(self.user_id)
+        placeholders = ", ".join([ph] * len(cols))
         self.db.execute(
-            """
-            INSERT INTO custom_extractions
-            (id, schema_name, date, data, source_file)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            [
-                extraction_id,
-                schema_name,
-                date,
-                json.dumps(data),
-                source_file,
-            ],
+            f"INSERT INTO custom_extractions ({', '.join(cols)}) VALUES ({placeholders})",
+            vals,
         )
 
         return 1
+
+    @staticmethod
+    @staticmethod
+    def _parse_exercise_names_from_content(content: str) -> list[str]:
+        """Parse original exercise names from structured markdown content.
+
+        Looks for lines matching patterns like:
+          * Exercise Name: 1x8 @ 20kg, ...
+          * Exercise Name: sets...
+          - Exercise Name: ...
+
+        Returns list of exercise names as written by the user.
+        """
+        names: list[str] = []
+        for line in content.split("\n"):
+            stripped = line.strip()
+            # Match bullet lines with exercise data (colon followed by set/rep info)
+            if stripped.startswith(("* ", "- ")):
+                text = stripped[2:].strip()
+                # Skip bold-prefixed metadata lines like "* **Type**: Strength"
+                if text.startswith("**") and "**:" in text:
+                    continue
+                # Skip checkbox lines
+                if text.startswith("[ ]") or text.startswith("[x]"):
+                    continue
+                # Look for "Name: <set data>" pattern
+                colon_idx = text.find(":")
+                if colon_idx > 0:
+                    after_colon = text[colon_idx + 1:].strip()
+                    # Verify it looks like exercise data (has digits for reps/weight)
+                    if re.search(r"\d+x\d+|\d+\s*kg|\d+\s*rep", after_colon, re.IGNORECASE):
+                        names.append(text[:colon_idx].strip())
+                elif re.search(r"\d+x\d+|\d+\s*kg", text):
+                    # Line without colon but with exercise data (e.g. "* GHD Crunches 1x12")
+                    match = re.match(r"^(.+?)\s*\d+x\d+", text)
+                    if match:
+                        names.append(match.group(1).strip())
+        return names
+
+    @staticmethod
+    def _restore_original_exercise_names(
+        content: str, activities: list[dict],
+    ) -> list[dict]:
+        """Replace Claude-renamed exercise names with the user's original names.
+
+        Claude sometimes renames exercises (e.g. 'Biceps Preacher Cable Curl' ->
+        'Biceps Cable Curl'). This parses the original names from the note and
+        restores them using fuzzy matching.
+        """
+        from difflib import SequenceMatcher
+
+        original_names = ExtractionPipeline._parse_exercise_names_from_content(content)
+        if not original_names:
+            return activities
+
+        for activity in activities:
+            for exercise in activity.get("exercises", []):
+                claude_name = exercise.get("name", "")
+                if not claude_name:
+                    continue
+
+                claude_lower = claude_name.lower().strip()
+
+                # Check if Claude's name exactly matches an original — keep it, but mark it
+                if any(n.lower().strip() == claude_lower for n in original_names):
+                    exercise["_name_from_note"] = True
+                    continue
+
+                # Find the best matching original name
+                best_score = 0.0
+                best_name = None
+                for orig in original_names:
+                    score = SequenceMatcher(
+                        None, claude_lower, orig.lower().strip()
+                    ).ratio()
+                    if score > best_score:
+                        best_score = score
+                        best_name = orig
+
+                # Restore original name if it's a close-enough match
+                if best_name and best_score >= 0.55:
+                    exercise["name"] = best_name
+                    exercise["_name_from_note"] = True
+
+        return activities
+
+    @staticmethod
+    def _strip_suggestions(content: str) -> str:
+        """Remove blockquoted workout suggestion tables before extraction.
+
+        Strips any contiguous blockquote block (lines starting with >) that
+        contains a markdown table (pipe characters). This catches all header
+        variants — "> **Last session", "> **Suggested Workout**", etc.
+        """
+        lines = content.split("\n")
+        result: list[str] = []
+        block: list[str] = []
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith(">"):
+                block.append(line)
+            else:
+                if block:
+                    # Keep the block only if it doesn't look like a suggestion table
+                    has_table = any("|" in l for l in block)
+                    if not has_table:
+                        result.extend(block)
+                    block = []
+                result.append(line)
+        # Handle trailing blockquote
+        if block:
+            has_table = any("|" in l for l in block)
+            if not has_table:
+                result.extend(block)
+        return "\n".join(result)
 
     async def extract(
         self,
@@ -582,11 +893,20 @@ class ExtractionPipeline:
                     error=str(e),
                 )
 
-            # Extract data using Claude
-            data = await self.claude.extract(content, schema)
+            # Strip suggestion blocks before extraction
+            clean_content = self._strip_suggestions(content)
 
-            # Get date from extracted data or file path
-            date = data.get("date") or self._extract_date_from_path(file_path)
+            # Extract data using Claude
+            data = await self.claude.extract(clean_content, schema)
+
+            # Restore original exercise names that Claude may have renamed
+            if data.get("activities"):
+                data["activities"] = self._restore_original_exercise_names(
+                    content, data["activities"]
+                )
+
+            # Get date from file path first (reliable), then fall back to extracted data
+            date = self._extract_date_from_path(file_path) or data.get("date")
             if not date:
                 # Use today if no date found
                 date = datetime.now().strftime("%Y-%m-%d")
@@ -618,7 +938,7 @@ class ExtractionPipeline:
                         date, data["activities"], file_path
                     )
 
-                if data.get("tasks"):
+                if data.get("tasks") and self._is_daily_note(file_path):
                     records_inserted["tasks"] = self._store_tasks(
                         date, data["tasks"], file_path
                     )

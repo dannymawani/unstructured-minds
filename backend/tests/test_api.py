@@ -20,6 +20,8 @@ def test_settings(tmp_path: Path):
         mock_settings.debug = False
         mock_settings.anthropic_api_key = None
         mock_settings.claude_enabled = False
+        mock_settings.database_url = None
+        mock_settings.is_cloud_mode = False
 
         # Create directories
         mock_settings.vault_path.mkdir(parents=True, exist_ok=True)
@@ -235,4 +237,53 @@ class TestVaultDeleteFile:
     def test_delete_file_path_required(self, client: TestClient) -> None:
         """Test that path parameter is required."""
         response = client.delete("/vault/file")
+        assert response.status_code == 422
+
+
+class TestVaultRenameFile:
+    """Tests for vault file rename endpoint."""
+
+    def test_rename_file_success(self, client: TestClient, test_settings) -> None:
+        """Test renaming a file."""
+        vault_path = test_settings.vault_path
+        (vault_path / "old-name.md").write_text("# Content")
+
+        response = client.patch(
+            "/vault/file",
+            json={"old_path": "old-name.md", "new_path": "new-name.md"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["old_path"] == "old-name.md"
+        assert data["new_path"] == "new-name.md"
+        assert data["success"] is True
+
+        # Verify file was renamed
+        assert not (vault_path / "old-name.md").exists()
+        assert (vault_path / "new-name.md").exists()
+        assert (vault_path / "new-name.md").read_text() == "# Content"
+
+    def test_rename_file_not_found(self, client: TestClient) -> None:
+        """Test renaming a nonexistent file."""
+        response = client.patch(
+            "/vault/file",
+            json={"old_path": "nonexistent.md", "new_path": "new.md"},
+        )
+        assert response.status_code == 404
+
+    def test_rename_file_dest_exists(self, client: TestClient, test_settings) -> None:
+        """Test renaming to an existing destination returns 409."""
+        vault_path = test_settings.vault_path
+        (vault_path / "a.md").write_text("# A")
+        (vault_path / "b.md").write_text("# B")
+
+        response = client.patch(
+            "/vault/file",
+            json={"old_path": "a.md", "new_path": "b.md"},
+        )
+        assert response.status_code == 409
+
+    def test_rename_file_paths_required(self, client: TestClient) -> None:
+        """Test that both path parameters are required."""
+        response = client.patch("/vault/file", json={})
         assert response.status_code == 422

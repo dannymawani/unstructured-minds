@@ -1,15 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { X, Folder, Palette, Key, Check, Loader2, Download, Upload, Database, Archive, FileJson } from 'lucide-react'
+import { X, Folder, Palette, Check, Loader2, Download, Upload, Database, Archive, ExternalLink, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { SchemaManager } from '@/components/Schemas'
 
 interface Settings {
-  vault_path: string
-  data_path: string
-  claude_enabled: boolean
-  claude_configured: boolean
-  api_key_set: boolean
   theme: string
 }
 
@@ -224,20 +218,6 @@ export function SettingsPanel({
             </div>
           ) : settings ? (
             <>
-              {/* General Section */}
-              <section>
-                <div className="flex items-center gap-2 mb-3">
-                  <Folder className="w-4 h-4 text-blue-400" />
-                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                    General
-                  </h3>
-                </div>
-                <div className="space-y-3">
-                  <SettingItem label="Vault Path" value={settings.vault_path} />
-                  <SettingItem label="Data Path" value={settings.data_path} />
-                </div>
-              </section>
-
               {/* Appearance Section */}
               <section>
                 <div className="flex items-center gap-2 mb-3">
@@ -264,39 +244,6 @@ export function SettingsPanel({
                       />
                     </div>
                   </div>
-                </div>
-              </section>
-
-              {/* API Section */}
-              <section>
-                <div className="flex items-center gap-2 mb-3">
-                  <Key className="w-4 h-4 text-green-400" />
-                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                    API
-                  </h3>
-                </div>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between bg-muted rounded-lg p-3">
-                    <span className="text-sm text-muted-foreground">Claude API</span>
-                    <ApiStatus
-                      enabled={settings.claude_enabled}
-                      configured={settings.claude_configured}
-                      keySet={settings.api_key_set}
-                    />
-                  </div>
-                </div>
-              </section>
-
-              {/* Schemas Section */}
-              <section>
-                <div className="flex items-center gap-2 mb-3">
-                  <FileJson className="w-4 h-4 text-cyan-400" />
-                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                    Data Extraction
-                  </h3>
-                </div>
-                <div className="bg-muted rounded-lg p-3">
-                  <SchemaManager apiBaseUrl={apiBaseUrl} />
                 </div>
               </section>
 
@@ -422,6 +369,27 @@ export function SettingsPanel({
                   )}
                 </div>
               </section>
+
+              {/* Upgrade Plan */}
+              <section>
+                <div className="flex items-center gap-2 mb-3">
+                  <Sparkles className="w-4 h-4 text-amber-400" />
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                    Plan
+                  </h3>
+                </div>
+                <a
+                  href="https://unstructuredminds.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-between bg-muted rounded-lg p-3 hover:bg-muted/80 transition-colors group"
+                >
+                  <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+                    Upgrade Plan
+                  </span>
+                  <ExternalLink className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                </a>
+              </section>
             </>
           ) : null}
         </div>
@@ -433,20 +401,6 @@ export function SettingsPanel({
           </Button>
         </div>
       </div>
-    </div>
-  )
-}
-
-interface SettingItemProps {
-  label: string
-  value: string
-}
-
-function SettingItem({ label, value }: SettingItemProps) {
-  return (
-    <div className="bg-muted rounded-lg p-3">
-      <span className="text-xs text-muted-foreground block mb-1">{label}</span>
-      <span className="text-sm text-muted-foreground font-mono break-all">{value}</span>
     </div>
   )
 }
@@ -481,42 +435,4 @@ function ThemeButton({ theme, currentTheme, onClick, disabled }: ThemeButtonProp
   )
 }
 
-interface ApiStatusProps {
-  enabled: boolean
-  configured: boolean
-  keySet: boolean
-}
-
-function ApiStatus({ enabled, configured, keySet }: ApiStatusProps) {
-  if (!enabled) {
-    return (
-      <span className="text-xs bg-secondary text-muted-foreground px-2 py-1 rounded">
-        Disabled
-      </span>
-    )
-  }
-
-  if (!keySet) {
-    return (
-      <span className="text-xs bg-red-500/20 text-red-400 px-2 py-1 rounded">
-        API Key Not Set
-      </span>
-    )
-  }
-
-  if (!configured) {
-    return (
-      <span className="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded">
-        Not Configured
-      </span>
-    )
-  }
-
-  return (
-    <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded flex items-center gap-1">
-      <Check className="w-3 h-3" />
-      Configured
-    </span>
-  )
-}
 
