@@ -269,17 +269,6 @@ async def detailed_health(
     )
     checks["claude_api"] = claude_status in (ComponentStatus.UP, ComponentStatus.DEGRADED)
 
-    # Check file watcher (if applicable)
-    watcher_status, watcher_message = _check_watcher()
-    components.append(
-        ComponentHealth(
-            name="file_watcher",
-            status=watcher_status,
-            message=watcher_message,
-        )
-    )
-    checks["file_watcher"] = watcher_status in (ComponentStatus.UP, ComponentStatus.DEGRADED)
-
     # Determine overall status
     critical_ok = checks["database"] and checks["storage"]
     all_ok = all(checks.values())
@@ -389,14 +378,3 @@ def _check_claude(claude) -> tuple[ComponentStatus, str | None]:
     return ComponentStatus.UP, None
 
 
-def _check_watcher() -> tuple[ComponentStatus, str | None]:
-    """Check file watcher status.
-
-    Returns:
-        Tuple of (status, message)
-    """
-    if not settings.vault_path.exists():
-        return ComponentStatus.DEGRADED, "Vault path does not exist, watcher disabled"
-
-    # File watcher is running if vault exists
-    return ComponentStatus.UP, None

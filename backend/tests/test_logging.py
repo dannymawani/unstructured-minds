@@ -4,11 +4,7 @@ import logging
 
 from src.logging_config import (
     configure_logging,
-    get_api_logger,
-    get_db_logger,
-    get_extraction_logger,
     get_logger,
-    get_watcher_logger,
 )
 
 
@@ -55,24 +51,19 @@ class TestGetLogger:
 
 
 class TestSpecializedLoggers:
-    """Tests for specialized logger getters."""
+    """Tests for specialized logger getters via get_logger(name)."""
 
     def test_get_api_logger(self):
         """Test getting API logger."""
-        logger = get_api_logger()
+        logger = get_logger("api")
         assert logger is not None
 
     def test_get_db_logger(self):
         """Test getting database logger."""
-        logger = get_db_logger()
+        logger = get_logger("db")
         assert logger is not None
 
     def test_get_extraction_logger(self):
         """Test getting extraction logger."""
-        logger = get_extraction_logger()
-        assert logger is not None
-
-    def test_get_watcher_logger(self):
-        """Test getting watcher logger."""
-        logger = get_watcher_logger()
+        logger = get_logger("extraction")
         assert logger is not None

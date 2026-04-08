@@ -1,6 +1,7 @@
 """Base plugin class and types."""
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
 
@@ -99,7 +100,7 @@ class Plugin(ABC):
         """
         self._hooks[hook] = callback
 
-    def get_hook(self, hook: PluginHook) -> callable | None:
+    def get_hook(self, hook: PluginHook) -> Callable | None:
         """Get registered hook callback.
 
         Args:
