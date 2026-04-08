@@ -18,6 +18,15 @@ resource "azurerm_container_app" "backend" {
   resource_group_name          = azurerm_resource_group.main.name
   revision_mode                = "Single"
 
+  identity {
+    type = "SystemAssigned"
+  }
+
+  registry {
+    server   = azurerm_container_registry.main.login_server
+    identity = "System"
+  }
+
   template {
     min_replicas = 0 # Scale to zero when idle
     max_replicas = 2
@@ -29,8 +38,20 @@ resource "azurerm_container_app" "backend" {
       memory = "1Gi"
 
       env {
-        name        = "DATABASE_URL"
-        secret_name = "database-url"
+        name  = "AZURE_USE_MANAGED_IDENTITY"
+        value = "true"
+      }
+      env {
+        name  = "AZURE_POSTGRES_HOST"
+        value = azurerm_postgresql_flexible_server.main.fqdn
+      }
+      env {
+        name  = "AZURE_POSTGRES_DB"
+        value = "unstructured_minds"
+      }
+      env {
+        name  = "AZURE_POSTGRES_USER"
+        value = "um-backend"
       }
       env {
         name        = "ANTHROPIC_API_KEY"
@@ -78,10 +99,6 @@ resource "azurerm_container_app" "backend" {
     }
   }
 
-  secret {
-    name  = "database-url"
-    value = "postgresql://umadmin:${var.postgres_admin_password}@${azurerm_postgresql_flexible_server.main.fqdn}/unstructured_minds?sslmode=require"
-  }
   secret {
     name  = "anthropic-api-key"
     value = var.anthropic_api_key

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react'
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router'
-import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/clerk-react'
+import { SignedIn, SignedOut, SignInButton, UserButton, useAuth } from '@clerk/clerk-react'
 import { Button } from '@/components/ui/button'
 import { FileTree } from '@/components/FileTree'
 import { MarkdownEditor } from '@/components/Editor/MarkdownEditor'
@@ -20,7 +20,6 @@ import { useTheme } from '@/hooks/useTheme'
 import { useFileManager } from '@/hooks/useFileManager'
 import { useUIState } from '@/hooks/useUIState'
 import { api, setTokenGetter } from '@/lib/apiClient'
-import { useAuth } from '@clerk/clerk-react'
 import {
   LayoutDashboard,
   FileText,
@@ -42,8 +41,6 @@ import {
 const Dashboard = lazy(() => import('@/components/Dashboard/Dashboard').then(m => ({ default: m.Dashboard })))
 const KanbanBoard = lazy(() => import('@/components/Kanban/KanbanBoard').then(m => ({ default: m.KanbanBoard })))
 const CalendarView = lazy(() => import('@/components/Calendar/CalendarView').then(m => ({ default: m.CalendarView })))
-const LifeProfile = lazy(() => import('@/components/LifeProfile/LifeProfile').then(m => ({ default: m.LifeProfile })))
-
 const CLERK_ENABLED = !!import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
 
 function SignInGate() {
@@ -83,7 +80,7 @@ function ViewLoadingFallback() {
   )
 }
 
-type View = 'editor' | 'dashboard' | 'kanban' | 'calendar' | 'profile'
+type View = 'editor' | 'dashboard' | 'kanban' | 'calendar'
 
 const DEFAULT_DAILY_NOTE_TEMPLATE = '{YYYY}/{MM}/{YYYY}-{MM}-{DD}-daily-note'
 
@@ -101,6 +98,7 @@ function App() {
   const navigate = useNavigate()
   const location = useLocation()
   const { theme, toggleTheme, setTheme } = useTheme()
+  const { isLoaded: clerkLoaded } = useAuth()
 
   // Fetch daily note path template from settings
   const [dailyNoteTemplate, setDailyNoteTemplate] = useState(DEFAULT_DAILY_NOTE_TEMPLATE)
@@ -119,7 +117,6 @@ function App() {
     if (path === 'dashboard') return 'dashboard'
     if (path === 'kanban') return 'kanban'
     if (path === 'calendar') return 'calendar'
-    if (path === 'profile') return 'profile'
     return 'editor'
   }, [location.pathname])
 
@@ -228,7 +225,7 @@ function App() {
     onSave: file.handleSave, onToggleSidebar: ui.toggleSidebar, onCreateDailyNote: createDailyNote,
     onOpenCommandPalette: ui.openCommandPalette, onSwitchToEditor: () => navigate('/editor'),
     onSwitchToDashboard: () => navigate('/dashboard'), onSwitchToKanban: () => navigate('/kanban'),
-    onSwitchToCalendar: () => navigate('/calendar'), onSwitchToProfile: () => navigate('/profile'),
+    onSwitchToCalendar: () => navigate('/calendar'),
     onSearch: ui.openSearch, onNewFromTemplate: ui.openTemplatePicker, onQuickCapture: ui.openQuickCapture,
   }), [file.handleSave, ui, createDailyNote, navigate])
 
@@ -383,7 +380,6 @@ function App() {
           <Route path="/dashboard" element={<Suspense fallback={<ViewLoadingFallback />}><section className="flex-1 overflow-auto bg-background"><Dashboard apiUrl={api.baseUrl} onCreateNote={createDailyNote} /></section></Suspense>} />
           <Route path="/kanban" element={<Suspense fallback={<ViewLoadingFallback />}><section className="flex-1 overflow-auto bg-background"><KanbanBoard apiUrl={api.baseUrl} onFileSelect={handleFileSelect} /></section></Suspense>} />
           <Route path="/calendar" element={<Suspense fallback={<ViewLoadingFallback />}><section className="flex-1 overflow-auto bg-background"><CalendarView apiUrl={api.baseUrl} onDaySelect={handleCalendarDaySelect} /></section></Suspense>} />
-          <Route path="/profile" element={<Suspense fallback={<ViewLoadingFallback />}><section className="flex-1 overflow-auto bg-background"><LifeProfile apiUrl={api.baseUrl} /></section></Suspense>} />
           <Route path="/editor" element={editorElement} />
           <Route path="/" element={editorElement} />
           <Route path="*" element={<Navigate to="/" replace />} />
@@ -401,6 +397,10 @@ function App() {
   )
 
   if (!CLERK_ENABLED) return appContent
+
+  if (!clerkLoaded) {
+    return <div className="min-h-screen bg-background" />
+  }
 
   return (
     <>

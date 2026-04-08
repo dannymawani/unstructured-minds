@@ -32,6 +32,9 @@ class ExerciseMatcher:
         self._fuzzy_candidates: list[tuple[str, str]] = []  # (lowercase_name, display)
         self._ai_cache: dict[str, str] = {}  # lowercased raw → canonical
         self._canonical_set: set[str] = set()  # all known display names
+        self._muscle_groups: dict[str, list[str]] = {}  # display_name → muscle_groups
+        self._categories: dict[str, str] = {}  # display_name → category
+        self._recovery_hours: dict[str, int] = {}  # display_name → recovery_hours
 
         if not definitions_path.exists():
             return
@@ -55,10 +58,35 @@ class ExerciseMatcher:
                 self._alias_map[alias.lower()] = display
                 self._fuzzy_candidates.append((alias.lower(), display))
 
+            # Metadata
+            self._muscle_groups[display] = entry.get("muscle_groups", [])
+            self._categories[display] = entry.get("category", "other")
+            self._recovery_hours[display] = entry.get("recovery_hours", 48)
+
     @property
     def canonical_names(self) -> list[str]:
         """Return sorted list of all known canonical display names."""
         return sorted(self._canonical_set)
+
+    def get_muscle_groups(self, canonical_name: str) -> list[str]:
+        """Look up muscle groups for a canonical exercise name.
+
+        Checks both builtin definitions and community exercises.
+        """
+        if canonical_name in self._muscle_groups:
+            return self._muscle_groups[canonical_name]
+        return []
+
+    def get_metadata(self, canonical_name: str) -> dict[str, Any]:
+        """Get full metadata for a canonical exercise name.
+
+        Returns dict with muscle_groups, category, recovery_hours.
+        """
+        return {
+            "muscle_groups": self._muscle_groups.get(canonical_name, []),
+            "category": self._categories.get(canonical_name, "other"),
+            "recovery_hours": self._recovery_hours.get(canonical_name, 48),
+        }
 
     def load_community_exercises(self, exercises: list[dict]) -> None:
         """Inject community exercises into the matcher's lookup maps.
@@ -96,6 +124,17 @@ class ExerciseMatcher:
             for alias in aliases:
                 self._alias_map[alias.lower()] = display
                 self._fuzzy_candidates.append((alias.lower(), display))
+
+            # Store metadata
+            muscle_groups = entry.get("muscle_groups", [])
+            if isinstance(muscle_groups, str):
+                try:
+                    muscle_groups = json.loads(muscle_groups)
+                except (json.JSONDecodeError, TypeError):
+                    muscle_groups = []
+            self._muscle_groups[display] = muscle_groups or []
+            self._categories[display] = entry.get("category", "other")
+            self._recovery_hours[display] = entry.get("recovery_hours", 48)
 
             count += 1
 

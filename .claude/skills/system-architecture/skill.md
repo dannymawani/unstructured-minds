@@ -52,7 +52,6 @@ unstructured_minds/
 ├── data/                       # Gitignored, per-instance
 │   ├── unstructured.duckdb     # ~39MB active database
 │   ├── settings.json           # {theme, show_month_names}
-│   ├── life_profile.json       # User profile (overview, work, training, goals)
 │   ├── training_config.json    # Athlete targets, recovery times
 │   └── ai_exercise_cache.json  # Claude-generated exercise aliases
 ├── vault/                      # Gitignored, markdown notes
@@ -190,7 +189,7 @@ class Settings(BaseSettings):
 - `/health`, `/health/live`, `/health/ready`, `/health/detailed` — Health probes
 - `/search` — Full-text vault search (100/min)
 - `/tags`, `/tags/{tag}` — Tag management
-- `/settings` (GET/PUT), `/profile` (GET/PUT) — Config
+- `/settings` (GET/PUT) — Config
 - `/export/json`, `/export/csv`, `/import/json` — Data portability (5/min)
 - `/skills`, `/skills/{name}/execute` — Custom skill system
 - `/schemas` — Custom extraction schemas CRUD
@@ -236,7 +235,7 @@ SQL generation uses `system` parameter (not user message) with explicit anti-inj
 
 - **LocalFilesystem** — reads/writes `VAULT_PATH`, path traversal prevention
 - **PostgresStorage** — reads/writes `vault_files` table, user-scoped
-- **DataStore** — JSON wrapper over storage for settings/profile/config files
+- **DataStore** — JSON wrapper over storage for settings/config files
 
 ### Claude AI Integration (`claude/client.py`)
 
@@ -273,9 +272,8 @@ React 19 + Vite 7 + TypeScript 5.9 (strict) + Tailwind v4 + Milkdown 7 + Clerk +
 2. **Dashboard** (`/dashboard`) — Configurable analytics widgets
 3. **Kanban** (`/kanban`) — 4-column personal task board (Backlog → In Progress → Done → Cancelled)
 4. **Calendar** (`/calendar`) — Monthly calendar with daily note indicators
-5. **Profile** (`/profile`) — Life profile editor (overview, personal, work, training, goals)
 
-### Component Inventory (22 directories)
+### Component Inventory (21 directories)
 
 **Layout:** Drawer (mobile slide-out), MobileNav (bottom tabs)
 **Files:** FileTree (virtualized, nested), FileTreeItem (memoized)
@@ -284,7 +282,6 @@ React 19 + Vite 7 + TypeScript 5.9 (strict) + Tailwind v4 + Milkdown 7 + Clerk +
 **Dashboard:** Dashboard, DashboardSummary, WeeklyActivityChart, MetricsTrends, ExerciseTable, ActivityHeatmap, SleepTrends, MoodCorrelation, NutritionTile, ExerciseProgress, EnduranceLog, EnduranceProgress, InsightsCard, WidgetConfig
 **Tasks:** PersonalKanban, PersonalTaskCard (draggable), PersonalTaskModal
 **Modals:** CommandPalette (Cmd+K), SearchModal, QuickCapture, TemplatePicker, SettingsPanel, DailyNoteWizard
-**Profile:** LifeProfile, OverviewSection, PersonalSection, WorkSection, TrainingSection, GoalsSection, ProgressReviews
 **Calendar:** CalendarView
 **UI:** Button (CVA variants), SchemaManager
 
@@ -385,7 +382,7 @@ All tables add `user_id UUID NOT NULL`. Primary keys become composite: `(user_id
 
 **vault_files** — `path`, `user_id` (UUID), `content` (TEXT), `size_bytes`, `content_hash`, `created_at`, `updated_at`. PK: `(user_id, path)`
 
-**user_settings** — `user_id` (UUID), `key` (VARCHAR), `value` (JSONB), `updated_at`. PK: `(user_id, key)`. Keys: `settings`, `life_profile`, `training_config`, `ai_exercise_cache`
+**user_settings** — `user_id` (UUID), `key` (VARCHAR), `value` (JSONB), `updated_at`. PK: `(user_id, key)`. Keys: `settings`, `training_config`, `ai_exercise_cache`
 
 **custom_extractions** — `id`, `user_id`, `schema_name`, `date`, `data` (JSONB), `source_file`, `extracted_at`
 
@@ -503,8 +500,6 @@ services:
 ## Data Config Files (`data/`)
 
 **settings.json:** `{theme, show_month_names}`
-
-**life_profile.json:** `{overview: {name, role, company, location}, work: {skills, projects, colleagues}, personal: {family, friends, interests}, training: {disciplines, current_lifts}, goals: [{id, status, category, description, progress}]}`
 
 **training_config.json:** `{athlete: {age, height_cm, weight_kg, bjj_days}, targets: {sleep_hours, daily_calories, daily_protein_g, strength/bjj/cardio sessions_per_week}, recovery: {bjj/large/medium/small muscles hours}, core_lifts, preferences: {working_sets_range, deload_week_frequency}}`
 

@@ -116,7 +116,7 @@ export function BodyWeightChart({
   // X-axis ticks: ~6 evenly spaced
   const xTickCount = Math.min(6, n);
   const xTicks = Array.from({ length: xTickCount }, (_, i) => {
-    const idx = Math.round((i / (xTickCount - 1)) * (n - 1));
+    const idx = xTickCount <= 1 ? 0 : Math.round((i / (xTickCount - 1)) * (n - 1));
     return {
       x: sx(idx, n),
       label: new Date(entries[idx].date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),

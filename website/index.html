@@ -949,6 +949,466 @@
     @media (max-width: 900px) {
       .mobile-toggle { display: block; }
     }
+
+    /* ===================== MOCKUP STYLES ===================== */
+    .mockup-window {
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.3), 0 0 60px rgba(20,184,166,0.04);
+    }
+    .mockup-titlebar {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 10px 14px;
+      background: var(--bg-elevated);
+      border-bottom: 1px solid var(--border);
+    }
+    .mockup-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .mockup-dot:nth-child(1) { background: #ef4444; }
+    .mockup-dot:nth-child(2) { background: #f59e0b; }
+    .mockup-dot:nth-child(3) { background: #22c55e; }
+    .mockup-tab {
+      margin-left: 10px;
+      font-size: 11px;
+      color: var(--text-muted);
+      background: var(--bg-primary);
+      padding: 3px 10px;
+      border-radius: 5px;
+    }
+    .mockup-body {
+      padding: 16px;
+      font-size: 12px;
+      line-height: 1.7;
+    }
+
+    /* -- HERO SPLIT MOCKUP -- */
+    .hero-mockup-split {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 16px;
+      align-items: start;
+    }
+    .hero-editor-mock .mockup-body {
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      min-height: 300px;
+    }
+    .hero-editor-mock .mock-heading {
+      font-family: var(--font-body);
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--text-primary);
+    }
+    .hero-editor-mock .mock-line {
+      color: var(--text-secondary);
+      padding: 2px 0;
+    }
+    .hero-editor-mock .mock-line.highlight-teal { color: var(--teal); }
+    .hero-editor-mock .mock-line.highlight-amber { color: var(--amber); }
+    .hero-editor-mock .mock-line.highlight-indigo { color: var(--indigo); }
+
+    .hero-dash-mock {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .mini-stat-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .mini-stat {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+    .mini-stat-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+    .mini-stat-value {
+      font-size: 18px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+    }
+    .mini-stat-value.teal-text { color: var(--teal); }
+    .mini-stat-value.amber-text { color: var(--amber); }
+    .mini-stat-value.indigo-text { color: var(--indigo); }
+    .mini-stat-value.rose-text { color: var(--rose); }
+
+    /* Mini heatmap */
+    .mini-heatmap {
+      display: grid;
+      grid-template-columns: repeat(14, 1fr);
+      gap: 3px;
+    }
+    .hm-cell {
+      aspect-ratio: 1;
+      border-radius: 2px;
+      background: var(--bg-surface);
+    }
+    .hm-cell.l1 { background: rgba(20,184,166,0.2); }
+    .hm-cell.l2 { background: rgba(20,184,166,0.4); }
+    .hm-cell.l3 { background: rgba(20,184,166,0.65); }
+    .hm-cell.l4 { background: var(--teal); }
+
+    /* Mini bar chart */
+    .mini-bars {
+      display: flex;
+      align-items: flex-end;
+      gap: 4px;
+      height: 48px;
+    }
+    .mini-bar {
+      flex: 1;
+      border-radius: 2px 2px 0 0;
+      min-height: 4px;
+      transition: height 0.3s;
+    }
+
+    /* Mini exercise table */
+    .mini-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 10.5px;
+    }
+    .mini-table th {
+      text-align: left;
+      padding: 5px 6px;
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      border-bottom: 1px solid var(--border);
+      font-size: 9px;
+    }
+    .mini-table td {
+      padding: 5px 6px;
+      color: var(--text-secondary);
+      border-bottom: 1px solid var(--border);
+    }
+    .mini-table .pr-badge {
+      background: rgba(245,158,11,0.15);
+      color: var(--amber);
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-size: 9px;
+      font-weight: 700;
+    }
+    .mini-table .trend-up { color: #22c55e; }
+    .mini-table .trend-down { color: var(--rose); }
+
+    /* Step mockups */
+    .step-mockup {
+      margin-top: 16px;
+    }
+    .step-mockup .mockup-window {
+      border-radius: 10px;
+    }
+    .step-mockup .mockup-titlebar {
+      padding: 8px 12px;
+    }
+    .step-mockup .mockup-dot {
+      width: 8px;
+      height: 8px;
+    }
+
+    /* Extraction animation cards */
+    .extract-cards {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .extract-card {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 11px;
+    }
+    .extract-card-icon {
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      flex-shrink: 0;
+    }
+    .extract-card-label {
+      color: var(--text-muted);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .extract-card-value {
+      color: var(--text-primary);
+      font-weight: 600;
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+
+    /* Query result mockup */
+    .query-bubble {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 12px 12px 12px 4px;
+      padding: 10px 14px;
+      font-size: 12px;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+      display: inline-block;
+    }
+    .query-response {
+      background: var(--teal-dim);
+      border: 1px solid rgba(20,184,166,0.15);
+      border-radius: 4px 12px 12px 12px;
+      padding: 12px 14px;
+      font-size: 11px;
+    }
+    .query-chart-bars {
+      display: flex;
+      align-items: flex-end;
+      gap: 6px;
+      height: 56px;
+      margin-top: 8px;
+    }
+    .query-chart-bar {
+      flex: 1;
+      border-radius: 3px 3px 0 0;
+      position: relative;
+    }
+    .query-chart-bar .bar-label {
+      position: absolute;
+      bottom: -16px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 8px;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    /* Feature card mockup previews */
+    .feature-preview {
+      margin-top: 16px;
+      background: var(--bg-deep);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      overflow: hidden;
+    }
+
+    /* Mini kanban */
+    .mini-kanban {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 6px;
+    }
+    .kanban-col {
+      background: var(--bg-elevated);
+      border-radius: 6px;
+      padding: 6px;
+    }
+    .kanban-col-title {
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      padding: 0 2px;
+    }
+    .kanban-card {
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 5px 6px;
+      font-size: 9px;
+      color: var(--text-secondary);
+      margin-bottom: 4px;
+    }
+    .kanban-card:last-child { margin-bottom: 0; }
+    .kanban-card.has-tag::after {
+      content: '';
+      display: block;
+      width: 20px;
+      height: 3px;
+      border-radius: 2px;
+      margin-top: 3px;
+    }
+    .kanban-card.tag-teal::after { background: var(--teal); }
+    .kanban-card.tag-amber::after { background: var(--amber); }
+    .kanban-card.tag-rose::after { background: var(--rose); }
+    .kanban-card.tag-indigo::after { background: var(--indigo); }
+
+    /* Mini editor preview */
+    .mini-editor-preview {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      line-height: 1.8;
+      color: var(--text-secondary);
+    }
+    .mini-editor-preview .md-h { color: var(--text-primary); font-weight: 700; font-size: 12px; }
+    .mini-editor-preview .md-bold { color: var(--text-primary); font-weight: 600; }
+    .mini-editor-preview .md-check { color: var(--teal); }
+    .mini-editor-preview .md-bullet { color: var(--text-muted); }
+
+    /* ===================== SEE IT IN ACTION ===================== */
+    .see-it-section {
+      padding: 120px 0;
+    }
+    .full-app-mockup {
+      margin-top: 64px;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      box-shadow: 0 8px 48px rgba(0,0,0,0.4), 0 0 120px rgba(20,184,166,0.06);
+    }
+    .full-app-titlebar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 20px;
+      background: var(--bg-elevated);
+      border-bottom: 1px solid var(--border);
+    }
+    .full-app-layout {
+      display: grid;
+      grid-template-columns: 200px 1fr 280px;
+      min-height: 420px;
+      background: var(--bg-primary);
+    }
+    .full-app-sidebar {
+      background: var(--bg-deep);
+      border-right: 1px solid var(--border);
+      padding: 16px 12px;
+      font-size: 12px;
+    }
+    .sidebar-section-title {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      margin-top: 12px;
+    }
+    .sidebar-section-title:first-child { margin-top: 0; }
+    .sidebar-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 8px;
+      border-radius: 5px;
+      color: var(--text-secondary);
+      font-size: 11.5px;
+      cursor: default;
+      margin-bottom: 2px;
+    }
+    .sidebar-item.active {
+      background: var(--teal-dim);
+      color: var(--teal);
+    }
+    .sidebar-item-icon {
+      font-size: 12px;
+      width: 16px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .full-app-editor {
+      padding: 28px 32px;
+      border-right: 1px solid var(--border);
+      font-family: var(--font-body);
+      font-size: 14px;
+      line-height: 1.8;
+      color: var(--text-secondary);
+    }
+    .full-app-editor h2 {
+      font-family: var(--font-body);
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 16px;
+    }
+    .full-app-editor .editor-section-head {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-top: 16px;
+      margin-bottom: 6px;
+    }
+    .full-app-chat {
+      background: var(--bg-deep);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      gap: 10px;
+      font-size: 12px;
+    }
+    .chat-msg {
+      padding: 8px 12px;
+      border-radius: 10px;
+      max-width: 90%;
+      line-height: 1.6;
+    }
+    .chat-msg.user {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      align-self: flex-end;
+      border-radius: 10px 10px 4px 10px;
+    }
+    .chat-msg.ai {
+      background: var(--teal-dim);
+      border: 1px solid rgba(20,184,166,0.15);
+      color: var(--text-primary);
+      align-self: flex-start;
+      border-radius: 4px 10px 10px 10px;
+    }
+    .chat-input-mock {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* Responsive for mockups */
+    @media (max-width: 900px) {
+      .hero-mockup-split {
+        grid-template-columns: 1fr;
+      }
+      .full-app-layout {
+        grid-template-columns: 1fr;
+        min-height: auto;
+      }
+      .full-app-sidebar { display: none; }
+      .full-app-chat { display: none; }
+      .features-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 600px) {
+      .mini-stat-row { grid-template-columns: 1fr; }
+      .mini-kanban { grid-template-columns: 1fr; }
+      .hero-mockup-split { gap: 12px; }
+    }
   </style>
 </head>
 <body>
@@ -970,6 +1430,7 @@
       <ul class="nav-links">
         <li><a href="#how-it-works">How It Works</a></li>
         <li><a href="#features">Features</a></li>
+        <li><a href="#see-it">Demo</a></li>
         <li><a href="#compare">Compare</a></li>
         <li><a href="#pricing">Pricing</a></li>
         <li><a href="https://github.com/unstructuredminds/unstructured-minds" target="_blank" rel="noopener">GitHub</a></li>
@@ -1013,21 +1474,77 @@
         </div>
 
         <div class="hero-demo reveal reveal-delay-3">
-          <div class="demo-window">
-            <div class="demo-titlebar">
-              <span class="demo-dot"></span>
-              <span class="demo-dot"></span>
-              <span class="demo-dot"></span>
-              <span class="demo-tab">2026-02-09.md</span>
+          <div class="hero-mockup-split">
+            <!-- Left: Editor mockup -->
+            <div class="mockup-window hero-editor-mock">
+              <div class="mockup-titlebar">
+                <span class="mockup-dot"></span>
+                <span class="mockup-dot"></span>
+                <span class="mockup-dot"></span>
+                <span class="mockup-tab">2026-03-09.md</span>
+              </div>
+              <div class="mockup-body" id="demo-content">
+                <!-- Populated by JS -->
+              </div>
             </div>
-            <div class="demo-content" id="demo-content">
-              <!-- Populated by JS -->
+            <!-- Right: Extracted data preview -->
+            <div class="hero-dash-mock">
+              <div class="mockup-window">
+                <div class="mockup-titlebar">
+                  <span class="mockup-dot"></span>
+                  <span class="mockup-dot"></span>
+                  <span class="mockup-dot"></span>
+                  <span class="mockup-tab">Dashboard</span>
+                </div>
+                <div class="mockup-body" style="padding: 12px;">
+                  <div class="mini-stat-row">
+                    <div class="mini-stat">
+                      <div class="mini-stat-label">Exercises</div>
+                      <div class="mini-stat-value teal-text">4</div>
+                    </div>
+                    <div class="mini-stat">
+                      <div class="mini-stat-label">Sleep</div>
+                      <div class="mini-stat-value amber-text">7.5h</div>
+                    </div>
+                    <div class="mini-stat">
+                      <div class="mini-stat-label">Calories</div>
+                      <div class="mini-stat-value indigo-text">2,180</div>
+                    </div>
+                    <div class="mini-stat">
+                      <div class="mini-stat-label">Mood</div>
+                      <div class="mini-stat-value rose-text">8/10</div>
+                    </div>
+                  </div>
+                  <div style="margin-top: 12px;">
+                    <div class="mini-stat-label" style="margin-bottom: 6px;">Activity (last 4 weeks)</div>
+                    <div class="mini-heatmap">
+                      <div class="hm-cell l1"></div><div class="hm-cell"></div><div class="hm-cell l2"></div><div class="hm-cell l3"></div><div class="hm-cell"></div><div class="hm-cell l4"></div><div class="hm-cell l1"></div>
+                      <div class="hm-cell l2"></div><div class="hm-cell l1"></div><div class="hm-cell"></div><div class="hm-cell l3"></div><div class="hm-cell l2"></div><div class="hm-cell"></div><div class="hm-cell l4"></div>
+                      <div class="hm-cell"></div><div class="hm-cell l3"></div><div class="hm-cell l1"></div><div class="hm-cell l4"></div><div class="hm-cell"></div><div class="hm-cell l2"></div><div class="hm-cell l3"></div>
+                      <div class="hm-cell l1"></div><div class="hm-cell"></div><div class="hm-cell l4"></div><div class="hm-cell l2"></div><div class="hm-cell l3"></div><div class="hm-cell l1"></div><div class="hm-cell l4"></div>
+                    </div>
+                  </div>
+                  <div style="margin-top: 12px;">
+                    <div class="mini-stat-label" style="margin-bottom: 6px;">Weekly Volume (lbs)</div>
+                    <div class="mini-bars">
+                      <div class="mini-bar" style="height: 55%; background: var(--teal);"></div>
+                      <div class="mini-bar" style="height: 70%; background: var(--teal);"></div>
+                      <div class="mini-bar" style="height: 45%; background: var(--teal);"></div>
+                      <div class="mini-bar" style="height: 85%; background: var(--teal);"></div>
+                      <div class="mini-bar" style="height: 60%; background: var(--teal);"></div>
+                      <div class="mini-bar" style="height: 95%; background: var(--teal);"></div>
+                      <div class="mini-bar" style="height: 75%; background: var(--teal);"></div>
+                      <div class="mini-bar" style="height: 100%; background: var(--amber);"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
           <div class="demo-extraction">
             AI extracting
             <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 7h10M8 3l4 4-4 4"/></svg>
-            3 data points
+            12 data points
           </div>
         </div>
       </div>
@@ -1048,11 +1565,28 @@
           <div class="step-number">01</div>
           <h3 class="step-title">Write naturally</h3>
           <p class="step-desc">Open your daily note and write. No structure required. Just describe your day, your workout, your meals, your thoughts.</p>
-          <div class="step-example">
-            <span class="highlight">Trained legs today.</span><br>
-            <span class="highlight">Squats 3x8 at 225.</span><br>
-            Felt great, energy was high.<br>
-            <span class="highlight">Sleep was 7.5 hours.</span>
+          <div class="step-mockup">
+            <div class="mockup-window">
+              <div class="mockup-titlebar">
+                <span class="mockup-dot"></span>
+                <span class="mockup-dot"></span>
+                <span class="mockup-dot"></span>
+                <span class="mockup-tab">2026-03-09.md</span>
+              </div>
+              <div class="mockup-body" style="font-family: var(--font-mono); font-size: 11.5px; line-height: 1.9;">
+                <div style="color: var(--text-primary); font-weight: 600; font-size: 13px; margin-bottom: 4px;">Sunday March 9</div>
+                <div style="color: var(--text-secondary);">Trained legs today. Felt strong.</div>
+                <div style="color: var(--teal);">Squats 3x8 at 225 lbs.</div>
+                <div style="color: var(--teal);">Romanian deadlifts 3x10 at 185.</div>
+                <div style="color: var(--teal);">Leg press 4x12 at 360.</div>
+                <div style="height: 6px;"></div>
+                <div style="color: var(--text-secondary);">Had a salmon bowl for lunch,</div>
+                <div style="color: var(--text-secondary);">chicken stir fry for dinner.</div>
+                <div style="height: 6px;"></div>
+                <div style="color: var(--amber);">Sleep was solid -- 7.5 hours.</div>
+                <div style="color: var(--indigo);">Energy: 8/10 &middot; Mood: great</div>
+              </div>
+            </div>
           </div>
           <div class="step-connector">
             <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 6h8M6 2l4 4-4 4"/></svg>
@@ -1063,11 +1597,63 @@
           <div class="step-number">02</div>
           <h3 class="step-title">AI extracts the data</h3>
           <p class="step-desc">Claude reads your notes and pulls out structured data points. Workouts, meals, sleep, mood, tasks &mdash; all automatically.</p>
-          <div class="step-example">
-            <span class="key">exercise</span>: <span class="val">squats</span><br>
-            <span class="key">weight</span>: <span class="val">225 lbs</span><br>
-            <span class="key">sets</span>: <span class="val">3</span> &middot; <span class="key">reps</span>: <span class="val">8</span><br>
-            <span class="key">sleep</span>: <span class="val">7.5 hours</span>
+          <div class="step-mockup">
+            <div class="extract-cards">
+              <div class="extract-card">
+                <div class="extract-card-icon" style="background: var(--teal-dim); color: var(--teal);">
+                  <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 10V6l3-4h2l3 4v4"/><path d="M4 10V7M8 10V7"/></svg>
+                </div>
+                <div>
+                  <div class="extract-card-label">Exercise</div>
+                  <div class="extract-card-value">Squats &middot; 225 lbs &middot; 3x8</div>
+                </div>
+              </div>
+              <div class="extract-card">
+                <div class="extract-card-icon" style="background: var(--teal-dim); color: var(--teal);">
+                  <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 10V6l3-4h2l3 4v4"/><path d="M4 10V7M8 10V7"/></svg>
+                </div>
+                <div>
+                  <div class="extract-card-label">Exercise</div>
+                  <div class="extract-card-value">RDL &middot; 185 lbs &middot; 3x10</div>
+                </div>
+              </div>
+              <div class="extract-card">
+                <div class="extract-card-icon" style="background: var(--teal-dim); color: var(--teal);">
+                  <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 10V6l3-4h2l3 4v4"/><path d="M4 10V7M8 10V7"/></svg>
+                </div>
+                <div>
+                  <div class="extract-card-label">Exercise</div>
+                  <div class="extract-card-value">Leg Press &middot; 360 lbs &middot; 4x12</div>
+                </div>
+              </div>
+              <div class="extract-card">
+                <div class="extract-card-icon" style="background: rgba(245,158,11,0.1); color: var(--amber);">
+                  <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 1v4l2 2"/><circle cx="6" cy="6" r="5"/></svg>
+                </div>
+                <div>
+                  <div class="extract-card-label">Sleep</div>
+                  <div class="extract-card-value">7.5 hours</div>
+                </div>
+              </div>
+              <div class="extract-card">
+                <div class="extract-card-icon" style="background: rgba(99,102,241,0.1); color: var(--indigo);">
+                  <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="4" r="3"/><path d="M1 11c0-2.8 2.2-5 5-5s5 2.2 5 5"/></svg>
+                </div>
+                <div>
+                  <div class="extract-card-label">Mood &amp; Energy</div>
+                  <div class="extract-card-value">great &middot; 8/10</div>
+                </div>
+              </div>
+              <div class="extract-card">
+                <div class="extract-card-icon" style="background: rgba(244,63,94,0.1); color: var(--rose);">
+                  <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 6h8M6 2v8"/></svg>
+                </div>
+                <div>
+                  <div class="extract-card-label">Nutrition</div>
+                  <div class="extract-card-value">Salmon bowl, chicken stir fry</div>
+                </div>
+              </div>
+            </div>
           </div>
           <div class="step-connector">
             <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 6h8M6 2l4 4-4 4"/></svg>
@@ -1078,12 +1664,37 @@
           <div class="step-number">03</div>
           <h3 class="step-title">Query your life</h3>
           <p class="step-desc">Ask any question in plain English. Your data becomes a personal analytics engine. Charts, trends, insights &mdash; on demand.</p>
-          <div class="step-example">
-            <span class="highlight">"How much did I squat<br>last month?"</span><br>
-            <br>
-            <span class="val">&#9608;&#9608;&#9608;&#9608;</span> Wk1: 205 lbs<br>
-            <span class="val">&#9608;&#9608;&#9608;&#9608;&#9608;</span> Wk2: 215 lbs<br>
-            <span class="val">&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;</span> Wk3: 225 lbs
+          <div class="step-mockup">
+            <div class="query-bubble">How did my squat progress this month?</div>
+            <div class="query-response">
+              <div style="color: var(--text-primary); font-weight: 600; margin-bottom: 4px;">Squat Progression - March 2026</div>
+              <div style="color: var(--text-secondary); font-size: 10px; margin-bottom: 6px;">Your squat 1RM estimate increased 12% over 4 weeks.</div>
+              <div class="query-chart-bars">
+                <div class="query-chart-bar" style="height: 60%; background: rgba(20,184,166,0.4); border: 1px solid rgba(20,184,166,0.3);">
+                  <span class="bar-label">Wk 1</span>
+                </div>
+                <div class="query-chart-bar" style="height: 72%; background: rgba(20,184,166,0.55); border: 1px solid rgba(20,184,166,0.4);">
+                  <span class="bar-label">Wk 2</span>
+                </div>
+                <div class="query-chart-bar" style="height: 85%; background: rgba(20,184,166,0.7); border: 1px solid rgba(20,184,166,0.5);">
+                  <span class="bar-label">Wk 3</span>
+                </div>
+                <div class="query-chart-bar" style="height: 100%; background: var(--teal); border: 1px solid var(--teal);">
+                  <span class="bar-label">Wk 4</span>
+                </div>
+              </div>
+              <div style="height: 18px;"></div>
+              <table class="mini-table" style="margin-top: 4px;">
+                <tr>
+                  <td style="color: var(--text-muted);">Week 1</td>
+                  <td style="color: var(--text-primary); font-family: var(--font-mono);">205 lbs</td>
+                </tr>
+                <tr>
+                  <td style="color: var(--text-muted);">Week 4</td>
+                  <td style="color: var(--teal); font-family: var(--font-mono); font-weight: 600;">225 lbs <span class="pr-badge">PR</span></td>
+                </tr>
+              </table>
+            </div>
           </div>
         </div>
       </div>
@@ -1107,6 +1718,17 @@
           <h3 class="feature-title">Rich markdown editor</h3>
           <p class="feature-desc">A beautiful writing experience powered by Milkdown. Templates, WYSIWYG toolbar, table editing, and autosave. Write naturally &mdash; the editor gets out of your way.</p>
           <span class="feature-tag teal">Milkdown-powered</span>
+          <div class="feature-preview">
+            <div class="mini-editor-preview">
+              <div class="md-h">## Morning Routine</div>
+              <div><span class="md-bullet">-</span> <span class="md-check">[x]</span> Meditation (15 min)</div>
+              <div><span class="md-bullet">-</span> <span class="md-check">[x]</span> Cold shower</div>
+              <div><span class="md-bullet">-</span> <span class="md-check">[ ]</span> Journal entry</div>
+              <div style="height: 4px;"></div>
+              <div>Had <span class="md-bold">oatmeal with berries</span></div>
+              <div>for breakfast. Feeling <span class="md-bold">energized</span>.</div>
+            </div>
+          </div>
         </div>
 
         <div class="feature-card reveal reveal-delay-2">
@@ -1116,6 +1738,18 @@
           <h3 class="feature-title">Smart extraction</h3>
           <p class="feature-desc">Claude AI reads your notes and extracts workouts, meals, sleep, moods, and tasks into structured data. AI-powered exercise normalization matches variations to canonical names automatically.</p>
           <span class="feature-tag indigo">Powered by Claude</span>
+          <div class="feature-preview">
+            <table class="mini-table">
+              <thead>
+                <tr><th>Exercise</th><th>Weight</th><th>Sets</th><th></th></tr>
+              </thead>
+              <tbody>
+                <tr><td style="color: var(--text-primary);">Bench Press</td><td>185 lbs</td><td>4x8</td><td><span class="pr-badge">PR</span></td></tr>
+                <tr><td style="color: var(--text-primary);">Incline DB</td><td>65 lbs</td><td>3x10</td><td><span class="trend-up">+5</span></td></tr>
+                <tr><td style="color: var(--text-primary);">Cable Flies</td><td>30 lbs</td><td>3x12</td><td></td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <div class="feature-card reveal reveal-delay-3">
@@ -1124,6 +1758,24 @@
           </div>
           <h3 class="feature-title">Visual dashboard</h3>
           <p class="feature-desc">Activity heatmaps, nutrition tracking with calories and macros, mood correlations against sleep and exercise, and weekly charts with stacked exercise categories. Your life at a glance.</p>
+          <div class="feature-preview">
+            <div class="mini-stat-label" style="margin-bottom: 6px;">Activity Heatmap</div>
+            <div class="mini-heatmap" style="grid-template-columns: repeat(7, 1fr); gap: 3px;">
+              <div class="hm-cell l2"></div><div class="hm-cell"></div><div class="hm-cell l3"></div><div class="hm-cell l1"></div><div class="hm-cell l4"></div><div class="hm-cell"></div><div class="hm-cell l2"></div>
+              <div class="hm-cell l1"></div><div class="hm-cell l3"></div><div class="hm-cell"></div><div class="hm-cell l4"></div><div class="hm-cell l2"></div><div class="hm-cell l1"></div><div class="hm-cell"></div>
+              <div class="hm-cell l4"></div><div class="hm-cell l1"></div><div class="hm-cell l2"></div><div class="hm-cell"></div><div class="hm-cell l3"></div><div class="hm-cell l4"></div><div class="hm-cell l1"></div>
+            </div>
+            <div style="display: flex; gap: 8px; margin-top: 8px;">
+              <div style="flex: 1;">
+                <div class="mini-stat-label">Calories</div>
+                <div style="font-size: 14px; font-weight: 700; color: var(--amber); font-family: var(--font-mono);">2,180</div>
+              </div>
+              <div style="flex: 1;">
+                <div class="mini-stat-label">Protein</div>
+                <div style="font-size: 14px; font-weight: 700; color: var(--teal); font-family: var(--font-mono);">142g</div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="feature-card reveal reveal-delay-4">
@@ -1133,6 +1785,22 @@
           <h3 class="feature-title">Daily note wizard + task rollover</h3>
           <p class="feature-desc">Create structured daily notes in seconds. The wizard prompts you through goals, metrics, and priorities &mdash; and automatically surfaces incomplete tasks from previous days so nothing falls through the cracks.</p>
           <span class="feature-tag teal">New in v0.8</span>
+          <div class="feature-preview">
+            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 8px;">
+              <div style="width: 8px; height: 8px; border-radius: 50%; background: var(--teal);"></div>
+              <span style="font-size: 10px; font-weight: 600; color: var(--teal); text-transform: uppercase; letter-spacing: 0.5px;">Step 2 of 4</span>
+            </div>
+            <div style="font-size: 11px; font-weight: 600; color: var(--text-primary); margin-bottom: 6px;">How did you sleep?</div>
+            <div style="display: flex; gap: 4px; margin-bottom: 8px;">
+              <div style="flex: 1; height: 4px; border-radius: 2px; background: var(--teal);"></div>
+              <div style="flex: 1; height: 4px; border-radius: 2px; background: var(--teal);"></div>
+              <div style="flex: 1; height: 4px; border-radius: 2px; background: var(--bg-surface);"></div>
+              <div style="flex: 1; height: 4px; border-radius: 2px; background: var(--bg-surface);"></div>
+            </div>
+            <div style="font-size: 10px; color: var(--text-muted); margin-bottom: 4px;">Rolled over from yesterday:</div>
+            <div style="font-size: 10px; color: var(--amber);">- [ ] Review Q1 goals</div>
+            <div style="font-size: 10px; color: var(--amber);">- [ ] Call dentist</div>
+          </div>
         </div>
 
         <div class="feature-card reveal reveal-delay-1">
@@ -1141,6 +1809,24 @@
           </div>
           <h3 class="feature-title">Personal kanban</h3>
           <p class="feature-desc">Drag-and-drop task board with two-way markdown sync. Check off a task in your note and it moves on the board. Move it on the board and the note updates. Deadlines, categories, and task detail modals included.</p>
+          <div class="feature-preview">
+            <div class="mini-kanban">
+              <div class="kanban-col">
+                <div class="kanban-col-title">To Do</div>
+                <div class="kanban-card has-tag tag-rose">Finalize proposal</div>
+                <div class="kanban-card has-tag tag-amber">Call dentist</div>
+              </div>
+              <div class="kanban-col">
+                <div class="kanban-col-title">In Progress</div>
+                <div class="kanban-card has-tag tag-teal">Review Q1 goals</div>
+                <div class="kanban-card has-tag tag-indigo">Update portfolio</div>
+              </div>
+              <div class="kanban-col">
+                <div class="kanban-col-title">Done</div>
+                <div class="kanban-card has-tag tag-teal">Grocery run</div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="feature-card reveal reveal-delay-2">
@@ -1150,6 +1836,133 @@
           <h3 class="feature-title">Self-host or cloud</h3>
           <p class="feature-desc">Run locally with DuckDB for full privacy, or deploy to the cloud with Postgres and Clerk auth for multi-user access. Same app, two modes &mdash; your choice. No vendor lock-in, ever.</p>
           <span class="feature-tag indigo">Docker ready</span>
+          <div class="feature-preview">
+            <div style="font-family: var(--font-mono); font-size: 10px; line-height: 1.8; color: var(--text-muted);">
+              <div style="color: var(--text-secondary);">$ docker compose up</div>
+              <div><span style="color: var(--teal);">&#10003;</span> backend &nbsp;| Ready on :8000</div>
+              <div><span style="color: var(--teal);">&#10003;</span> frontend | Ready on :3000</div>
+              <div><span style="color: var(--teal);">&#10003;</span> duckdb &nbsp;| Connected</div>
+              <div style="color: var(--amber);">USE_CLOUD=false (local mode)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== SEE IT IN ACTION ==================== -->
+  <section class="see-it-section" id="see-it">
+    <div class="container">
+      <div style="text-align: center;" class="reveal">
+        <div class="section-label" style="justify-content: center;">See It In Action</div>
+        <h2 class="section-title">Your personal data cockpit</h2>
+        <p class="section-subtitle" style="margin: 0 auto;">Editor, file tree, and AI query panel -- all in one window. Write on the left, ask questions on the right.</p>
+      </div>
+
+      <div class="full-app-mockup reveal reveal-delay-1">
+        <div class="full-app-titlebar">
+          <span class="mockup-dot"></span>
+          <span class="mockup-dot"></span>
+          <span class="mockup-dot"></span>
+          <span class="mockup-tab" style="margin-left: 12px;">Unstructured Minds</span>
+          <span style="flex: 1;"></span>
+          <span style="font-size: 11px; color: var(--text-muted);">local mode</span>
+        </div>
+        <div class="full-app-layout">
+          <!-- Sidebar -->
+          <div class="full-app-sidebar">
+            <div class="sidebar-section-title">Daily Notes</div>
+            <div class="sidebar-item active">
+              <span class="sidebar-item-icon">&#128196;</span>
+              2026-03-09
+            </div>
+            <div class="sidebar-item">
+              <span class="sidebar-item-icon">&#128196;</span>
+              2026-03-08
+            </div>
+            <div class="sidebar-item">
+              <span class="sidebar-item-icon">&#128196;</span>
+              2026-03-07
+            </div>
+            <div class="sidebar-item">
+              <span class="sidebar-item-icon">&#128196;</span>
+              2026-03-06
+            </div>
+            <div class="sidebar-section-title">Views</div>
+            <div class="sidebar-item">
+              <span class="sidebar-item-icon">&#128202;</span>
+              Dashboard
+            </div>
+            <div class="sidebar-item">
+              <span class="sidebar-item-icon">&#128203;</span>
+              Kanban
+            </div>
+            <div class="sidebar-item">
+              <span class="sidebar-item-icon">&#128170;</span>
+              Exercises
+            </div>
+            <div class="sidebar-section-title">Quick Notes</div>
+            <div class="sidebar-item">
+              <span class="sidebar-item-icon">&#128221;</span>
+              Supplement research
+            </div>
+            <div class="sidebar-item">
+              <span class="sidebar-item-icon">&#128221;</span>
+              Book notes
+            </div>
+          </div>
+
+          <!-- Editor -->
+          <div class="full-app-editor">
+            <h2>Sunday, March 9</h2>
+            <div class="editor-section-head">Workout</div>
+            <div>Trained legs at the gym this morning. Feeling strong after a good night's sleep.</div>
+            <div style="height: 8px;"></div>
+            <div style="color: var(--teal);">Squats: 3 sets of 8 at 225 lbs</div>
+            <div style="color: var(--teal);">Romanian Deadlifts: 3x10 at 185 lbs</div>
+            <div style="color: var(--teal);">Leg Press: 4x12 at 360 lbs</div>
+            <div style="color: var(--teal);">Walking Lunges: 3x12 each leg, 50 lb DBs</div>
+            <div style="height: 12px;"></div>
+            <div class="editor-section-head">Nutrition</div>
+            <div>Salmon rice bowl for lunch. Chicken stir fry for dinner.</div>
+            <div style="color: var(--text-muted); font-size: 13px;">Estimated: ~2,180 cal / 142g protein</div>
+            <div style="height: 12px;"></div>
+            <div class="editor-section-head">Metrics</div>
+            <div><span style="color: var(--amber);">Sleep: 7.5 hours</span> &middot; <span style="color: var(--indigo);">Energy: 8/10</span> &middot; <span style="color: var(--indigo);">Mood: great</span></div>
+            <div style="height: 12px;"></div>
+            <div class="editor-section-head">Tasks</div>
+            <div style="color: var(--teal);">- [x] Morning workout</div>
+            <div style="color: var(--teal);">- [x] Meal prep for the week</div>
+            <div style="color: var(--text-secondary);">- [ ] Review Q1 goals</div>
+            <div style="color: var(--text-secondary);">- [ ] Call dentist</div>
+          </div>
+
+          <!-- Chat / Query panel -->
+          <div class="full-app-chat">
+            <div class="chat-msg user">What was my total volume for legs this week?</div>
+            <div class="chat-msg ai">
+              <div style="font-weight: 600; margin-bottom: 4px;">Leg Volume - Week of Mar 3</div>
+              <div style="color: var(--text-secondary); margin-bottom: 6px;">Total: <span style="color: var(--teal); font-weight: 700;">28,380 lbs</span></div>
+              <div class="mini-bars" style="height: 36px;">
+                <div class="mini-bar" style="height: 65%; background: var(--teal);" title="Mon"></div>
+                <div class="mini-bar" style="height: 0%; background: var(--bg-surface);" title="Tue"></div>
+                <div class="mini-bar" style="height: 80%; background: var(--teal);" title="Wed"></div>
+                <div class="mini-bar" style="height: 0%; background: var(--bg-surface);" title="Thu"></div>
+                <div class="mini-bar" style="height: 0%; background: var(--bg-surface);" title="Fri"></div>
+                <div class="mini-bar" style="height: 100%; background: var(--amber);" title="Sat"></div>
+                <div class="mini-bar" style="height: 0%; background: var(--bg-surface);" title="Sun"></div>
+              </div>
+              <div style="font-size: 10px; color: var(--text-muted); margin-top: 4px;">Up 12% from last week</div>
+            </div>
+            <div class="chat-msg user">Am I sleeping enough?</div>
+            <div class="chat-msg ai">
+              <div>Your 7-day average is <span style="color: var(--amber); font-weight: 600;">7.2 hours</span>. That's within the recommended range. Your best sleep correlates with rest days.</div>
+            </div>
+            <div class="chat-input-mock">
+              <svg width="14" height="14" fill="none" stroke="var(--text-muted)" stroke-width="1.5"><circle cx="7" cy="7" r="6"/><path d="M7 4v3l2 1"/></svg>
+              Ask anything about your data...
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -1326,7 +2139,7 @@
               Full dashboard &amp; analytics
             </li>
           </ul>
-          <a href="#" class="btn btn-outline pricing-cta">Start Free</a>
+          <a href="#" class="btn btn-outline pricing-cta">Get Started</a>
         </div>
 
         <!-- BYO KEY -->
@@ -1351,8 +2164,13 @@
               <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 8.5l3.5 3.5L13 5"/></svg>
               Full control over costs
             </li>
+            <li>
+              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 8.5l3.5 3.5L13 5"/></svg>
+              Self-host with Docker
+            </li>
           </ul>
-          <a href="#" class="btn btn-primary pricing-cta">Start Free</a>
+          <a href="#" class="btn btn-primary pricing-cta">Get Started</a>
+          <p style="font-size: 11px; color: var(--text-muted); text-align: center; margin-top: 12px;">Requires a <a href="https://console.anthropic.com/" target="_blank" rel="noopener" style="color: var(--teal); text-decoration: none;">Claude API key</a> for self-hosted</p>
         </div>
 
         <!-- PRO -->
@@ -1470,28 +2288,36 @@
 
     // -- HERO DEMO TYPING ANIMATION --
     const demoLines = [
-      { text: '## Daily Note', cls: 'muted' },
+      { text: '## Sunday, March 9', tag: 'h', cls: '' },
       { text: '', cls: '' },
       { text: 'Trained legs today. Felt strong.', cls: '' },
-      { text: 'Squats 3x8 at 225 lbs.', cls: 'teal' },
-      { text: 'Romanian deadlifts 3x10 at 185.', cls: 'teal' },
+      { text: 'Squats 3x8 at 225 lbs.', cls: 'highlight-teal' },
+      { text: 'Romanian deadlifts 3x10 at 185.', cls: 'highlight-teal' },
+      { text: 'Leg press 4x12 at 360.', cls: 'highlight-teal' },
       { text: '', cls: '' },
-      { text: 'Had salmon bowl for lunch.', cls: '' },
-      { text: 'Sleep was solid — 7.5 hours.', cls: 'amber' },
+      { text: 'Had a salmon bowl for lunch.', cls: '' },
+      { text: 'Chicken stir fry for dinner.', cls: '' },
       { text: '', cls: '' },
-      { text: 'Energy: 8/10', cls: 'indigo' },
-      { text: 'Mood: great', cls: 'indigo' },
+      { text: 'Sleep was solid -- 7.5 hours.', cls: 'highlight-amber' },
+      { text: 'Energy: 8/10 . Mood: great', cls: 'highlight-indigo' },
+      { text: '', cls: '' },
+      { text: '- [x] Morning workout', cls: 'highlight-teal' },
+      { text: '- [ ] Review Q1 goals', cls: '' },
     ];
 
     const demoContent = document.getElementById('demo-content');
     demoLines.forEach((line, i) => {
       const div = document.createElement('div');
-      div.className = 'demo-line';
-      div.style.animationDelay = `${0.8 + i * 0.15}s`;
-      if (line.text === '') {
+      div.className = 'demo-line mock-line' + (line.cls ? ' ' + line.cls : '');
+      div.style.animationDelay = `${0.8 + i * 0.12}s`;
+      if (line.tag === 'h') {
+        div.className = 'demo-line mock-heading';
+        div.style.animationDelay = `${0.8 + i * 0.12}s`;
+        div.textContent = line.text.replace('## ', '');
+      } else if (line.text === '') {
         div.innerHTML = '&nbsp;';
       } else {
-        div.innerHTML = `<span class="${line.cls}">${line.text}</span>`;
+        div.textContent = line.text;
       }
       demoContent.appendChild(div);
     });

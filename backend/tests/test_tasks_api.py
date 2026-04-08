@@ -95,17 +95,28 @@ class TestListTasks:
 
     def test_hide_old_done_tasks(self, client):
         """Done/cancelled tasks older than 7 days are hidden by default."""
+        from datetime import date, timedelta
+
         from src.main import app
 
         db = app.state.db
+        today = date.today()
+        old_date = str(today - timedelta(days=30))
+        recent_date = str(today - timedelta(days=2))
         db.execute(
             """INSERT INTO tasks (id, date, description, status, completed_at, category)
                VALUES
-               ('old1', '2026-01-01', 'Old done task', 'done', '2026-01-01T12:00:00', 'work'),
-               ('old2', '2026-01-01', 'Old cancelled task', 'cancelled', '2026-01-01T12:00:00', 'work'),
-               ('new1', '2026-02-07', 'Recent done task', 'done', '2026-02-07T12:00:00', 'work'),
-               ('active1', '2026-02-07', 'Active task', 'backlog', NULL, 'work')
-            """
+               (?, ?, 'Old done task', 'done', ?, 'work'),
+               (?, ?, 'Old cancelled task', 'cancelled', ?, 'work'),
+               (?, ?, 'Recent done task', 'done', ?, 'work'),
+               (?, ?, 'Active task', 'backlog', NULL, 'work')
+            """,
+            [
+                'old1', old_date, f'{old_date}T12:00:00',
+                'old2', old_date, f'{old_date}T12:00:00',
+                'new1', recent_date, f'{recent_date}T12:00:00',
+                'active1', recent_date,
+            ]
         )
 
         # Default: hide_old=true — old done/cancelled hidden

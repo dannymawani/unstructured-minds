@@ -1,5 +1,7 @@
 """Dashboard API endpoints."""
 
+import json
+import re
 import uuid
 from datetime import date, timedelta
 from typing import Any, Literal, Optional
@@ -597,7 +599,6 @@ def get_dashboard_summary(
     ), default=None)
 
     # Get last daily note date — check both extraction_log paths and daily_metrics dates
-    import re as _re
     last_daily_note = None
 
     # Method 1: most recent date in daily_metrics (most reliable)
@@ -621,7 +622,7 @@ def get_dashboard_summary(
         ).fetchone()
         if last_note_row and last_note_row[0]:
             fname = last_note_row[0].split('/')[-1].removesuffix('.md').removesuffix('-daily-note')
-            if _re.match(r'\d{4}-\d{2}-\d{2}$', fname):
+            if re.match(r'\d{4}-\d{2}-\d{2}$', fname):
                 last_daily_note = fname
 
     # Calculate streak (consecutive days with activities ending today or yesterday)
@@ -933,9 +934,6 @@ def get_exercise_table(
     Exercise names are normalized via fuzzy matching so variants merge into one row.
     Includes PR detection, trend calculation, muscle groups, and last session sets.
     """
-    # Load exercise definitions for muscle group lookup
-    exercise_defs = _load_json_config("exercise_definitions.json")
-
     # Query 1: Exercise stats with per-session max weights for trend/PR
     result = db.execute(
         """
@@ -1041,15 +1039,11 @@ def get_exercise_table(
         })
 
     def _lookup_muscle_groups(canonical: str) -> list[str]:
-        """Look up muscle groups for a canonical exercise name."""
-        key = canonical.lower().replace(" ", "_").replace("-", "_")
-        if key in exercise_defs:
-            return exercise_defs[key].get("muscle_groups", [])
-        # Fuzzy fallback by display name
-        for _k, defn in exercise_defs.items():
-            if defn.get("display", "").lower() == canonical.lower():
-                return defn.get("muscle_groups", [])
-        return []
+        """Look up muscle groups for a canonical exercise name.
+
+        Checks builtin definitions first, then community exercises via the matcher.
+        """
+        return matcher.get_muscle_groups(canonical)
 
     def _calc_trend(s1: float | None, s2: float | None, s3: float | None) -> str:
         """Calculate trend from 3 most recent session maxes (s1=newest)."""
@@ -1250,10 +1244,15 @@ class LastWorkoutResponse(BaseModel):
     focus: Optional[str] = None
 
 
-def _load_json_config(filename: str, request: Request = None, user_id: str = None) -> dict:
-    """Load a JSON config file. Checks user_settings (Postgres) first, then data dir."""
-    import json
+_json_config_cache: dict[str, tuple[float, dict]] = {}
 
+
+def _load_json_config(filename: str, request: Request = None, user_id: str = None) -> dict:
+    """Load a JSON config file. Checks user_settings (Postgres) first, then data dir.
+
+    Local-mode disk reads are cached with mtime invalidation to avoid
+    repeated I/O on every request.
+    """
     # In hybrid/postgres mode, check user_settings table
     if request and user_id:
         from ..db.sql_compat import get_dialect
@@ -1268,7 +1267,13 @@ def _load_json_config(filename: str, request: Request = None, user_id: str = Non
 
     config_path = settings.data_path / filename
     if config_path.exists():
-        return json.loads(config_path.read_text())
+        mtime = config_path.stat().st_mtime
+        cached = _json_config_cache.get(filename)
+        if cached and cached[0] == mtime:
+            return cached[1]
+        data = json.loads(config_path.read_text())
+        _json_config_cache[filename] = (mtime, data)
+        return data
     return {}
 
 
@@ -1295,9 +1300,8 @@ def get_last_strength_workout(
     Returns:
         Last workout date, exercises with suggested weights, and focus area
     """
-    # Load config for progressive overload increment and exercise display names
+    # Load config for progressive overload increment
     training_config = _load_json_config("training_config.json", request, user_id)
-    exercise_defs = _load_json_config("exercise_definitions.json")
     increment = training_config.get("preferences", {}).get(
         "progressive_overload_increment_kg", 1.5
     )
@@ -1617,6 +1621,37 @@ def get_endurance_table(
         sport_filter = "AND a.activity_type = ?"
         params.append(sport)
 
+    # Build ORDER BY clause for SQL-level sorting
+    sort_col_map = {
+        "date": "a.date",
+        "distance_km": "el.distance_km",
+        "duration_minutes": "el.duration_minutes",
+    }
+    order_dir = "DESC" if sort_order == "desc" else "ASC"
+    # pace_min_per_km is computed, sort in SQL as duration/distance
+    if sort_by == "pace_min_per_km":
+        nulls = "LAST" if sort_order == "asc" else "LAST"
+        order_clause = f"(CASE WHEN el.distance_km > 0 THEN el.duration_minutes * 1.0 / el.distance_km ELSE NULL END) {order_dir} NULLS {nulls}"
+    else:
+        sql_col = sort_col_map.get(sort_by, "a.date")
+        order_clause = f"{sql_col} {order_dir}"
+
+    # Get total count first
+    count_result = db.execute(
+        f"""
+        SELECT COUNT(*)
+        FROM activities a
+        LEFT JOIN exercise_log el ON a.id = el.activity_id
+        WHERE a.activity_type IN ('running', 'cycling', 'swimming')
+          AND a.date >= ? AND a.date <= ?
+          {sport_filter}
+        """,
+        params,
+    ).fetchone()
+    total_count = count_result[0] if count_result else 0
+
+    # Paginated query with SQL-level sort
+    page_params = params + [limit, offset]
     result = db.execute(
         f"""
         SELECT
@@ -1630,9 +1665,10 @@ def get_endurance_table(
         WHERE a.activity_type IN ('running', 'cycling', 'swimming')
           AND a.date >= ? AND a.date <= ?
           {sport_filter}
-        ORDER BY a.date DESC
+        ORDER BY {order_clause}
+        LIMIT ? OFFSET ?
         """,
-        params,
+        page_params,
     ).fetchall()
 
     entries = []
@@ -1649,29 +1685,8 @@ def get_endurance_table(
             notes=row[4],
         ))
 
-    # Sort
-    if sort_by == "pace_min_per_km":
-        entries.sort(
-            key=lambda e: e.pace_min_per_km if e.pace_min_per_km is not None else float('inf'),
-            reverse=(sort_order == "desc"),
-        )
-    elif sort_by == "distance_km":
-        entries.sort(
-            key=lambda e: e.distance_km if e.distance_km is not None else -1,
-            reverse=(sort_order == "desc"),
-        )
-    elif sort_by == "duration_minutes":
-        entries.sort(
-            key=lambda e: e.duration_minutes if e.duration_minutes is not None else -1,
-            reverse=(sort_order == "desc"),
-        )
-    # date sort already handled by SQL ORDER BY
-
-    total_count = len(entries)
-    paginated = entries[offset:offset + limit]
-
     return EnduranceTableResponse(
-        entries=paginated,
+        entries=entries,
         total_count=total_count,
         offset=offset,
         limit=limit,
@@ -1765,12 +1780,7 @@ def get_muscle_groups(
 
     Maps exercises from exercise_log to muscle groups via exercise_definitions.json.
     """
-    import json
-
     period = get_period(days)
-
-    # Load exercise definitions for muscle group mapping
-    exercise_defs = _load_json_config("exercise_definitions.json")
 
     # Query distinct exercises with session/set counts
     result = db.execute(
@@ -1796,18 +1806,9 @@ def get_muscle_groups(
 
         # Normalize exercise name to canonical form
         canonical, _ = matcher.match(raw_name)
-        canonical_key = canonical.lower().replace(" ", "_").replace("-", "_")
 
-        # Look up muscle groups from definitions
-        groups = []
-        if canonical_key in exercise_defs:
-            groups = exercise_defs[canonical_key].get("muscle_groups", [])
-        else:
-            # Try fuzzy lookup by display name
-            for key, defn in exercise_defs.items():
-                if defn.get("display", "").lower() == canonical.lower():
-                    groups = defn.get("muscle_groups", [])
-                    break
+        # Look up muscle groups (checks builtins + community exercises)
+        groups = matcher.get_muscle_groups(canonical)
 
         for group in groups:
             if group not in muscle_data:

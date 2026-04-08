@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, Fragment } from 'react';
 import { Dumbbell, Plus, X, Loader2, Search, ChevronDown, ChevronUp, Share2, Check, TrendingUp, TrendingDown, Minus, ChevronRight } from 'lucide-react';
 import { clearCache } from '../../lib/cachedFetch';
 
@@ -521,9 +521,8 @@ export function ExerciseTable({ apiUrl = 'http://localhost:8000' }: ExerciseTabl
                   const hasSets = exercise.last_session_sets.length > 0;
 
                   return (
-                    <>
+                    <Fragment key={exercise.exercise_name}>
                       <tr
-                        key={exercise.exercise_name}
                         className={`border-b border-border/50 transition-colors ${
                           hasSets ? 'cursor-pointer hover:bg-secondary/30' : 'hover:bg-secondary/30'
                         } ${isExpanded ? 'bg-secondary/20' : ''}`}
@@ -577,7 +576,7 @@ export function ExerciseTable({ apiUrl = 'http://localhost:8000' }: ExerciseTabl
                       </tr>
                       {/* Expanded row: last session sets */}
                       {isExpanded && hasSets && (
-                        <tr key={`${exercise.exercise_name}-sets`} className="bg-secondary/10">
+                        <tr className="bg-secondary/10">
                           <td colSpan={8} className="px-4 py-2">
                             <div className="text-xs text-muted-foreground mb-1.5">
                               Last session ({exercise.last_trained_date})
@@ -601,7 +600,7 @@ export function ExerciseTable({ apiUrl = 'http://localhost:8000' }: ExerciseTabl
                           </td>
                         </tr>
                       )}
-                    </>
+                    </Fragment>
                   );
                 })}
               </tbody>

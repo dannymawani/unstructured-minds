@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from ..claude import ClaudeClient
 from ..db import DatabaseManager
 from ..logging_config import get_logger
-from .dependencies import get_analytics_db
+from .dependencies import get_analytics_db, get_user_id
 
 logger = get_logger(__name__)
 
@@ -56,7 +56,7 @@ def get_claude(request: Request) -> ClaudeClient:
 async def _gather_context_data(db: DatabaseManager, days: int = 7) -> dict:
     """Gather recent data for insight generation.
 
-    Consolidates 7 sequential queries into 3 using CTEs.
+    Consolidates queries into 3 round-trips using UNION ALL and CTEs.
 
     Args:
         db: Database manager
@@ -73,33 +73,46 @@ async def _gather_context_data(db: DatabaseManager, days: int = 7) -> dict:
         "start_date": str(start_date),
     }
 
-    # Query 1: Activities + food count + activity patterns (consolidated)
-    activities = db.execute(
-        "SELECT date, activity_type, duration_minutes FROM activities WHERE date >= ? ORDER BY date DESC",
-        [str(start_date)],
-    ).fetchall()
-    context["activities"] = [
-        {"date": str(row[0]), "type": row[1], "duration": row[2]}
-        for row in activities
-    ]
-
-    food_today = db.execute(
-        "SELECT COUNT(*) FROM food_log WHERE date = ?", [str(today)]
-    ).fetchone()[0]
-    context["food_logged_today"] = food_today > 0
-
-    activity_patterns = db.execute(
+    # Query 1: Activities + food count + activity patterns in one round-trip
+    combined = db.execute(
         """
-        SELECT DAYOFWEEK(date) as dow, activity_type, COUNT(*) as count
-        FROM activities WHERE date >= ?
-        GROUP BY DAYOFWEEK(date), activity_type ORDER BY count DESC
+        WITH recent_activities AS (
+            SELECT date, activity_type, duration_minutes
+            FROM activities WHERE date >= ?
+        ),
+        food AS (
+            SELECT COUNT(*) as cnt FROM food_log WHERE date = ?
+        ),
+        patterns AS (
+            SELECT DAYOFWEEK(date) as dow, activity_type, COUNT(*) as count
+            FROM activities WHERE date >= ?
+            GROUP BY DAYOFWEEK(date), activity_type
+        )
+        SELECT 'a' as t, date, activity_type, duration_minutes, NULL, NULL
+            FROM recent_activities
+        UNION ALL
+        SELECT 'f', NULL, NULL, cnt, NULL, NULL FROM food
+        UNION ALL
+        SELECT 'p', NULL, activity_type, count, dow, NULL FROM patterns
+        ORDER BY t, date DESC
         """,
-        [str(today - timedelta(days=30))],
+        [str(start_date), str(today), str(today - timedelta(days=30))],
     ).fetchall()
-    context["activity_patterns"] = [
-        {"day_of_week": row[0], "type": row[1], "count": row[2]}
-        for row in activity_patterns
-    ]
+
+    activities_list = []
+    food_count = 0
+    patterns_list = []
+    for row in combined:
+        if row[0] == "a":
+            activities_list.append({"date": str(row[1]), "type": row[2], "duration": row[3]})
+        elif row[0] == "f":
+            food_count = row[3] if row[3] else 0
+        elif row[0] == "p":
+            patterns_list.append({"day_of_week": row[4], "type": row[2], "count": row[3]})
+
+    context["activities"] = activities_list
+    context["food_logged_today"] = food_count > 0
+    context["activity_patterns"] = patterns_list
 
     # Query 2: Tasks
     incomplete_tasks = db.execute(
@@ -282,6 +295,7 @@ Each insight should have:
 
 @router.get("/daily", response_model=DailyInsightsResponse)
 async def get_daily_insights(
+    user_id: str = Depends(get_user_id),
     db: DatabaseManager = Depends(get_db),
     claude: ClaudeClient = Depends(get_claude),
 ) -> DailyInsightsResponse:
@@ -390,6 +404,7 @@ Return a JSON array of insights. Example format:
 
 @router.get("/weekly", response_model=WeeklySummaryResponse)
 async def get_weekly_summary(
+    user_id: str = Depends(get_user_id),
     db: DatabaseManager = Depends(get_db),
     claude: ClaudeClient = Depends(get_claude),
 ) -> WeeklySummaryResponse:
@@ -485,7 +500,7 @@ Example:
 
 
 @router.post("/dismiss/{insight_id}")
-async def dismiss_insight(insight_id: str) -> dict:
+async def dismiss_insight(insight_id: str, user_id: str = Depends(get_user_id)) -> dict:
     """Dismiss an insight (client-side tracking only for now).
 
     Args:
