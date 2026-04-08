@@ -11,7 +11,7 @@ This repo contains the original working implementation of:
 - Data extraction from markdown notes
 - CSV storage patterns and schemas
 - Daily note workflows
-- Skills and automation scripts
+- Skills and automation
 
 ### Key Reference Paths in Obsidian Repo
 
@@ -19,7 +19,6 @@ This repo contains the original working implementation of:
 |------|------|
 | Data schemas | `/Users/dmh/Code/obsedian/data/schemas/` |
 | CSV data | `/Users/dmh/Code/obsedian/data/` |
-| Python scripts | `/Users/dmh/Code/obsedian/scripts/` |
 | Daily notes | `/Users/dmh/Code/obsedian/secondbrain/Daily-Notes/` |
 | Templates | `/Users/dmh/Code/obsedian/secondbrain/Templates/` |
 | Claude config | `/Users/dmh/Code/obsedian/CLAUDE.md` |
@@ -54,29 +53,18 @@ Markdown Note → Claude Extraction → CSV/DuckDB → Natural Language Query
 - **CSV dates**: `YYYY-MM-DD`
 - **Daily note path**: `Daily-Notes/YYYY-MM/YYYY-MM-DD.md`
 
-### CSV Storage Structure
+### Data Storage Structure
 ```
 data/
-├── exercise_log.csv          # Single file per data type
-├── food_log.csv              # DuckDB handles filtering by date
-├── daily_metrics.csv
-├── daily_tasks.csv
-├── schemas/*.json
-├── exercise_definitions.json  # Exercise name aliases and muscle groups
-├── training_config.json       # Athlete profile, recovery targets
-└── injury_config.json         # Active injuries and constraints
+├── unstructured.duckdb           # Main database (all extracted data)
+├── settings.json                 # User preferences
+├── schemas/*.json                # Schema definitions for extraction
+├── exercise_definitions.json     # Exercise name aliases and muscle groups
+├── training_config.json          # Athlete profile, recovery targets
+└── injury_config.json            # Active injuries and constraints
 ```
 
-> **Simplified:** No date-partitioned folders. DuckDB queries flat CSVs efficiently at personal data volumes.
-
-## Demo Examples
-
-The `demo_examples/` folder contains reference implementations showing:
-- Input markdown notes
-- Expected extracted CSV data
-- Schema definitions
-
-Use these as the ground truth for how extraction should work.
+> **Note:** Extracted data lives in DuckDB tables. Config/reference files (exercise definitions, training profile, injuries) stay as JSON for easy hand-editing and git tracking.
 
 ## Development Workflow
 
@@ -113,7 +101,7 @@ Plan → Approve → Implement → Test → Review → Deploy
 ## Brand & Design
 
 For visual identity, colors, typography, and component styling, see:
-- **`DESIGN_MANUAL.md`** — Full design system document (generated via `/design-manual`)
+- **`docs/DESIGN_MANUAL.md`** — Full design system document (generated via `/design-manual`)
 - **`brand-guidelines` skill** — Quick reference for colors, fonts, CSS variables
 
 ### Quick Color Reference
@@ -126,23 +114,6 @@ For visual identity, colors, typography, and component styling, see:
 | Amber | `#f59e0b` | Warnings, highlights |
 | Indigo | `#6366f1` | Links |
 | Rose | `#f43f5e` | Errors, destructive |
-
----
-
-## Implementation Docs
-
-All planning documents are in `/implementation_plan/`:
-
-| Document | Purpose |
-|----------|---------|
-| 01-VISION.md | Product vision, user stories |
-| 02-ARCHITECTURE.md | System design |
-| 03-FRONTEND.md | UI/UX specs |
-| 04-DATA-LAYER.md | Database design |
-| 05-LLM-INTEGRATION.md | Claude integration |
-| 06-IMPLEMENTATION.md | Code patterns |
-| 07-DECISIONS.md | ADRs |
-| 09-IMPLEMENTATION-PLAN-AND-STEPS.md | Build phases |
 
 ---
 
@@ -207,4 +178,4 @@ These skills provide context automatically when relevant:
 
 ---
 
-**Last Updated**: 2026-02-06
+**Last Updated**: 2026-02-07

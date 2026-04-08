@@ -1,13 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { useInstance } from '@milkdown/react'
 import { SlashProvider, slashFactory } from '@milkdown/kit/plugin/slash'
-import { TooltipProvider, tooltipFactory } from '@milkdown/kit/plugin/tooltip'
-import { callCommand } from '@milkdown/utils'
+import { callCommand, $prose } from '@milkdown/utils'
 import {
-  toggleStrongCommand,
-  toggleEmphasisCommand,
-  toggleInlineCodeCommand,
-  toggleLinkCommand,
   wrapInHeadingCommand,
   wrapInBulletListCommand,
   wrapInOrderedListCommand,
@@ -15,23 +10,77 @@ import {
   createCodeBlockCommand,
   insertHrCommand,
 } from '@milkdown/kit/preset/commonmark'
-import { toggleStrikethroughCommand } from '@milkdown/kit/preset/gfm'
+import { keymap } from '@milkdown/prose/keymap'
+import { TextSelection } from '@milkdown/prose/state'
 import type { EditorView } from '@milkdown/prose/view'
 import type { EditorState } from '@milkdown/prose/state'
+
+// ============================================================
+// Code Block Exit Plugin
+// ============================================================
+// Pressing Enter on an empty line at the end of a code block exits it.
+// Pressing Mod-Enter anywhere in a code block exits it.
+
+export const codeBlockExitPlugin = $prose(() => {
+  return keymap({
+    'Enter': (state, dispatch) => {
+      const { $head, empty } = state.selection
+      if (!empty) return false
+      if ($head.parent.type.name !== 'code_block') return false
+
+      const cursorPos = $head.parentOffset
+      const text = $head.parent.textContent
+
+      // Only exit if cursor is at the end and the last line is empty
+      if (cursorPos !== text.length || !text.endsWith('\n')) return false
+
+      if (dispatch) {
+        const posAfterCodeBlock = $head.after()
+        const tr = state.tr
+
+        // Remove the trailing empty line
+        tr.delete($head.pos - 1, $head.pos)
+
+        // Create a new paragraph after the code block
+        const mappedPos = tr.mapping.map(posAfterCodeBlock)
+        const paragraph = state.schema.nodes.paragraph.createAndFill()!
+        tr.insert(mappedPos, paragraph)
+
+        // Move cursor into the new paragraph
+        tr.setSelection(TextSelection.near(tr.doc.resolve(mappedPos + 1)))
+        dispatch(tr.scrollIntoView())
+      }
+      return true
+    },
+
+    'Mod-Enter': (state, dispatch) => {
+      const { $head, empty } = state.selection
+      if (!empty) return false
+      if ($head.parent.type.name !== 'code_block') return false
+
+      if (dispatch) {
+        const posAfterCodeBlock = $head.after()
+        const tr = state.tr
+
+        const paragraph = state.schema.nodes.paragraph.createAndFill()!
+        tr.insert(posAfterCodeBlock, paragraph)
+        tr.setSelection(TextSelection.near(tr.doc.resolve(posAfterCodeBlock + 1)))
+        dispatch(tr.scrollIntoView())
+      }
+      return true
+    },
+  })
+})
 
 // ============================================================
 // Slash Menu Plugin
 // ============================================================
 
-interface SlashItem {
-  label: string
-  icon: string
-  action: () => void
-}
-
 function createSlashMenuElement(getEditor: () => any, hide: () => void): HTMLElement {
   const el = document.createElement('div')
   el.className = 'slash-menu rounded-md border bg-popover shadow-md p-1 w-56'
+  el.style.zIndex = '50'
+  el.dataset.show = 'false'
 
   const items: { label: string; icon: string; commandFn: () => (ctx: any) => boolean }[] = [
     { label: 'Heading 1', icon: 'H1', commandFn: () => callCommand(wrapInHeadingCommand.key, 1) },
@@ -84,7 +133,7 @@ export function useSlashPlugin() {
 
     editor.config((ctx: any) => {
       ctx.set(slash.key, {
-        view: (view: EditorView) => {
+        view: (_view: EditorView) => {
           const provider = new SlashProvider({
             content: el,
             debounce: 50,
@@ -111,85 +160,3 @@ export function useSlashPlugin() {
   }, [loading, getEditor])
 }
 
-// ============================================================
-// Floating Toolbar Plugin
-// ============================================================
-
-function createToolbarElement(getEditor: () => any): HTMLElement {
-  const el = document.createElement('div')
-  el.className = 'floating-toolbar flex items-center gap-0.5 rounded-md border bg-popover shadow-md p-1'
-
-  const buttons: { label: string; title: string; commandFn: () => (ctx: any) => boolean }[] = [
-    { label: '<b>B</b>', title: 'Bold', commandFn: () => callCommand(toggleStrongCommand.key) },
-    { label: '<i>I</i>', title: 'Italic', commandFn: () => callCommand(toggleEmphasisCommand.key) },
-    { label: '<s>S</s>', title: 'Strikethrough', commandFn: () => callCommand(toggleStrikethroughCommand.key) },
-    { label: '<code>&lt;&gt;</code>', title: 'Inline Code', commandFn: () => callCommand(toggleInlineCodeCommand.key) },
-  ]
-
-  buttons.forEach((item) => {
-    const btn = document.createElement('button')
-    btn.className = 'rounded px-2 py-1 text-sm hover:bg-accent cursor-pointer'
-    btn.title = item.title
-    btn.innerHTML = item.label
-    btn.addEventListener('mousedown', (e) => {
-      e.preventDefault()
-      const editor = getEditor()
-      if (editor) {
-        editor.action(item.commandFn())
-      }
-    })
-    el.appendChild(btn)
-  })
-
-  return el
-}
-
-export const tooltip = tooltipFactory('editor-tooltip')
-
-export function useTooltipPlugin() {
-  const [loading, getEditor] = useInstance()
-  const tooltipElRef = useRef<HTMLElement | null>(null)
-  const providerRef = useRef<TooltipProvider | null>(null)
-
-  useEffect(() => {
-    if (loading) return
-
-    const editor = getEditor()
-    if (!editor) return
-
-    const el = createToolbarElement(getEditor)
-    tooltipElRef.current = el
-    document.body.appendChild(el)
-
-    editor.config((ctx: any) => {
-      ctx.set(tooltip.key, {
-        view: (view: EditorView) => {
-          const provider = new TooltipProvider({
-            content: el,
-            debounce: 50,
-            shouldShow: (view: EditorView) => {
-              const { selection } = view.state
-              const { empty } = selection
-              return !empty
-            },
-          })
-          providerRef.current = provider
-
-          return {
-            update: (updatedView: EditorView, prevState?: EditorState) => {
-              provider.update(updatedView, prevState)
-            },
-            destroy: () => {
-              provider.destroy()
-            },
-          }
-        },
-      })
-    })
-
-    return () => {
-      providerRef.current?.destroy()
-      el.remove()
-    }
-  }, [loading, getEditor])
-}

@@ -1,11 +1,14 @@
 """Schema management API endpoints."""
 
 import json
+import logging
 from pathlib import Path
 from typing import Any, Optional
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
+
+logger = logging.getLogger(__name__)
 
 from ..config import settings
 from ..extraction.schemas import EXTRACTION_SCHEMAS
@@ -160,8 +163,8 @@ def _load_custom_schema(name: str) -> Optional[dict[str, Any]]:
         try:
             with open(path) as f:
                 return json.load(f)
-        except (json.JSONDecodeError, IOError):
-            pass
+        except (json.JSONDecodeError, IOError) as e:
+            logger.warning("Failed to load custom schema '%s': %s", name, e)
     return None
 
 
@@ -296,16 +299,16 @@ def list_schemas() -> SchemaListResponse:
             )
         )
 
-    # Add custom schemas
+    # Add custom schemas (skip files that don't match expected format)
     for name in _list_custom_schemas():
         custom_schema = _load_custom_schema(name)
-        if custom_schema:
+        if custom_schema and "name" in custom_schema:
             schemas.append(
                 SchemaListItem(
                     name=custom_schema["name"],
                     description=custom_schema.get("description", ""),
                     is_builtin=False,
-                    field_count=len(custom_schema.get("fields", [])),
+                    field_count=len(custom_schema.get("fields", custom_schema.get("columns", []))),
                 )
             )
 

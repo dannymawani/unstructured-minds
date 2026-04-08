@@ -2,23 +2,22 @@ import { useState, useEffect, useCallback } from 'react'
 import {
   DndContext,
   DragOverlay,
-  DragStartEvent,
-  DragOverEvent,
-  DragEndEvent,
   closestCorners,
   PointerSensor,
   useSensor,
   useSensors,
   useDroppable,
 } from '@dnd-kit/core'
+import type { DragStartEvent, DragOverEvent, DragEndEvent } from '@dnd-kit/core'
 import {
   SortableContext,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
-import { Plus, Calendar, Loader2 } from 'lucide-react'
+import { Plus, Loader2, ListTodo } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { PersonalTaskCard, type Task } from './PersonalTaskCard'
+import { PersonalTaskModal } from './PersonalTaskModal'
 
 interface PersonalKanbanProps {
   apiUrl: string
@@ -30,7 +29,7 @@ interface TasksResponse {
   total: number
 }
 
-type ColumnId = 'pending' | 'completed' | 'cancelled' | 'rolled_over'
+type ColumnId = 'backlog' | 'in_progress' | 'done' | 'cancelled'
 
 interface ColumnDef {
   id: ColumnId
@@ -39,33 +38,35 @@ interface ColumnDef {
 }
 
 const COLUMNS: ColumnDef[] = [
-  { id: 'pending', label: 'Pending', borderColor: 'border-t-blue-500' },
-  { id: 'completed', label: 'Completed', borderColor: 'border-t-green-500' },
-  { id: 'cancelled', label: 'Cancelled', borderColor: 'border-t-zinc-500' },
-  { id: 'rolled_over', label: 'Rolled Over', borderColor: 'border-t-amber-500' },
+  { id: 'backlog', label: 'Backlog', borderColor: 'border-t-blue-500' },
+  { id: 'in_progress', label: 'In Progress', borderColor: 'border-t-amber-500' },
+  { id: 'done', label: 'Done', borderColor: 'border-t-green-500' },
+  { id: 'cancelled', label: 'Cancelled', borderColor: 'border-t-muted-foreground' },
 ]
 
 interface NewTaskForm {
   description: string
   category: string
   priority: string
+  deadline: string
 }
 
 const INITIAL_FORM: NewTaskForm = {
   description: '',
   category: '',
   priority: '',
+  deadline: '',
 }
 
 function DroppableColumn({
   column,
   tasks,
-  onFileSelect,
+  onTaskClick,
   children,
 }: {
   column: ColumnDef
   tasks: Task[]
-  onFileSelect?: (path: string) => void
+  onTaskClick?: (task: Task) => void
   children?: React.ReactNode
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id })
@@ -99,7 +100,7 @@ function DroppableColumn({
               <PersonalTaskCard
                 key={task.id}
                 task={task}
-                onFileSelect={onFileSelect}
+                onTaskClick={onTaskClick}
               />
             ))}
             {tasks.length === 0 && (
@@ -119,13 +120,10 @@ export function PersonalKanban({ apiUrl, onFileSelect }: PersonalKanbanProps) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeTask, setActiveTask] = useState<Task | null>(null)
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [showNewForm, setShowNewForm] = useState(false)
   const [newTask, setNewTask] = useState<NewTaskForm>(INITIAL_FORM)
   const [submitting, setSubmitting] = useState(false)
-
-  // Date filters
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -136,13 +134,7 @@ export function PersonalKanban({ apiUrl, onFileSelect }: PersonalKanbanProps) {
   const fetchTasks = useCallback(async () => {
     try {
       setLoading(true)
-      const params = new URLSearchParams()
-      if (dateFrom) params.set('date_from', dateFrom)
-      if (dateTo) params.set('date_to', dateTo)
-      const qs = params.toString()
-      const url = `${apiUrl}/tasks${qs ? `?${qs}` : ''}`
-
-      const response = await fetch(url)
+      const response = await fetch(`${apiUrl}/tasks`)
       if (!response.ok) throw new Error('Failed to fetch tasks')
       const data: TasksResponse = await response.json()
       setTasks(data.tasks)
@@ -152,7 +144,7 @@ export function PersonalKanban({ apiUrl, onFileSelect }: PersonalKanbanProps) {
     } finally {
       setLoading(false)
     }
-  }, [apiUrl, dateFrom, dateTo])
+  }, [apiUrl])
 
   useEffect(() => {
     fetchTasks()
@@ -161,8 +153,8 @@ export function PersonalKanban({ apiUrl, onFileSelect }: PersonalKanbanProps) {
   const getColumnTasks = useCallback(
     (columnId: ColumnId): Task[] => {
       return tasks.filter((t) => {
-        if (columnId === 'pending') {
-          return t.status === 'pending' || t.status === null
+        if (columnId === 'backlog') {
+          return t.status === 'backlog' || t.status === null
         }
         return t.status === columnId
       })
@@ -211,7 +203,7 @@ export function PersonalKanban({ apiUrl, onFileSelect }: PersonalKanbanProps) {
     (taskId: string): ColumnId | null => {
       const task = tasks.find((t) => t.id === taskId)
       if (!task) return null
-      if (task.status === null || task.status === 'pending') return 'pending'
+      if (task.status === null || task.status === 'backlog') return 'backlog'
       return (task.status as ColumnId) || null
     },
     [tasks]
@@ -260,10 +252,11 @@ export function PersonalKanban({ apiUrl, onFileSelect }: PersonalKanbanProps) {
       try {
         const body: Record<string, string | number> = {
           description: newTask.description.trim(),
-          status: 'pending',
+          status: 'backlog',
         }
         if (newTask.category.trim()) body.category = newTask.category.trim()
         if (newTask.priority) body.priority = Number(newTask.priority)
+        if (newTask.deadline) body.deadline = newTask.deadline
 
         const response = await fetch(`${apiUrl}/tasks`, {
           method: 'POST',
@@ -299,9 +292,12 @@ export function PersonalKanban({ apiUrl, onFileSelect }: PersonalKanbanProps) {
       <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-border">
         <div className="flex items-center justify-between mb-2">
           <div>
-            <h2 className="text-lg sm:text-xl font-semibold text-foreground">
-              Personal Tasks
-            </h2>
+            <div className="flex items-center gap-2">
+              <ListTodo className="w-5 h-5 text-accent" />
+              <h2 className="text-lg sm:text-xl font-semibold text-foreground">
+                Personal Tasks
+              </h2>
+            </div>
             <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
               {tasks.length} task{tasks.length !== 1 ? 's' : ''} total
             </p>
@@ -314,48 +310,6 @@ export function PersonalKanban({ apiUrl, onFileSelect }: PersonalKanbanProps) {
             <Plus className="w-4 h-4 mr-1" />
             New Task
           </Button>
-        </div>
-
-        {/* Date filters */}
-        <div className="flex flex-wrap items-center gap-3 mt-2">
-          <div className="flex items-center gap-1.5">
-            <Calendar className="w-4 h-4 text-muted-foreground" />
-            <label htmlFor="date-from" className="text-xs text-muted-foreground">
-              From
-            </label>
-            <input
-              id="date-from"
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className="text-xs bg-muted border border-border rounded px-2 py-1 text-foreground"
-            />
-          </div>
-          <div className="flex items-center gap-1.5">
-            <label htmlFor="date-to" className="text-xs text-muted-foreground">
-              To
-            </label>
-            <input
-              id="date-to"
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              className="text-xs bg-muted border border-border rounded px-2 py-1 text-foreground"
-            />
-          </div>
-          {(dateFrom || dateTo) && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-xs h-7"
-              onClick={() => {
-                setDateFrom('')
-                setDateTo('')
-              }}
-            >
-              Clear
-            </Button>
-          )}
         </div>
 
         {/* Inline new task form */}
@@ -374,7 +328,7 @@ export function PersonalKanban({ apiUrl, onFileSelect }: PersonalKanbanProps) {
               className="w-full bg-background border border-border rounded px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground"
               autoFocus
             />
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <input
                 type="text"
                 placeholder="Category (optional)"
@@ -382,7 +336,7 @@ export function PersonalKanban({ apiUrl, onFileSelect }: PersonalKanbanProps) {
                 onChange={(e) =>
                   setNewTask((prev) => ({ ...prev, category: e.target.value }))
                 }
-                className="flex-1 bg-background border border-border rounded px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground"
+                className="flex-1 min-w-[120px] bg-background border border-border rounded px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground"
               />
               <select
                 value={newTask.priority}
@@ -396,6 +350,15 @@ export function PersonalKanban({ apiUrl, onFileSelect }: PersonalKanbanProps) {
                 <option value="2">Medium</option>
                 <option value="3">Low</option>
               </select>
+              <input
+                type="date"
+                value={newTask.deadline}
+                onChange={(e) =>
+                  setNewTask((prev) => ({ ...prev, deadline: e.target.value }))
+                }
+                className="bg-background border border-border rounded px-3 py-1.5 text-sm text-foreground"
+                title="Deadline (optional)"
+              />
             </div>
             <div className="flex justify-end gap-2">
               <Button
@@ -445,7 +408,7 @@ export function PersonalKanban({ apiUrl, onFileSelect }: PersonalKanbanProps) {
                 key={column.id}
                 column={column}
                 tasks={getColumnTasks(column.id)}
-                onFileSelect={onFileSelect}
+                onTaskClick={(task) => setSelectedTask(task)}
               />
             ))}
           </div>
@@ -454,11 +417,31 @@ export function PersonalKanban({ apiUrl, onFileSelect }: PersonalKanbanProps) {
         <DragOverlay>
           {activeTask ? (
             <div className="w-72 sm:w-80 opacity-90">
-              <PersonalTaskCard task={activeTask} onFileSelect={onFileSelect} />
+              <PersonalTaskCard task={activeTask} />
             </div>
           ) : null}
         </DragOverlay>
       </DndContext>
+
+      {selectedTask && (
+        <PersonalTaskModal
+          task={selectedTask}
+          apiUrl={apiUrl}
+          onClose={() => setSelectedTask(null)}
+          onMove={(taskId, newStatus) => {
+            updateTaskStatus(taskId, newStatus)
+            setSelectedTask(null)
+          }}
+          onOpenNote={(path) => {
+            setSelectedTask(null)
+            onFileSelect?.(path)
+          }}
+          onTaskUpdated={(updated) => {
+            setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)))
+            setSelectedTask(updated)
+          }}
+        />
+      )}
     </div>
   )
 }

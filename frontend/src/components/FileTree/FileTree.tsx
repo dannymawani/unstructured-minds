@@ -23,16 +23,71 @@ interface FlattenedNode {
   depth: number
 }
 
-function buildTree(files: FileInfo[]): FileNode[] {
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+]
+
+/**
+ * Transform Daily-Notes children from flat YYYY-MM folders
+ * into a year > month hierarchy with human-readable month names.
+ */
+export function transformDailyNotes(roots: FileNode[]): FileNode[] {
+  const dailyNotes = roots.find(
+    (n) => n.path === 'Daily-Notes' && n.isDirectory
+  )
+  if (!dailyNotes || !dailyNotes.children) return roots
+
+  // Separate month folders (YYYY-MM) from other children (e.g. Life-Profile.md)
+  const monthPattern = /^(\d{4})-(\d{2})$/
+  const yearMap = new Map<string, FileNode[]>()
+  const otherChildren: FileNode[] = []
+
+  for (const child of dailyNotes.children) {
+    const match = child.name.match(monthPattern)
+    if (match && child.isDirectory) {
+      const year = match[1]
+      const monthIdx = parseInt(match[2], 10) - 1
+      const displayName = MONTH_NAMES[monthIdx] || child.name
+      const transformed: FileNode = {
+        ...child,
+        displayName,
+      }
+      if (!yearMap.has(year)) yearMap.set(year, [])
+      yearMap.get(year)!.push(transformed)
+    } else {
+      otherChildren.push(child)
+    }
+  }
+
+  // Build virtual year nodes, sorted newest first
+  const yearNodes: FileNode[] = [...yearMap.entries()]
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .map(([year, months]) => ({
+      path: `Daily-Notes/__year__/${year}`,
+      name: year,
+      isDirectory: true,
+      isVirtual: true,
+      children: months.sort((a, b) => b.path.localeCompare(a.path)),
+    }))
+
+  // Non-month children first (files), then year nodes
+  dailyNotes.children = [...otherChildren, ...yearNodes]
+
+  return roots
+}
+
+export function buildTree(files: FileInfo[]): FileNode[] {
   const nodeMap = new Map<string, FileNode>()
   const roots: FileNode[] = []
 
-  // Sort files so directories come first, then alphabetically
+  // Sort: directories first, then newest first (reverse alpha for date-based names)
   const sortedFiles = [...files].sort((a, b) => {
     if (a.is_directory !== b.is_directory) {
       return a.is_directory ? -1 : 1
     }
-    return a.path.localeCompare(b.path)
+    // Reverse sort so newest dates appear first
+    return b.path.localeCompare(a.path)
   })
 
   for (const file of sortedFiles) {
@@ -98,7 +153,17 @@ export function FileTree({
   onOpenTemplatePicker,
 }: FileTreeProps) {
   const [files, setFiles] = useState<FileNode[]>([])
-  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [expanded, setExpanded] = useState<Set<string>>(() => {
+    // Auto-expand Daily-Notes, current year, and current month folder on first load
+    const now = new Date()
+    const year = String(now.getFullYear())
+    const month = `${year}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    return new Set([
+      'Daily-Notes',
+      `Daily-Notes/__year__/${year}`,
+      `Daily-Notes/${month}`,
+    ])
+  })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isNewMenuOpen, setIsNewMenuOpen] = useState(false)
@@ -114,7 +179,7 @@ export function FileTree({
         throw new Error(`Failed to fetch files: ${response.statusText}`)
       }
       const data = await response.json()
-      const tree = buildTree(data.files)
+      const tree = transformDailyNotes(buildTree(data.files))
       setFiles(tree)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load files')

@@ -1,6 +1,7 @@
+import { useRef } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { FileText } from 'lucide-react'
+import { Clock, FileText } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export interface Task {
@@ -12,17 +13,18 @@ export interface Task {
   category: string | null
   priority: number | null
   source_file: string | null
+  deadline: string | null
 }
 
 interface PersonalTaskCardProps {
   task: Task
-  onFileSelect?: (path: string) => void
+  onTaskClick?: (task: Task) => void
 }
 
 const priorityConfig: Record<number, { label: string; className: string }> = {
   1: { label: 'High', className: 'bg-red-500/20 text-red-400 border-red-500/30' },
   2: { label: 'Med', className: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
-  3: { label: 'Low', className: 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30' },
+  3: { label: 'Low', className: 'bg-muted text-muted-foreground border-border' },
 }
 
 const categoryColors: Record<string, string> = {
@@ -38,7 +40,9 @@ function getFilename(path: string): string {
   return parts[parts.length - 1] || path
 }
 
-export function PersonalTaskCard({ task, onFileSelect }: PersonalTaskCardProps) {
+export function PersonalTaskCard({ task, onTaskClick }: PersonalTaskCardProps) {
+  const mouseStart = useRef<{ x: number; y: number } | null>(null)
+
   const {
     attributes,
     listeners,
@@ -55,8 +59,24 @@ export function PersonalTaskCard({ task, onFileSelect }: PersonalTaskCardProps) 
 
   const priority = task.priority != null ? priorityConfig[task.priority] : null
   const categoryClass = task.category
-    ? categoryColors[task.category.toLowerCase()] || 'bg-zinc-500/20 text-zinc-400'
+    ? categoryColors[task.category.toLowerCase()] || 'bg-muted text-muted-foreground'
     : null
+
+  // Use mouse events for click detection — completely independent of
+  // dnd-kit's pointer event system, so no interference.
+  const handleMouseDown = (e: React.MouseEvent) => {
+    mouseStart.current = { x: e.clientX, y: e.clientY }
+  }
+
+  const handleMouseUp = (e: React.MouseEvent) => {
+    if (!mouseStart.current) return
+    const dx = e.clientX - mouseStart.current.x
+    const dy = e.clientY - mouseStart.current.y
+    mouseStart.current = null
+    if (Math.abs(dx) < 5 && Math.abs(dy) < 5) {
+      onTaskClick?.(task)
+    }
+  }
 
   return (
     <div
@@ -64,14 +84,16 @@ export function PersonalTaskCard({ task, onFileSelect }: PersonalTaskCardProps) 
       style={style}
       {...attributes}
       {...listeners}
+      onMouseDown={handleMouseDown}
+      onMouseUp={handleMouseUp}
       className={cn(
-        'bg-zinc-900 border border-zinc-700 rounded-lg p-3 cursor-grab',
-        'hover:border-zinc-500 transition-colors text-zinc-100',
+        'bg-popover border border-border rounded-lg p-3 cursor-grab',
+        'hover:border-muted-foreground transition-colors text-foreground',
         'active:cursor-grabbing',
-        isDragging && 'opacity-50 shadow-lg ring-2 ring-primary/50'
+        isDragging && 'opacity-50 shadow-lg ring-2 ring-primary/50',
       )}
     >
-      <p className="text-sm leading-tight mb-2 text-zinc-100">
+      <p className="text-sm leading-tight mb-2 text-foreground">
         {task.description}
       </p>
 
@@ -91,25 +113,23 @@ export function PersonalTaskCard({ task, onFileSelect }: PersonalTaskCardProps) 
             {priority.label}
           </span>
         )}
+        {task.deadline && (
+          <span className="flex items-center gap-1 text-xs bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded">
+            <Clock className="w-3 h-3" />
+            {new Date(task.deadline + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+          </span>
+        )}
       </div>
 
-      <div className="flex items-center justify-between text-xs text-zinc-500">
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span>{task.date}</span>
-        {task.source_file && onFileSelect && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              onFileSelect(task.source_file!)
-            }}
-            className="flex items-center gap-1 text-zinc-400 hover:text-zinc-200 transition-colors"
-            title={task.source_file}
-          >
+        {task.source_file && (
+          <span className="flex items-center gap-1 text-muted-foreground">
             <FileText className="w-3 h-3" />
             <span className="max-w-[120px] truncate">
               {getFilename(task.source_file)}
             </span>
-          </button>
+          </span>
         )}
       </div>
     </div>

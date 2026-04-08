@@ -29,7 +29,7 @@ Available tables and their schemas:
 
 4. food_log (id VARCHAR, date DATE, meal_type VARCHAR, time TIME, description VARCHAR, calories INTEGER, protein_g INTEGER, carbs_g INTEGER, fat_g INTEGER, notes VARCHAR)
 
-5. tasks (id VARCHAR, date DATE, description VARCHAR, status VARCHAR, completed_at TIMESTAMP, category VARCHAR, priority INTEGER)
+5. tasks (id VARCHAR, date DATE, description VARCHAR, status VARCHAR [values: 'backlog', 'in_progress', 'done', 'cancelled'], completed_at TIMESTAMP, category VARCHAR, priority INTEGER)
 
 Rules:
 - Only generate SELECT queries (no INSERT, UPDATE, DELETE, DROP, etc.)
@@ -165,8 +165,8 @@ def extract_sql_from_response(response: str) -> str:
 @router.post("/query/natural", response_model=QueryResponse)
 @limiter.limit(RATE_LIMIT_CLAUDE_API)
 async def natural_language_query(
-    request: QueryRequest,
-    http_request: Request,
+    request: Request,
+    body: QueryRequest,
     db: DatabaseManager = Depends(get_db),
     claude: ClaudeClient = Depends(get_claude),
 ) -> QueryResponse:
@@ -178,7 +178,8 @@ async def natural_language_query(
     4. Return structured response
 
     Args:
-        request: Query request with natural language question
+        request: HTTP request (required by slowapi rate limiter)
+        body: Query request with natural language question
         db: Database manager
         claude: Claude client
 
@@ -191,7 +192,7 @@ async def natural_language_query(
             detail="Claude API not configured. Set ANTHROPIC_API_KEY environment variable.",
         )
 
-    question = request.question.strip()
+    question = body.question.strip()
     if not question:
         raise HTTPException(status_code=400, detail="Question cannot be empty")
 

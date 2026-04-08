@@ -8,48 +8,26 @@ user-invocable: false
 
 ## Overview
 
-Migrate existing Obsidian-generated data into the Unstructured Minds flat-file + DuckDB architecture. The existing data lives in `existing_data/` with date-partitioned folders; the target is flat CSVs in `data/`.
+Migrate existing Obsidian-generated data into the Unstructured Minds DuckDB architecture. The existing data lives in the Obsidian reference repo; the target is DuckDB tables in `data/`.
 
-## Source Data Structure (existing_data/)
+## Source Data Structure (Obsidian reference repo)
 
-```
-existing_data/
-├── data/
-│   ├── exercise_log/{year}/{month}/{day}/{date}_exercise_log.csv
-│   ├── food_log/{year}/{month}/{day}/{date}_food_log.csv
-│   ├── daily_metrics/{year}/{month}/{day}/{date}_daily_metrics.csv
-│   ├── daily_tasks/{year}/{month}/{day}/{date}_daily_tasks.csv
-│   ├── schemas/*.json
-│   ├── exercise_definitions.json
-│   ├── training_config.json
-│   └── injury_config.json
-├── secondbrain/
-│   ├── Daily-Notes/{YYYY-MM}/{YYYY-MM-DD}.md
-│   └── Templates/
-│       ├── Daily-Note-Template.md
-│       ├── Strength-Training-Template.md
-│       ├── Code-Snippet-Template.md
-│       ├── Project-Template.md
-│       ├── Meeting-Note-Template.md
-│       └── DEFAULT TEMPLATE.md
-```
+See `/Users/dmh/Code/obsedian` for the original data:
+- `data/` — date-partitioned CSVs and schemas
+- `secondbrain/Daily-Notes/` — daily note markdown files
+- `secondbrain/Templates/` — note templates
 
 ## Target Data Structure (data/)
 
 ```
 data/
-├── exercise_log.csv         # All exercise data, single flat file
-├── food_log.csv             # All food data, single flat file
-├── daily_metrics.csv        # All metrics, single flat file
-├── daily_tasks.csv          # All tasks, single flat file
-├── schemas/
-│   ├── exercise_log.json
-│   ├── food_log.json
-│   ├── daily_metrics.json
-│   └── daily_tasks.json
-├── exercise_definitions.json
-├── training_config.json
-└── injury_config.json
+├── unstructured.duckdb      # All extracted data in DuckDB tables
+├── settings.json            # User preferences
+└── schemas/
+    ├── exercise_log.json
+    ├── food_log.json
+    ├── daily_metrics.json
+    └── daily_tasks.json
 ```
 
 ## Column Mapping
@@ -82,14 +60,13 @@ These schemas are compatible — columns match between existing and new. Merge b
 
 The migration script (`scripts/migrate_existing_data.py`) must:
 
-1. **Scan** `existing_data/data/{type}/{year}/{month}/{day}/` for all CSV files
+1. **Scan** source `data/{type}/{year}/{month}/{day}/` for all CSV files
 2. **Read** each CSV and validate against its schema
 3. **Transform** column names per mapping above
 4. **Deduplicate** by primary key (date + activity_id + exercise_name + set_number for exercise_log)
 5. **Sort** by date ascending
 6. **Write** single flat CSV per data type to `data/`
-7. **Copy** config files (exercise_definitions.json, training_config.json, injury_config.json) to `data/`
-8. **Copy** schemas to `data/schemas/`, updating column names in the exercise_log schema
+7. **Copy** schemas to `data/schemas/`, updating column names in the exercise_log schema
 9. **Report** summary: rows migrated per type, any validation errors
 
 ## Template Merge Strategy
@@ -111,26 +88,9 @@ The migration script (`scripts/migrate_existing_data.py`) must:
 - Incorporate useful sections from existing templates (e.g., the emoji headers from Daily-Note-Template)
 - Ensure all templates have proper `type` and `tags` frontmatter for extraction
 
-## Config File Integration
-
-### exercise_definitions.json
-- Copy to `data/exercise_definitions.json`
-- Used by extraction to normalize exercise names and resolve aliases (e.g., "dødløft" → "deadlift")
-- Backend loads this at startup to provide to Claude as context during extraction
-
-### training_config.json
-- Copy to `data/training_config.json`
-- Provides athlete profile, recovery targets, and preferences
-- Used by chat/query to contextualize fitness advice
-
-### injury_config.json
-- Copy to `data/injury_config.json`
-- Active injuries with prehab routines and exercise constraints
-- Used by extraction to flag exercise warnings
-
 ## Daily Notes Import
 
-- Copy all files from `existing_data/secondbrain/Daily-Notes/` to `vault/Daily-Notes/`
+- Copy daily notes from the Obsidian reference repo to `vault/Daily-Notes/`
 - Maintain the `{YYYY-MM}/{YYYY-MM-DD}.md` structure
 - After copy, run extraction on each note to populate DuckDB with historical data
 - Expect ~95 daily note files spanning 2024-11 through 2026-01

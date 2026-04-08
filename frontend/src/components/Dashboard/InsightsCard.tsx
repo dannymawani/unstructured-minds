@@ -122,7 +122,7 @@ export function InsightsCard({ apiUrl = 'http://localhost:8000' }: InsightsCardP
 
   if (loading) {
     return (
-      <div className="bg-card border rounded-lg p-4" data-testid="insights-loading">
+      <div className="bg-card rounded-md shadow-sm p-4" data-testid="insights-loading">
         <div className="flex items-center gap-2 mb-4">
           <Lightbulb className="w-5 h-5 text-yellow-400" />
           <h3 className="text-lg font-semibold text-foreground">Insights</h3>
@@ -138,7 +138,7 @@ export function InsightsCard({ apiUrl = 'http://localhost:8000' }: InsightsCardP
 
   if (error) {
     return (
-      <div className="bg-card border rounded-lg p-4" data-testid="insights-error">
+      <div className="bg-card rounded-md shadow-sm p-4" data-testid="insights-error">
         <div className="flex items-center gap-2 mb-2">
           <Lightbulb className="w-5 h-5 text-yellow-400" />
           <h3 className="text-lg font-semibold text-foreground">Insights</h3>
@@ -155,7 +155,7 @@ export function InsightsCard({ apiUrl = 'http://localhost:8000' }: InsightsCardP
   }
 
   return (
-    <div className="bg-card border rounded-lg p-4" data-testid="insights-card">
+    <div className="bg-card rounded-md shadow-sm p-4" data-testid="insights-card">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Lightbulb className="w-5 h-5 text-yellow-400" />

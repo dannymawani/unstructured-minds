@@ -1,16 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
-import {
-  ScatterChart,
-  Scatter,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  ZAxis,
-  Cell,
-  ReferenceLine,
-} from 'recharts';
 import { Brain, ChevronDown } from 'lucide-react';
+import { cachedFetch } from '../../lib/cachedFetch';
 
 interface CorrelationEntry {
   date: string;
@@ -47,60 +37,19 @@ const METRIC_PAIRS: { value: MetricPair; label: string; xKey: string; yKey: stri
   { value: 'stress_mood', label: 'Stress vs Mood', xKey: 'stress', yKey: 'mood', xLabel: 'Stress', yLabel: 'Mood' },
 ];
 
-interface ChartDataPoint {
+interface DataPoint {
   date: string;
   sleep: number;
   energy: number;
   mood: number;
   stress: number;
   activity: number;
-  size: number;
-}
-
-interface CustomTooltipProps {
-  active?: boolean;
-  payload?: Array<{
-    payload: ChartDataPoint;
-  }>;
-}
-
-function CustomTooltip({ active, payload }: CustomTooltipProps) {
-  if (!active || !payload || !payload.length) return null;
-
-  const data = payload[0].payload;
-  return (
-    <div className="bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm">
-      <div className="font-medium text-white mb-1">
-        {new Date(data.date).toLocaleDateString('en-US', {
-          weekday: 'short',
-          month: 'short',
-          day: 'numeric',
-        })}
-      </div>
-      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-        <span className="text-zinc-400">Sleep:</span>
-        <span className="text-white">{data.sleep.toFixed(1)} hrs</span>
-        <span className="text-zinc-400">Energy:</span>
-        <span className="text-white">{data.energy}/10</span>
-        <span className="text-zinc-400">Mood:</span>
-        <span className="text-white">{data.mood}/10</span>
-        <span className="text-zinc-400">Stress:</span>
-        <span className="text-white">{data.stress}/10</span>
-        {data.activity > 0 && (
-          <>
-            <span className="text-zinc-400">Activity:</span>
-            <span className="text-white">{data.activity} min</span>
-          </>
-        )}
-      </div>
-    </div>
-  );
 }
 
 function getCorrelationColor(correlation: number | null): string {
-  if (correlation === null) return 'text-zinc-500';
+  if (correlation === null) return 'text-muted-foreground';
   const abs = Math.abs(correlation);
-  if (abs < 0.3) return 'text-zinc-400';
+  if (abs < 0.3) return 'text-muted-foreground';
   if (abs < 0.6) return correlation > 0 ? 'text-yellow-400' : 'text-orange-400';
   return correlation > 0 ? 'text-green-400' : 'text-red-400';
 }
@@ -114,6 +63,13 @@ function getCorrelationLabel(correlation: number | null): string {
   return `Strong ${direction}`;
 }
 
+// SVG layout
+const W = 400;
+const H = 180;
+const PAD = { t: 8, r: 8, b: 28, l: 36 };
+const plotW = W - PAD.l - PAD.r;
+const plotH = H - PAD.t - PAD.b;
+
 export function MoodCorrelation({
   apiUrl = 'http://localhost:8000',
   days = 30,
@@ -123,33 +79,19 @@ export function MoodCorrelation({
   const [error, setError] = useState<string | null>(null);
   const [selectedPair, setSelectedPair] = useState<MetricPair>('sleep_mood');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [hovered, setHovered] = useState<number | null>(null);
 
   useEffect(() => {
-    async function fetchData() {
-      try {
-        const response = await fetch(`${apiUrl}/dashboard/correlation?days=${days}`);
-        if (!response.ok) throw new Error('Failed to fetch correlation data');
-        const result = await response.json();
-        setData(result);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchData();
+    cachedFetch<CorrelationData>(`${apiUrl}/dashboard/correlation?days=${days}`)
+      .then(setData)
+      .catch((err) => setError(err instanceof Error ? err.message : 'Unknown error'))
+      .finally(() => setLoading(false));
   }, [apiUrl, days]);
 
-  const chartData = useMemo(() => {
+  const chartDataPoints: DataPoint[] = useMemo(() => {
     if (!data) return [];
     return data.entries
-      .filter(
-        (e) =>
-          e.sleep_hours !== null &&
-          e.energy !== null &&
-          e.mood !== null &&
-          e.stress !== null
-      )
+      .filter((e) => e.sleep_hours !== null && e.energy !== null && e.mood !== null && e.stress !== null)
       .map((e) => ({
         date: e.date,
         sleep: e.sleep_hours || 0,
@@ -157,7 +99,6 @@ export function MoodCorrelation({
         mood: e.mood || 0,
         stress: e.stress || 0,
         activity: e.activity_minutes || 0,
-        size: 100,
       }));
   }, [data]);
 
@@ -166,7 +107,7 @@ export function MoodCorrelation({
 
   if (loading) {
     return (
-      <div className="bg-zinc-800 rounded-lg p-4 h-72 animate-pulse" data-testid="correlation-loading" />
+      <div className="bg-card rounded-md shadow-sm p-4 h-72 animate-pulse" data-testid="correlation-loading" />
     );
   }
 
@@ -178,53 +119,69 @@ export function MoodCorrelation({
     );
   }
 
-  if (!data || chartData.length < 3) {
+  if (!data || chartDataPoints.length < 3) {
     return (
-      <div className="bg-zinc-800 rounded-lg p-4" data-testid="correlation-empty">
+      <div className="bg-card rounded-md shadow-sm p-4" data-testid="correlation-empty">
         <div className="flex items-center gap-2 mb-2">
           <Brain className="w-5 h-5 text-purple-400" />
-          <h3 className="text-lg font-semibold text-white">Mood Correlations</h3>
+          <h3 className="text-lg font-semibold text-foreground">Mood Correlations</h3>
         </div>
-        <p className="text-zinc-400">Need at least 3 days of data to show correlations.</p>
+        <p className="text-muted-foreground">Need at least 3 days of data to show correlations.</p>
       </div>
     );
   }
 
-  // Calculate domain for X axis based on selected metric
-  const xValues = chartData.map((d) => d[currentPair.xKey as keyof ChartDataPoint] as number);
+  const xValues = chartDataPoints.map((d) => d[currentPair.xKey as keyof DataPoint] as number);
+  const yValues = chartDataPoints.map((d) => d[currentPair.yKey as keyof DataPoint] as number);
   const xMin = Math.min(...xValues);
   const xMax = Math.max(...xValues);
   const xPadding = (xMax - xMin) * 0.1 || 1;
+  const scaleXMin = Math.max(0, xMin - xPadding);
+  const scaleXMax = xMax + xPadding;
+  const yMin = 0;
+  const yMax = 10;
+  const yAvg = yValues.reduce((a, b) => a + b, 0) / yValues.length;
+
+  function scaleX(val: number) {
+    return PAD.l + ((val - scaleXMin) / (scaleXMax - scaleXMin)) * plotW;
+  }
+  function scaleY(val: number) {
+    return PAD.t + plotH - ((val - yMin) / (yMax - yMin)) * plotH;
+  }
+
+  function dotColor(mood: number) {
+    if (mood >= 7) return 'rgba(34, 197, 94, 0.7)';
+    if (mood >= 5) return 'rgba(245, 158, 11, 0.7)';
+    return 'rgba(239, 68, 68, 0.7)';
+  }
+
+  const hoveredPoint = hovered !== null ? chartDataPoints[hovered] : null;
 
   return (
-    <div className="bg-zinc-800 rounded-lg p-4" data-testid="mood-correlation">
+    <div className="bg-card rounded-md shadow-sm p-4" data-testid="mood-correlation">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 mb-4">
         <div className="flex items-center gap-2">
           <Brain className="w-5 h-5 text-purple-400" />
-          <h3 className="text-lg font-semibold text-white">Mood Correlations</h3>
+          <h3 className="text-lg font-semibold text-foreground">Mood Correlations</h3>
         </div>
 
-        {/* Metric selector dropdown */}
         <div className="relative">
           <button
-            className="flex items-center gap-2 bg-zinc-700 hover:bg-zinc-600 text-white text-sm px-3 py-2 rounded-lg transition-colors"
+            className="flex items-center gap-2 bg-secondary hover:bg-secondary text-foreground text-sm px-3 py-2 rounded-lg transition-colors"
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
           >
             {currentPair.label}
             <ChevronDown className={`w-4 h-4 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
           </button>
           {isDropdownOpen && (
-            <div className="absolute right-0 mt-1 w-48 bg-zinc-700 rounded-lg shadow-lg z-10 overflow-hidden">
+            <div className="absolute right-0 mt-1 w-48 bg-secondary rounded-lg shadow-lg z-10 overflow-hidden">
               {METRIC_PAIRS.map((pair) => (
                 <button
                   key={pair.value}
-                  className={`w-full text-left px-3 py-2 text-sm hover:bg-zinc-600 transition-colors ${
-                    pair.value === selectedPair ? 'bg-zinc-600 text-white' : 'text-zinc-300'
+                  className={`w-full text-left px-3 py-2 text-sm hover:bg-secondary transition-colors ${
+                    pair.value === selectedPair ? 'bg-secondary text-foreground' : 'text-muted-foreground'
                   }`}
-                  onClick={() => {
-                    setSelectedPair(pair.value);
-                    setIsDropdownOpen(false);
-                  }}
+                  onClick={() => { setSelectedPair(pair.value); setIsDropdownOpen(false); }}
                 >
                   {pair.label}
                 </button>
@@ -234,9 +191,8 @@ export function MoodCorrelation({
         </div>
       </div>
 
-      {/* Correlation indicator */}
       <div className="flex items-center gap-3 mb-3 text-sm">
-        <span className="text-zinc-400">Correlation:</span>
+        <span className="text-muted-foreground">Correlation:</span>
         <span className={`font-medium ${getCorrelationColor(correlation)}`}>
           {correlation !== null ? correlation.toFixed(2) : 'N/A'}
         </span>
@@ -245,54 +201,67 @@ export function MoodCorrelation({
         </span>
       </div>
 
-      <div className="h-52">
-        <ResponsiveContainer width="100%" height="100%">
-          <ScatterChart margin={{ top: 10, right: 10, bottom: 20, left: 0 }}>
-            <XAxis
-              type="number"
-              dataKey={currentPair.xKey}
-              name={currentPair.xLabel}
-              stroke="#71717a"
-              fontSize={12}
-              domain={[Math.max(0, xMin - xPadding), xMax + xPadding]}
-              tickLine={false}
-              label={{ value: currentPair.xLabel, position: 'bottom', fill: '#71717a', fontSize: 11 }}
-            />
-            <YAxis
-              type="number"
-              dataKey={currentPair.yKey}
-              name={currentPair.yLabel}
-              stroke="#71717a"
-              fontSize={12}
-              domain={[0, 10]}
-              tickLine={false}
-              axisLine={false}
-              label={{ value: currentPair.yLabel, angle: -90, position: 'insideLeft', fill: '#71717a', fontSize: 11 }}
-            />
-            <ZAxis type="number" dataKey="size" range={[50, 200]} />
-            <Tooltip content={<CustomTooltip />} />
-            {/* Average lines */}
-            <ReferenceLine
-              y={chartData.reduce((sum, d) => sum + (d[currentPair.yKey as keyof ChartDataPoint] as number), 0) / chartData.length}
-              stroke="#8b5cf6"
-              strokeDasharray="3 3"
-              strokeOpacity={0.5}
-            />
-            <Scatter data={chartData} fill="#8b5cf6">
-              {chartData.map((entry, index) => (
-                <Cell
-                  key={`cell-${index}`}
-                  fill={entry.mood >= 7 ? '#22c55e' : entry.mood >= 5 ? '#f59e0b' : '#ef4444'}
-                  fillOpacity={0.7}
+      <div className="relative h-52">
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full" preserveAspectRatio="none">
+          {/* Y grid */}
+          {[0, 2, 4, 6, 8, 10].map((v) => (
+            <line key={v} x1={PAD.l} x2={W - PAD.r} y1={scaleY(v)} y2={scaleY(v)} stroke="#3f3f46" strokeWidth="0.5" />
+          ))}
+          {[0, 5, 10].map((v) => (
+            <text key={`yl-${v}`} x={PAD.l - 4} y={scaleY(v) + 3} fill="#71717a" fontSize="8" textAnchor="end">{v}</text>
+          ))}
+
+          {/* Y-axis label */}
+          <text x="8" y={PAD.t + plotH / 2} fill="#71717a" fontSize="8" textAnchor="middle"
+            transform={`rotate(-90, 8, ${PAD.t + plotH / 2})`}>{currentPair.yLabel}</text>
+          {/* X-axis label */}
+          <text x={PAD.l + plotW / 2} y={H - 2} fill="#71717a" fontSize="8" textAnchor="middle">{currentPair.xLabel}</text>
+
+          {/* Y average reference line */}
+          <line x1={PAD.l} x2={W - PAD.r} y1={scaleY(yAvg)} y2={scaleY(yAvg)}
+            stroke="#8b5cf6" strokeWidth="0.8" strokeDasharray="4 3" />
+
+          {/* Scatter dots */}
+          {chartDataPoints.map((d, i) => {
+            const cx = scaleX(d[currentPair.xKey as keyof DataPoint] as number);
+            const cy = scaleY(d[currentPair.yKey as keyof DataPoint] as number);
+            return (
+              <g key={i}>
+                <circle cx={cx} cy={cy} r={hovered === i ? 7 : 5} fill={dotColor(d.mood)}
+                  stroke={hovered === i ? '#fff' : 'none'} strokeWidth="2"
+                  style={{ cursor: 'pointer', transition: 'r 0.15s' }}
+                  onMouseEnter={() => setHovered(i)}
+                  onMouseLeave={() => setHovered(null)}
                 />
-              ))}
-            </Scatter>
-          </ScatterChart>
-        </ResponsiveContainer>
+              </g>
+            );
+          })}
+        </svg>
+
+        {/* Tooltip */}
+        {hoveredPoint && hovered !== null && (
+          <div
+            className="absolute pointer-events-none bg-popover text-popover-foreground rounded-md shadow-lg border border-border px-3 py-2 text-xs z-10"
+            style={{
+              left: `${(scaleX(hoveredPoint[currentPair.xKey as keyof DataPoint] as number) / W) * 100}%`,
+              top: `${(scaleY(hoveredPoint[currentPair.yKey as keyof DataPoint] as number) / H) * 100}%`,
+              transform: 'translate(-50%, -120%)',
+            }}
+          >
+            <div className="font-medium text-foreground mb-1">
+              {new Date(hoveredPoint.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+            </div>
+            <div className="text-muted-foreground">Sleep: {hoveredPoint.sleep.toFixed(1)} hrs</div>
+            <div className="text-muted-foreground">Energy: {hoveredPoint.energy}/10</div>
+            <div className="text-muted-foreground">Mood: {hoveredPoint.mood}/10</div>
+            <div className="text-muted-foreground">Stress: {hoveredPoint.stress}/10</div>
+            {hoveredPoint.activity > 0 && <div className="text-muted-foreground">Activity: {hoveredPoint.activity} min</div>}
+          </div>
+        )}
       </div>
 
-      <div className="flex items-center justify-between mt-2 text-xs text-zinc-500">
-        <span>{chartData.length} data points</span>
+      <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
+        <span>{chartDataPoints.length} data points</span>
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1">
             <span className="w-2 h-2 rounded-full bg-green-500" /> Good mood

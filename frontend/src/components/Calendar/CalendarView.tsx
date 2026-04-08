@@ -149,7 +149,7 @@ export function CalendarView({ apiUrl = 'http://localhost:8000', onDaySelect }: 
                     text-sm transition-all hover:ring-2 hover:ring-blue-400
                     ${isToday(day.date) ? 'ring-2 ring-blue-500 font-bold' : ''}
                     ${getActivityColor(day.activity_level)}
-                    ${day.has_note ? 'text-white' : 'text-zinc-400'}
+                    ${day.has_note ? 'text-foreground font-medium' : 'text-muted-foreground'}
                   `}
                   title={`${day.date}${day.has_note ? ' (has note)' : ''}${day.activity_level > 0 ? ` - Activity level: ${day.activity_level}` : ''}`}
                 >
@@ -186,7 +186,7 @@ export function CalendarView({ apiUrl = 'http://localhost:8000', onDaySelect }: 
       </div>
 
       {/* Navigation */}
-      <div className="bg-card border rounded-lg p-3 sm:p-4 mb-3 sm:mb-4">
+      <div className="bg-card rounded-md shadow-sm p-3 sm:p-4 mb-3 sm:mb-4">
         <div className="flex items-center justify-between mb-3 sm:mb-4">
           <Button
             variant="ghost"
@@ -252,7 +252,7 @@ export function CalendarView({ apiUrl = 'http://localhost:8000', onDaySelect }: 
       </div>
 
       {/* Legend */}
-      <div className="bg-card border rounded-lg p-3 sm:p-4">
+      <div className="bg-card rounded-md shadow-sm p-3 sm:p-4">
         <h3 className="text-xs sm:text-sm font-medium text-muted-foreground mb-2 sm:mb-3">Legend</h3>
         <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:gap-4 text-xs sm:text-sm">
           <div className="flex items-center gap-2">

@@ -1,6 +1,12 @@
 import { cn } from '@/lib/utils'
-import { User, Bot, Database, ChevronDown, ChevronUp } from 'lucide-react'
+import { User, Bot, Database, ChevronDown, ChevronUp, FileCheck } from 'lucide-react'
 import { useState } from 'react'
+
+export interface ImageAttachment {
+  data: string
+  media_type: string
+  preview?: string  // object URL for display
+}
 
 export interface QueryData {
   columns: string[]
@@ -15,6 +21,8 @@ export interface Message {
   content: string
   timestamp?: Date
   queryData?: QueryData
+  images?: ImageAttachment[]
+  noteUpdated?: boolean
 }
 
 interface ChatMessageProps {
@@ -145,9 +153,27 @@ export function ChatMessage({ message }: ChatMessageProps) {
             </span>
           )}
         </div>
+        {message.images && message.images.length > 0 && (
+          <div className="flex gap-2 flex-wrap">
+            {message.images.map((img, i) => (
+              <img
+                key={i}
+                src={img.preview || `data:${img.media_type};base64,${img.data}`}
+                alt={`Attachment ${i + 1}`}
+                className="h-16 w-16 object-cover rounded-md border"
+              />
+            ))}
+          </div>
+        )}
         <div className="text-sm whitespace-pre-wrap break-words">
           {message.content}
         </div>
+        {message.noteUpdated && (
+          <div className="flex items-center gap-1.5 text-xs text-teal-600 dark:text-teal-400 mt-1">
+            <FileCheck className="h-3.5 w-3.5" />
+            <span>Note updated</span>
+          </div>
+        )}
         {message.queryData && <DataTable queryData={message.queryData} />}
       </div>
     </div>

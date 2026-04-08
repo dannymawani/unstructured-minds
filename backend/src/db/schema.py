@@ -91,6 +91,7 @@ def init_database(db_path: Path | str) -> duckdb.DuckDBPyConnection:
             category VARCHAR,
             priority INTEGER,
             source_file VARCHAR,
+            deadline DATE,
             extracted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
@@ -107,15 +108,79 @@ def init_database(db_path: Path | str) -> duckdb.DuckDBPyConnection:
             depends_on VARCHAR,
             description VARCHAR,
             content TEXT,
+            deadline DATE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             completed_at TIMESTAMP
         )
     """)
 
+    # Migration: add deadline column if missing (existing databases)
+    try:
+        conn.execute("SELECT deadline FROM kanban_tasks LIMIT 0")
+    except duckdb.BinderException:
+        conn.execute("ALTER TABLE kanban_tasks ADD COLUMN deadline DATE")
+
+    # Migration: add deadline column to personal tasks if missing
+    try:
+        conn.execute("SELECT deadline FROM tasks LIMIT 0")
+    except duckdb.BinderException:
+        conn.execute("ALTER TABLE tasks ADD COLUMN deadline DATE")
+
+    # Migration: normalize task statuses to new kanban values
+    conn.execute("UPDATE tasks SET status = 'backlog' WHERE status IN ('pending', 'todo')")
+    conn.execute("UPDATE tasks SET status = 'done' WHERE status = 'completed'")
+    conn.execute("UPDATE tasks SET status = 'in_progress' WHERE status = 'rolled_over'")
+    # Backfill completed_at for done/cancelled tasks that don't already have one
+    conn.execute("""
+        UPDATE tasks SET completed_at = CAST(date AS TIMESTAMP)
+        WHERE status IN ('done', 'cancelled') AND completed_at IS NULL
+    """)
+
+    # Migration: deduplicate tasks — keep oldest per (source_file, description),
+    # delete newer duplicates
+    conn.execute("""
+        DELETE FROM tasks
+        WHERE id IN (
+            SELECT id FROM (
+                SELECT id,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY source_file, description
+                           ORDER BY extracted_at ASC, id ASC
+                       ) AS rn
+                FROM tasks
+                WHERE source_file IS NOT NULL
+            ) ranked
+            WHERE rn > 1
+        )
+    """)
+
+    # Kanban task updates / notes timeline
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS kanban_task_updates (
+            id INTEGER PRIMARY KEY,
+            task_id VARCHAR NOT NULL,
+            note TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # File index table for fast file lookups
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS file_index (
+            path VARCHAR PRIMARY KEY,
+            filename VARCHAR NOT NULL,
+            extension VARCHAR,
+            size_bytes BIGINT,
+            modified_at TIMESTAMP,
+            content_hash VARCHAR
+        )
+    """)
+
     # Extraction log table
+    conn.execute("CREATE SEQUENCE IF NOT EXISTS extraction_log_id_seq")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS extraction_log (
-            id INTEGER PRIMARY KEY,
+            id INTEGER PRIMARY KEY DEFAULT nextval('extraction_log_id_seq'),
             file_path VARCHAR NOT NULL,
             file_hash VARCHAR NOT NULL,
             extracted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -186,6 +251,17 @@ def _create_indexes(conn: duckdb.DuckDBPyConnection) -> None:
     conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_kanban_phase
         ON kanban_tasks(phase)
+    """)
+
+    # Index on file_index for file search
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_file_index_filename
+        ON file_index(filename)
+    """)
+
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_file_index_extension
+        ON file_index(extension)
     """)
 
     # Index on activities for dashboard queries

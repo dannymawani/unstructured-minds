@@ -1,16 +1,17 @@
 """API routes for vault file operations."""
 
 import re
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, Request, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from ..cache import file_list_cache, invalidate_all
 from ..db import DatabaseManager
 from ..middleware import validate_file_path, PathValidationError
 from ..middleware.validation import MAX_FILE_PATH_LENGTH, MAX_QUERY_LENGTH
 from ..storage import StorageBackend
-from ..webhooks import dispatch_event, WebhookEvent
+from ..templates.daily_note import render_daily_note
 
 router = APIRouter()
 
@@ -106,6 +107,11 @@ async def list_files(
         List of files matching the prefix
     """
     try:
+        cache_key = f"files:{prefix}"
+        cached = file_list_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
         file_paths = await storage.list(prefix)
         files = []
         seen_dirs: set[str] = set()
@@ -129,15 +135,15 @@ async def list_files(
                             )
                         )
             else:
-                # Add top-level directories
-                if len(parts) > 1:
-                    dir_path = parts[0]
+                # Add all intermediate directories
+                for i in range(len(parts) - 1):
+                    dir_path = "/".join(parts[: i + 1])
                     if dir_path not in seen_dirs:
                         seen_dirs.add(dir_path)
                         files.append(
                             FileInfo(
                                 path=dir_path,
-                                name=parts[0],
+                                name=parts[i],
                                 is_directory=True,
                             )
                         )
@@ -151,7 +157,9 @@ async def list_files(
                 )
             )
 
-        return FileListResponse(files=files)
+        response = FileListResponse(files=files)
+        file_list_cache.set(cache_key, response)
+        return response
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -189,15 +197,15 @@ async def read_file(
 
 @router.post("/vault/file", response_model=FileWriteResponse)
 async def write_file(
-    request_obj: Request,
-    request: FileWriteRequest,
+    request: Request,
+    body: FileWriteRequest,
     extract: bool = Query(True, description="Whether to trigger Claude extraction after save"),
     storage: StorageBackend = Depends(get_storage),
 ) -> FileWriteResponse:
     """Write a file to the vault.
 
     Args:
-        request: File path and content
+        body: File path and content
         extract: If False, save to disk only (no Claude extraction).
                  Used by autosave to avoid unnecessary API calls.
 
@@ -206,50 +214,29 @@ async def write_file(
     """
     # Validate path for security
     try:
-        validate_file_path(request.path, allow_any_extension=True)
+        validate_file_path(body.path, allow_any_extension=True)
     except PathValidationError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
     try:
-        # Check if file exists to determine create vs update
-        is_new = not await storage.exists(request.path)
-        await storage.write(request.path, request.content.encode("utf-8"))
-
-        # Dispatch webhook event
-        event = WebhookEvent.NOTE_CREATED if is_new else WebhookEvent.NOTE_UPDATED
-        await dispatch_event(
-            event.value,
-            {
-                "path": request.path,
-                "content_length": len(request.content),
-            },
-        )
-
-        # Check if this is a daily note creation
-        if is_new and "Daily-Notes/" in request.path:
-            await dispatch_event(
-                WebhookEvent.DAILY_CREATED.value,
-                {
-                    "path": request.path,
-                    "content_length": len(request.content),
-                },
-            )
+        await storage.write(body.path, body.content.encode("utf-8"))
+        invalidate_all()
 
         # Only trigger extraction if requested
         did_extract = False
-        if extract and request.path.endswith(".md"):
+        if extract and body.path.endswith(".md"):
             try:
-                claude = request_obj.app.state.claude
-                db = request_obj.app.state.db
+                claude = request.app.state.claude
+                db = request.app.state.db
                 if claude.is_configured:
                     from ..extraction import ExtractionPipeline
                     pipeline = ExtractionPipeline(db, claude)
-                    result = await pipeline.extract(request.path, request.content)
+                    result = await pipeline.extract(body.path, body.content)
                     did_extract = result.success
             except Exception:
                 pass  # Extraction failure shouldn't fail the save
 
-        return FileWriteResponse(path=request.path, success=True, extracted=did_extract)
+        return FileWriteResponse(path=body.path, success=True, extracted=did_extract)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -277,12 +264,7 @@ async def delete_file(
 
     try:
         await storage.delete(path)
-
-        # Dispatch webhook event for deletion
-        await dispatch_event(
-            WebhookEvent.NOTE_DELETED.value,
-            {"path": path},
-        )
+        invalidate_all()
 
         return FileDeleteResponse(path=path, success=True)
     except FileNotFoundError:
@@ -297,22 +279,6 @@ async def delete_file(
 # Quick Capture Endpoint
 # =============================================================================
 
-# Daily note template for quick capture (minimal version)
-QUICK_CAPTURE_DAILY_NOTE_TEMPLATE = """---
-date: {date}
-type: daily-note
-tags:
-  - daily
-  - journal
----
-
-## Quick Notes
-
-{quick_note}
-
----
-**Previous**: [[{prev_date}]] | **Next**: [[{next_date}]]
-"""
 
 
 @router.post("/vault/quick-capture", response_model=QuickCaptureResponse)
@@ -322,7 +288,7 @@ async def quick_capture(
 ) -> QuickCaptureResponse:
     """Quick capture - append text to today's daily note.
 
-    Appends the text with a timestamp to the "## Quick Notes" section
+    Appends the text with a timestamp to the Adhoc Notes section
     of today's daily note. Creates the daily note if it doesn't exist.
 
     Args:
@@ -335,8 +301,6 @@ async def quick_capture(
     date_str = now.strftime("%Y-%m-%d")
     time_str = now.strftime("%H:%M")
     year_month = now.strftime("%Y-%m")
-    prev_date = (now - timedelta(days=1)).strftime("%Y-%m-%d")
-    next_date = (now + timedelta(days=1)).strftime("%Y-%m-%d")
 
     # Build the file path: Daily-Notes/YYYY-MM/YYYY-MM-DD.md
     file_path = f"Daily-Notes/{year_month}/{date_str}.md"
@@ -351,9 +315,9 @@ async def quick_capture(
             content_bytes = await storage.read(file_path)
             content = content_bytes.decode("utf-8")
 
-            # Find the "## Quick Notes" section and append to it
-            quick_notes_pattern = r"(## Quick Notes\n)"
-            match = re.search(quick_notes_pattern, content)
+            # Find the Adhoc Notes section and append to it
+            adhoc_pattern = r"(## .*Adhoc Notes\n)"
+            match = re.search(adhoc_pattern, content)
 
             if match:
                 # Insert the new entry after the section header
@@ -369,7 +333,7 @@ async def quick_capture(
                     insert_pos = frontmatter_end + 3
                     new_content = (
                         content[:insert_pos]
-                        + "\n\n## Quick Notes\n"
+                        + "\n\n## 📝 Adhoc Notes\n"
                         + quick_note_entry
                         + "\n"
                         + content[insert_pos:]
@@ -377,29 +341,21 @@ async def quick_capture(
                 else:
                     # No frontmatter, prepend
                     new_content = (
-                        "## Quick Notes\n" + quick_note_entry + "\n\n" + content
+                        "## 📝 Adhoc Notes\n" + quick_note_entry + "\n\n" + content
                     )
 
             await storage.write(file_path, new_content.encode("utf-8"))
         else:
-            # Create new daily note with the quick capture
-            content = QUICK_CAPTURE_DAILY_NOTE_TEMPLATE.format(
-                date=date_str,
-                quick_note=quick_note_entry,
-                prev_date=prev_date,
-                next_date=next_date,
-            )
+            # Create new daily note from shared template, then append quick capture
+            content = render_daily_note(date_str)
+            # Insert quick note entry under the Adhoc Notes section
+            adhoc_match = re.search(r"(## .*Adhoc Notes\n)", content)
+            if adhoc_match:
+                insert_pos = adhoc_match.end()
+                content = (
+                    content[:insert_pos] + quick_note_entry + "\n" + content[insert_pos:]
+                )
             await storage.write(file_path, content.encode("utf-8"))
-
-            # Dispatch webhook events for new daily note
-            await dispatch_event(
-                WebhookEvent.NOTE_CREATED.value,
-                {"path": file_path, "content_length": len(content)},
-            )
-            await dispatch_event(
-                WebhookEvent.DAILY_CREATED.value,
-                {"path": file_path, "date": date_str},
-            )
 
         return QuickCaptureResponse(
             success=True,

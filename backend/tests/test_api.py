@@ -25,8 +25,7 @@ def test_settings(tmp_path: Path):
         mock_settings.vault_path.mkdir(parents=True, exist_ok=True)
         mock_settings.data_path.mkdir(parents=True, exist_ok=True)
 
-        with patch("src.main.settings", mock_settings), \
-             patch("src.api.routes.settings", mock_settings):
+        with patch("src.main.settings", mock_settings):
             yield mock_settings
 
 
@@ -46,18 +45,11 @@ class TestHealthEndpoint:
         response = client.get("/health")
         assert response.status_code == 200
 
-    def test_health_returns_ok_status(self, client: TestClient) -> None:
-        """Test health response contains ok status."""
+    def test_health_returns_healthy_status(self, client: TestClient) -> None:
+        """Test health response contains healthy status."""
         response = client.get("/health")
         data = response.json()
-        assert data["status"] == "ok"
-
-    def test_health_returns_version(self, client: TestClient) -> None:
-        """Test health response contains version."""
-        response = client.get("/health")
-        data = response.json()
-        assert "version" in data
-        assert data["version"] == "0.1.0"
+        assert data["status"] == "healthy"
 
     def test_health_returns_timestamp(self, client: TestClient) -> None:
         """Test health response contains timestamp."""
@@ -65,42 +57,28 @@ class TestHealthEndpoint:
         data = response.json()
         assert "timestamp" in data
 
-    def test_health_returns_claude_status(self, client: TestClient) -> None:
-        """Test health response includes claude_enabled."""
-        response = client.get("/health")
-        data = response.json()
-        assert "claude_enabled" in data
-        assert isinstance(data["claude_enabled"], bool)
 
+class TestLivenessEndpoint:
+    """Tests for liveness endpoint."""
 
-class TestStatusEndpoint:
-    """Tests for status endpoint."""
-
-    def test_status_returns_200(self, client: TestClient) -> None:
-        """Test status endpoint returns 200."""
-        response = client.get("/status")
+    def test_liveness_returns_200(self, client: TestClient) -> None:
+        """Test liveness endpoint returns 200."""
+        response = client.get("/health/live")
         assert response.status_code == 200
 
-    def test_status_returns_database_status(self, client: TestClient) -> None:
-        """Test status includes database status."""
-        response = client.get("/status")
+    def test_liveness_returns_alive(self, client: TestClient) -> None:
+        """Test liveness response indicates alive."""
+        response = client.get("/health/live")
         data = response.json()
-        assert "database" in data
-        assert data["database"] == "connected"
+        assert data["alive"] is True
+        assert data["status"] == "healthy"
 
-    def test_status_returns_storage_status(self, client: TestClient) -> None:
-        """Test status includes storage status."""
-        response = client.get("/status")
+    def test_liveness_returns_uptime(self, client: TestClient) -> None:
+        """Test liveness response includes uptime."""
+        response = client.get("/health/live")
         data = response.json()
-        assert "storage" in data
-        assert data["storage"] == "connected"
-
-    def test_status_returns_paths(self, client: TestClient) -> None:
-        """Test status includes configured paths."""
-        response = client.get("/status")
-        data = response.json()
-        assert "vault_path" in data
-        assert "data_path" in data
+        assert "uptime_seconds" in data
+        assert isinstance(data["uptime_seconds"], (int, float))
 
 
 class TestConfig:

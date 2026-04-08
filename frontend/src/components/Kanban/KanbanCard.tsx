@@ -1,15 +1,22 @@
+import { Clock } from 'lucide-react'
+import { useDraggable } from '@dnd-kit/core'
+import { cn } from '@/lib/utils'
 import type { KanbanTask } from './KanbanBoard'
 
 interface KanbanCardProps {
   task: KanbanTask
   onClick: () => void
+  isDragOverlay?: boolean
 }
 
 const priorityColors: Record<string, string> = {
   'Critical': 'bg-red-500/20 text-red-400 border-red-500/30',
   'High': 'bg-orange-500/20 text-orange-400 border-orange-500/30',
+  'high': 'bg-orange-500/20 text-orange-400 border-orange-500/30',
   'Medium': 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-  'Low': 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30',
+  'medium': 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+  'Low': 'bg-muted text-muted-foreground border-border',
+  'low': 'bg-muted text-muted-foreground border-border',
 }
 
 const phaseColors: Record<string, string> = {
@@ -27,22 +34,55 @@ function getPhaseNumber(phase: string | null): string | null {
   return match ? match[1] : null
 }
 
-export function KanbanCard({ task, onClick }: KanbanCardProps) {
+function getDeadlineUrgency(deadline: string | null): 'overdue' | 'urgent' | 'soon' | 'normal' | null {
+  if (!deadline) return null
+  const parsed = new Date(deadline + 'T23:59:59')
+  if (isNaN(parsed.getTime())) return 'normal'
+  const now = new Date()
+  now.setHours(0, 0, 0, 0)
+  const diffDays = (parsed.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+  if (diffDays < 0) return 'overdue'
+  if (diffDays <= 1) return 'urgent'
+  if (diffDays <= 3) return 'soon'
+  return 'normal'
+}
+
+function formatDeadline(deadline: string): string {
+  const d = new Date(deadline + 'T00:00:00')
+  if (isNaN(d.getTime())) return deadline
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+const urgencyStyles: Record<string, string> = {
+  overdue: 'text-red-400',
+  urgent: 'text-red-400',
+  soon: 'text-amber-400',
+  normal: 'text-muted-foreground',
+}
+
+function CardContent({ task }: { task: KanbanTask }) {
   const priorityClass = task.priority ? priorityColors[task.priority] || priorityColors['Medium'] : ''
   const phaseNum = getPhaseNumber(task.phase)
-  const phaseClass = phaseNum ? phaseColors[phaseNum] || '' : 'bg-zinc-500/20 text-zinc-400'
+  const phaseClass = phaseNum ? phaseColors[phaseNum] || '' : 'bg-muted text-muted-foreground'
+  const deadlineUrgency = getDeadlineUrgency(task.deadline)
 
   return (
-    <div
-      onClick={onClick}
-      className="bg-zinc-900 border border-zinc-700 rounded-lg p-3 cursor-pointer hover:border-zinc-500 transition-colors text-zinc-100"
-    >
-      <h4 className="font-medium text-sm leading-tight mb-2 text-zinc-100">{task.title}</h4>
+    <>
+      <h4 className="font-medium text-sm leading-tight mb-2 text-foreground">{task.title}</h4>
 
       {task.description && (
-        <p className="text-xs text-zinc-400 line-clamp-2 mb-2">
+        <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
           {task.description}
         </p>
+      )}
+
+      {task.deadline && (
+        <div className={`flex items-center gap-1 text-xs mb-2 ${urgencyStyles[deadlineUrgency || 'normal']}`}>
+          <Clock className="w-3 h-3" />
+          <span>{formatDeadline(task.deadline)}</span>
+          {deadlineUrgency === 'overdue' && <span className="font-semibold">(overdue)</span>}
+          {deadlineUrgency === 'urgent' && <span className="font-semibold">(today)</span>}
+        </div>
       )}
 
       <div className="flex flex-wrap gap-1.5">
@@ -57,6 +97,35 @@ export function KanbanCard({ task, onClick }: KanbanCardProps) {
           </span>
         )}
       </div>
+    </>
+  )
+}
+
+export function KanbanCard({ task, onClick, isDragOverlay }: KanbanCardProps) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: task.id,
+  })
+
+  if (isDragOverlay) {
+    return (
+      <div className="bg-popover border border-border rounded-lg p-3 text-foreground shadow-xl ring-2 ring-primary/30">
+        <CardContent task={task} />
+      </div>
+    )
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      onClick={onClick}
+      className={cn(
+        'bg-popover border border-border rounded-lg p-3 cursor-grab active:cursor-grabbing hover:border-muted-foreground transition-colors text-foreground',
+        isDragging && 'opacity-30'
+      )}
+    >
+      <CardContent task={task} />
     </div>
   )
 }

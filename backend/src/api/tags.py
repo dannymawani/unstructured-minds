@@ -9,6 +9,7 @@ Provides endpoints for:
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
 
+from ..cache import tag_cache
 from ..middleware import limiter
 from ..middleware.rate_limit import RATE_LIMIT_SEARCH
 from ..middleware.validation import MAX_FILE_PATH_LENGTH
@@ -130,6 +131,10 @@ async def list_tags(
     Returns:
         List of tags with their counts
     """
+    cached = tag_cache.get("all_tags")
+    if cached is not None:
+        return cached
+
     tag_counts: dict[str, int] = {}
 
     # Get all markdown files
@@ -156,10 +161,12 @@ async def list_tags(
 
     tags = [TagCount(tag=tag, count=count) for tag, count in sorted_tags]
 
-    return TagListResponse(
+    response = TagListResponse(
         tags=tags,
         total=len(tags),
     )
+    tag_cache.set("all_tags", response)
+    return response
 
 
 @router.get("/{tag}/notes", response_model=NotesByTagResponse)

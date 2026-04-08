@@ -25,8 +25,7 @@ def test_settings(tmp_path: Path):
         mock_settings.vault_path.mkdir(parents=True, exist_ok=True)
         mock_settings.data_path.mkdir(parents=True, exist_ok=True)
 
-        with patch("src.main.settings", mock_settings), \
-             patch("src.api.routes.settings", mock_settings):
+        with patch("src.main.settings", mock_settings):
             yield mock_settings
 
 
@@ -77,7 +76,7 @@ def db_with_data(client):
         INSERT INTO tasks (id, date, description, status, category)
         VALUES (?, ?, ?, ?, ?)
         """,
-        ["task_1", str(today - timedelta(days=1)), "Review code", "pending", "work"],
+        ["task_1", str(today - timedelta(days=1)), "Review code", "backlog", "work"],
     )
     db.execute(
         """

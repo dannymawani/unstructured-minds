@@ -7,6 +7,8 @@ export interface FileNode {
   name: string
   isDirectory: boolean
   children?: FileNode[]
+  isVirtual?: boolean
+  displayName?: string
 }
 
 interface FileTreeItemProps {
@@ -54,8 +56,8 @@ function FileTreeItemComponent({
   const className = useMemo(
     () =>
       cn(
-        'flex items-center gap-1 px-2 py-2 sm:py-1 cursor-pointer text-sm',
-        'min-h-[44px] sm:min-h-0',
+        'flex items-center gap-1 px-2 py-1.5 sm:py-0.5 cursor-pointer text-sm',
+        'min-h-[44px] sm:min-h-[28px]',
         'hover:bg-accent rounded-sm',
         'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1',
         selected && 'bg-accent text-accent-foreground'
@@ -89,7 +91,7 @@ function FileTreeItemComponent({
           <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
         </>
       )}
-      <span className="truncate">{node.name}</span>
+      <span className="truncate">{node.displayName || node.name}</span>
     </div>
   )
 }
@@ -101,6 +103,8 @@ export const FileTreeItem = memo(FileTreeItemComponent, (prevProps, nextProps) =
     prevProps.node.path === nextProps.node.path &&
     prevProps.node.name === nextProps.node.name &&
     prevProps.node.isDirectory === nextProps.node.isDirectory &&
+    prevProps.node.isVirtual === nextProps.node.isVirtual &&
+    prevProps.node.displayName === nextProps.node.displayName &&
     prevProps.depth === nextProps.depth &&
     prevProps.expanded === nextProps.expanded &&
     prevProps.selected === nextProps.selected &&

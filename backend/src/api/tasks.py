@@ -2,7 +2,7 @@
 
 import re
 import uuid
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Request, HTTPException, Query
@@ -28,6 +28,7 @@ class TaskOut(BaseModel):
     category: Optional[str] = None
     priority: Optional[int] = None
     source_file: Optional[str] = None
+    deadline: Optional[str] = None
 
 
 class TaskListResponse(BaseModel):
@@ -36,15 +37,18 @@ class TaskListResponse(BaseModel):
 
 
 class TaskUpdateRequest(BaseModel):
-    status: Optional[str] = Field(None, pattern=r"^(pending|completed|cancelled|rolled_over)$")
+    status: Optional[str] = Field(None, pattern=r"^(backlog|in_progress|done|cancelled)$")
+    description: Optional[str] = Field(None, min_length=1, max_length=500)
     category: Optional[str] = None
     priority: Optional[int] = Field(None, ge=1, le=3)
+    deadline: Optional[date] = None
 
 
 class TaskCreateRequest(BaseModel):
     description: str = Field(..., min_length=1, max_length=500)
     category: Optional[str] = None
     priority: Optional[int] = Field(None, ge=1, le=3)
+    deadline: Optional[date] = None
 
 
 # =============================================================================
@@ -71,6 +75,7 @@ def _row_to_task(row: tuple, columns: list[str]) -> TaskOut:
         category=data.get("category"),
         priority=data.get("priority"),
         source_file=data.get("source_file"),
+        deadline=str(data["deadline"]) if data.get("deadline") else None,
     )
 
 
@@ -87,10 +92,40 @@ async def _sync_task_to_markdown(
     except (FileNotFoundError, ValueError):
         return
 
-    checked = new_status == "completed"
+    checked = new_status == "done"
     old_pattern = r"- \[([ xX])\] " + re.escape(description)
     new_checkbox = f"- [{'x' if checked else ' '}] {description}"
     updated = re.sub(old_pattern, new_checkbox, content, count=1)
+
+    if updated != content:
+        await storage.write(source_file, updated.encode("utf-8"))
+
+
+async def _sync_description_to_markdown(
+    storage: StorageBackend,
+    source_file: str,
+    old_description: str,
+    new_description: str,
+    current_status: str,
+) -> None:
+    """Rename a task's text in the source markdown file."""
+    try:
+        content_bytes = await storage.read(source_file)
+        content = content_bytes.decode("utf-8")
+    except (FileNotFoundError, ValueError):
+        return
+
+    checked = current_status == "done"
+    checkbox = "x" if checked else " "
+    old_line = f"- [{checkbox}] {old_description}"
+    new_line = f"- [{checkbox}] {new_description}"
+    # Also try matching the opposite checkbox state in case of mismatch
+    updated = content.replace(old_line, new_line, 1)
+    if updated == content:
+        alt_checkbox = " " if checked else "x"
+        old_line_alt = f"- [{alt_checkbox}] {old_description}"
+        new_line_alt = f"- [{alt_checkbox}] {new_description}"
+        updated = content.replace(old_line_alt, new_line_alt, 1)
 
     if updated != content:
         await storage.write(source_file, updated.encode("utf-8"))
@@ -107,6 +142,7 @@ async def list_tasks(
     category: Optional[str] = Query(None, description="Filter by category"),
     date_from: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
     date_to: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
+    hide_old: bool = Query(True, description="Hide done/cancelled tasks older than 7 days"),
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
     db: DatabaseManager = Depends(get_db),
@@ -114,6 +150,12 @@ async def list_tasks(
     """List personal tasks with optional filters."""
     conditions = []
     params: list = []
+
+    if hide_old and not status:
+        conditions.append(
+            "(status NOT IN ('done', 'cancelled') OR completed_at IS NULL OR completed_at >= ?)"
+        )
+        params.append((datetime.now() - timedelta(days=7)).isoformat())
 
     if status:
         conditions.append("status = ?")
@@ -182,17 +224,23 @@ async def update_task(
     if request.status is not None:
         updates.append("status = ?")
         values.append(request.status)
-        if request.status == "completed":
+        if request.status in ("done", "cancelled"):
             updates.append("completed_at = ?")
             values.append(datetime.now().isoformat())
         elif existing.get("completed_at"):
             updates.append("completed_at = NULL")
+    if request.description is not None:
+        updates.append("description = ?")
+        values.append(request.description)
     if request.category is not None:
         updates.append("category = ?")
         values.append(request.category)
     if request.priority is not None:
         updates.append("priority = ?")
         values.append(request.priority)
+    if request.deadline is not None:
+        updates.append("deadline = ?")
+        values.append(request.deadline)
 
     if not updates:
         raise HTTPException(status_code=400, detail="No fields to update")
@@ -201,13 +249,24 @@ async def update_task(
     db.execute(f"UPDATE tasks SET {', '.join(updates)} WHERE id = ?", values)
 
     # Two-way sync: update checkbox in source markdown
-    if request.status is not None and existing.get("source_file"):
-        await _sync_task_to_markdown(
-            storage,
-            existing["source_file"],
-            existing["description"],
-            request.status,
-        )
+    if existing.get("source_file"):
+        if request.description is not None and request.description != existing["description"]:
+            await _sync_description_to_markdown(
+                storage,
+                existing["source_file"],
+                existing["description"],
+                request.description,
+                existing.get("status") or "backlog",
+            )
+        if request.status is not None:
+            # Use the new description if it was also updated
+            desc = request.description if request.description is not None else existing["description"]
+            await _sync_task_to_markdown(
+                storage,
+                existing["source_file"],
+                desc,
+                request.status,
+            )
 
     # Return updated task
     result = db.execute("SELECT * FROM tasks WHERE id = ?", [task_id])
@@ -232,9 +291,9 @@ async def create_task(
 
     # Insert into DuckDB
     db.execute(
-        """INSERT INTO tasks (id, date, description, status, category, priority, source_file)
-           VALUES (?, ?, ?, 'pending', ?, ?, ?)""",
-        [task_id, date_str, request.description, request.category, request.priority, daily_note_path],
+        """INSERT INTO tasks (id, date, description, status, category, priority, source_file, deadline)
+           VALUES (?, ?, ?, 'backlog', ?, ?, ?, ?)""",
+        [task_id, date_str, request.description, request.category, request.priority, daily_note_path, request.deadline],
     )
 
     # Append to today's daily note

@@ -1,18 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { X, Folder, Palette, Key, Check, Loader2, Download, Upload, Database, Archive, FileJson, Puzzle } from 'lucide-react'
+import { X, Folder, Palette, Key, Check, Loader2, Download, Upload, Database, Archive, FileJson } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { SchemaManager } from '@/components/Schemas'
-import { WebhooksSection } from './WebhooksSection'
-
-interface PluginInfo {
-  name: string
-  version: string
-  description: string
-  author: string
-  enabled: boolean
-  hooks: string[]
-}
 
 interface Settings {
   vault_path: string
@@ -45,9 +35,6 @@ export function SettingsPanel({
   const [exportStatus, setExportStatus] = useState<string | null>(null)
   const [isExporting, setIsExporting] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
-  const [plugins, setPlugins] = useState<PluginInfo[]>([])
-  const [isLoadingPlugins, setIsLoadingPlugins] = useState(false)
-  const [pluginTogglingName, setPluginTogglingName] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const fetchSettings = useCallback(async () => {
@@ -67,48 +54,11 @@ export function SettingsPanel({
     }
   }, [apiBaseUrl])
 
-  const fetchPlugins = useCallback(async () => {
-    setIsLoadingPlugins(true)
-    try {
-      const response = await fetch(`${apiBaseUrl}/plugins`)
-      if (!response.ok) {
-        throw new Error('Failed to fetch plugins')
-      }
-      const data = await response.json()
-      setPlugins(data.plugins || [])
-    } catch (err) {
-      console.error('Failed to fetch plugins:', err)
-      setPlugins([])
-    } finally {
-      setIsLoadingPlugins(false)
-    }
-  }, [apiBaseUrl])
-
-  const togglePlugin = async (pluginName: string, enabled: boolean) => {
-    setPluginTogglingName(pluginName)
-    try {
-      const action = enabled ? 'disable' : 'enable'
-      const response = await fetch(`${apiBaseUrl}/plugins/${pluginName}/${action}`, {
-        method: 'POST',
-      })
-      if (!response.ok) {
-        throw new Error(`Failed to ${action} plugin`)
-      }
-      // Refresh plugins list
-      await fetchPlugins()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to toggle plugin')
-    } finally {
-      setPluginTogglingName(null)
-    }
-  }
-
   useEffect(() => {
     if (isOpen) {
       fetchSettings()
-      fetchPlugins()
     }
-  }, [isOpen, fetchSettings, fetchPlugins])
+  }, [isOpen, fetchSettings])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -248,15 +198,15 @@ export function SettingsPanel({
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
       <div
-        className="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col text-zinc-100"
+        className="bg-popover border border-border rounded-lg w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col text-foreground"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-zinc-700">
-          <h2 className="text-lg font-semibold text-zinc-100">Settings</h2>
+        <div className="flex items-center justify-between p-4 border-b border-border">
+          <h2 className="text-lg font-semibold text-foreground">Settings</h2>
           <button
             onClick={onClose}
-            className="p-1 hover:bg-zinc-800 rounded transition-colors"
+            className="p-1 hover:bg-muted rounded transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -266,7 +216,7 @@ export function SettingsPanel({
         <div className="flex-1 overflow-y-auto p-4 space-y-6">
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-6 h-6 animate-spin text-zinc-400" />
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
             </div>
           ) : error ? (
             <div className="text-red-400 bg-red-400/10 rounded-lg p-4 text-sm">
@@ -278,7 +228,7 @@ export function SettingsPanel({
               <section>
                 <div className="flex items-center gap-2 mb-3">
                   <Folder className="w-4 h-4 text-blue-400" />
-                  <h3 className="text-sm font-semibold text-zinc-300 uppercase tracking-wide">
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                     General
                   </h3>
                 </div>
@@ -292,13 +242,13 @@ export function SettingsPanel({
               <section>
                 <div className="flex items-center gap-2 mb-3">
                   <Palette className="w-4 h-4 text-purple-400" />
-                  <h3 className="text-sm font-semibold text-zinc-300 uppercase tracking-wide">
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                     Appearance
                   </h3>
                 </div>
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between bg-zinc-800/50 rounded-lg p-3">
-                    <span className="text-sm text-zinc-300">Theme</span>
+                  <div className="flex items-center justify-between bg-muted rounded-lg p-3">
+                    <span className="text-sm text-muted-foreground">Theme</span>
                     <div className="flex gap-2">
                       <ThemeButton
                         theme="dark"
@@ -321,13 +271,13 @@ export function SettingsPanel({
               <section>
                 <div className="flex items-center gap-2 mb-3">
                   <Key className="w-4 h-4 text-green-400" />
-                  <h3 className="text-sm font-semibold text-zinc-300 uppercase tracking-wide">
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                     API
                   </h3>
                 </div>
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between bg-zinc-800/50 rounded-lg p-3">
-                    <span className="text-sm text-zinc-300">Claude API</span>
+                  <div className="flex items-center justify-between bg-muted rounded-lg p-3">
+                    <span className="text-sm text-muted-foreground">Claude API</span>
                     <ApiStatus
                       enabled={settings.claude_enabled}
                       configured={settings.claude_configured}
@@ -341,63 +291,30 @@ export function SettingsPanel({
               <section>
                 <div className="flex items-center gap-2 mb-3">
                   <FileJson className="w-4 h-4 text-cyan-400" />
-                  <h3 className="text-sm font-semibold text-zinc-300 uppercase tracking-wide">
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                     Data Extraction
                   </h3>
                 </div>
-                <div className="bg-zinc-800/50 rounded-lg p-3">
+                <div className="bg-muted rounded-lg p-3">
                   <SchemaManager apiBaseUrl={apiBaseUrl} />
                 </div>
               </section>
-
-              {/* Plugins Section */}
-              <section>
-                <div className="flex items-center gap-2 mb-3">
-                  <Puzzle className="w-4 h-4 text-pink-400" />
-                  <h3 className="text-sm font-semibold text-zinc-300 uppercase tracking-wide">
-                    Plugins
-                  </h3>
-                </div>
-                <div className="space-y-3">
-                  {isLoadingPlugins ? (
-                    <div className="flex items-center justify-center py-4">
-                      <Loader2 className="w-4 h-4 animate-spin text-zinc-400" />
-                    </div>
-                  ) : plugins.length === 0 ? (
-                    <div className="bg-zinc-800/50 rounded-lg p-3">
-                      <p className="text-sm text-zinc-500">No plugins installed</p>
-                    </div>
-                  ) : (
-                    plugins.map((plugin) => (
-                      <PluginItem
-                        key={plugin.name}
-                        plugin={plugin}
-                        isToggling={pluginTogglingName === plugin.name}
-                        onToggle={() => togglePlugin(plugin.name, plugin.enabled)}
-                      />
-                    ))
-                  )}
-                </div>
-              </section>
-
-              {/* Webhooks Section */}
-              <WebhooksSection apiBaseUrl={apiBaseUrl} />
 
               {/* Export/Import Section */}
               <section>
                 <div className="flex items-center gap-2 mb-3">
                   <Archive className="w-4 h-4 text-orange-400" />
-                  <h3 className="text-sm font-semibold text-zinc-300 uppercase tracking-wide">
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                     Backup & Export
                   </h3>
                 </div>
                 <div className="space-y-3">
                   {/* Export Vault */}
-                  <div className="bg-zinc-800/50 rounded-lg p-3">
+                  <div className="bg-muted rounded-lg p-3">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <Folder className="w-4 h-4 text-zinc-400" />
-                        <span className="text-sm text-zinc-300">Export Vault</span>
+                        <Folder className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">Export Vault</span>
                       </div>
                       <Button
                         variant="outline"
@@ -414,17 +331,17 @@ export function SettingsPanel({
                         <span className="ml-1">ZIP</span>
                       </Button>
                     </div>
-                    <p className="text-xs text-zinc-500">
+                    <p className="text-xs text-muted-foreground">
                       Download all vault files as a ZIP archive
                     </p>
                   </div>
 
                   {/* Export Data */}
-                  <div className="bg-zinc-800/50 rounded-lg p-3">
+                  <div className="bg-muted rounded-lg p-3">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <Database className="w-4 h-4 text-zinc-400" />
-                        <span className="text-sm text-zinc-300">Export Data</span>
+                        <Database className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">Export Data</span>
                       </div>
                       <div className="flex gap-1">
                         <Button
@@ -457,17 +374,17 @@ export function SettingsPanel({
                         </Button>
                       </div>
                     </div>
-                    <p className="text-xs text-zinc-500">
+                    <p className="text-xs text-muted-foreground">
                       Download extracted data tables
                     </p>
                   </div>
 
                   {/* Import Vault */}
-                  <div className="bg-zinc-800/50 rounded-lg p-3">
+                  <div className="bg-muted rounded-lg p-3">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <Upload className="w-4 h-4 text-zinc-400" />
-                        <span className="text-sm text-zinc-300">Import Vault</span>
+                        <Upload className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">Import Vault</span>
                       </div>
                       <Button
                         variant="outline"
@@ -491,7 +408,7 @@ export function SettingsPanel({
                         className="hidden"
                       />
                     </div>
-                    <p className="text-xs text-zinc-500">
+                    <p className="text-xs text-muted-foreground">
                       Restore vault from a ZIP backup
                     </p>
                   </div>
@@ -510,7 +427,7 @@ export function SettingsPanel({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-zinc-700">
+        <div className="p-4 border-t border-border">
           <Button variant="outline" onClick={onClose} className="w-full">
             Close
           </Button>
@@ -527,9 +444,9 @@ interface SettingItemProps {
 
 function SettingItem({ label, value }: SettingItemProps) {
   return (
-    <div className="bg-zinc-800/50 rounded-lg p-3">
-      <span className="text-xs text-zinc-500 block mb-1">{label}</span>
-      <span className="text-sm text-zinc-300 font-mono break-all">{value}</span>
+    <div className="bg-muted rounded-lg p-3">
+      <span className="text-xs text-muted-foreground block mb-1">{label}</span>
+      <span className="text-sm text-muted-foreground font-mono break-all">{value}</span>
     </div>
   )
 }
@@ -549,10 +466,10 @@ function ThemeButton({ theme, currentTheme, onClick, disabled }: ThemeButtonProp
       disabled={disabled}
       className={cn(
         'px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
-        'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-zinc-900',
+        'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-popover',
         isActive
-          ? 'bg-blue-500 text-white'
-          : 'bg-zinc-700 text-zinc-300 hover:bg-zinc-600',
+          ? 'bg-primary text-primary-foreground'
+          : 'bg-secondary text-muted-foreground hover:bg-secondary/80',
         disabled && 'opacity-50 cursor-not-allowed'
       )}
     >
@@ -573,7 +490,7 @@ interface ApiStatusProps {
 function ApiStatus({ enabled, configured, keySet }: ApiStatusProps) {
   if (!enabled) {
     return (
-      <span className="text-xs bg-zinc-700 text-zinc-400 px-2 py-1 rounded">
+      <span className="text-xs bg-secondary text-muted-foreground px-2 py-1 rounded">
         Disabled
       </span>
     )
@@ -603,47 +520,3 @@ function ApiStatus({ enabled, configured, keySet }: ApiStatusProps) {
   )
 }
 
-interface PluginItemProps {
-  plugin: PluginInfo
-  isToggling: boolean
-  onToggle: () => void
-}
-
-function PluginItem({ plugin, isToggling, onToggle }: PluginItemProps) {
-  return (
-    <div className="bg-zinc-800/50 rounded-lg p-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-sm font-medium text-zinc-200">{plugin.name}</span>
-            <span className="text-xs text-zinc-500">v{plugin.version}</span>
-          </div>
-          <p className="text-xs text-zinc-400 mb-2">{plugin.description}</p>
-          {plugin.author && (
-            <p className="text-xs text-zinc-500">by {plugin.author}</p>
-          )}
-        </div>
-        <button
-          onClick={onToggle}
-          disabled={isToggling}
-          className={cn(
-            'relative w-11 h-6 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-zinc-900',
-            plugin.enabled ? 'bg-blue-500' : 'bg-zinc-600',
-            isToggling && 'opacity-50 cursor-not-allowed'
-          )}
-        >
-          {isToggling ? (
-            <Loader2 className="w-3 h-3 animate-spin absolute top-1.5 left-1.5 text-white" />
-          ) : (
-            <span
-              className={cn(
-                'absolute top-1 w-4 h-4 rounded-full bg-white transition-transform',
-                plugin.enabled ? 'translate-x-6' : 'translate-x-1'
-              )}
-            />
-          )}
-        </button>
-      </div>
-    </div>
-  )
-}

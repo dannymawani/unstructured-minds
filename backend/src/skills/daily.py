@@ -1,46 +1,9 @@
 """Daily note skill implementation."""
 
-from datetime import datetime, timedelta
+from datetime import datetime
 
+from ..templates.daily_note import render_daily_note
 from .base import Skill, SkillContext, SkillResult
-
-
-DAILY_NOTE_TEMPLATE = """---
-date: {date}
-type: daily-note
-tags:
-  - daily
-  - journal
----
-
-## 📝 Adhoc Notes
--
-
-## 🎯 Today's Focus
-
-- [ ]
-
-- [ ]
-
-## 💼 Work
-
-
-## 🤷🏽 Personal
-
-
-## 🏋️ Training & Health
-### Workout
-- **Type**:
-- **Focus**:
-
-### Energy & Recovery
-- Sleep:
-- Energy Level:
-- Nutrition:
-
----
-**Previous**: [[{prev_date}]] | **Next**: [[{next_date}]]
-"""
 
 
 class DailyNoteSkill(Skill):
@@ -79,8 +42,6 @@ class DailyNoteSkill(Skill):
             date = datetime.now()
 
         date_str = date.strftime("%Y-%m-%d")
-        prev_date = (date - timedelta(days=1)).strftime("%Y-%m-%d")
-        next_date = (date + timedelta(days=1)).strftime("%Y-%m-%d")
 
         # Build the file path: Daily-Notes/YYYY-MM/YYYY-MM-DD.md
         year_month = date.strftime("%Y-%m")
@@ -95,11 +56,7 @@ class DailyNoteSkill(Skill):
             )
 
         # Render template
-        content = DAILY_NOTE_TEMPLATE.format(
-            date=date_str,
-            prev_date=prev_date,
-            next_date=next_date,
-        )
+        content = render_daily_note(date_str)
 
         # Write the file
         await context.storage.write(file_path, content.encode("utf-8"))

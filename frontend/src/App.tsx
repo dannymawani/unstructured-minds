@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useRef, useEffect, lazy, Suspense } from 'react'
+import { Routes, Route, Navigate, useNavigate, useLocation, useSearchParams } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { FileTree } from '@/components/FileTree'
 import { MarkdownEditor } from '@/components/Editor/MarkdownEditor'
@@ -29,6 +30,8 @@ import {
   Loader2,
   Menu,
   MessageSquare,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react'
 
 // Lazy load heavy view components for code splitting
@@ -54,9 +57,22 @@ type SidebarTab = 'files' | 'tags' | 'links'
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 function App() {
-  const [view, setView] = useState<View>('editor')
+  const navigate = useNavigate()
+  const location = useLocation()
+  const [searchParams] = useSearchParams()
+
+  // Derive view from URL pathname instead of state
+  const view: View = useMemo(() => {
+    const path = location.pathname.replace(/^\//, '')
+    if (path === 'dashboard') return 'dashboard'
+    if (path === 'kanban') return 'kanban'
+    if (path === 'calendar') return 'calendar'
+    return 'editor'
+  }, [location.pathname])
+
   const [selectedFile, setSelectedFile] = useState<string | undefined>()
   const [content, setContent] = useState('')
+  const contentRef = useRef(content)
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'extracting' | 'saved'>('idle')
   const isDirtyRef = useRef(false)
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false)
@@ -72,6 +88,8 @@ function App() {
   const { isMobile, isTablet } = useMobile()
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
   const [isMobileChatOpen, setIsMobileChatOpen] = useState(false)
+  const [isChatExpanded, setIsChatExpanded] = useState(false)
+  const [chatInitialMessage, setChatInitialMessage] = useState<string | undefined>()
 
   const fetchFileContent = useCallback(async (path: string) => {
     try {
@@ -82,29 +100,52 @@ function App() {
         throw new Error('Failed to fetch file')
       }
       const data = await response.json()
-      setContent(data.content)
+      return data.content as string
     } catch (err) {
       console.error('Error loading file:', err)
-      setContent('')
+      return ''
     }
   }, [])
 
   const handleFileSelect = useCallback(
-    (path: string) => {
+    async (path: string) => {
+      // Fetch content FIRST, then update selectedFile so the editor
+      // remounts (via key={selectedFile}) with the correct content
+      const fileContent = await fetchFileContent(path)
+      setContent(fileContent)
       setSelectedFile(path)
-      fetchFileContent(path)
+      navigate(`/editor?file=${encodeURIComponent(path)}`)
       // Close mobile sidebar after selection
       if (isMobile || isTablet) {
         setIsMobileSidebarOpen(false)
       }
     },
-    [fetchFileContent, isMobile, isTablet]
+    [fetchFileContent, isMobile, isTablet, navigate]
   )
 
   const handleContentChange = useCallback((markdown: string) => {
     setContent(markdown)
+    contentRef.current = markdown
     isDirtyRef.current = true
   }, [])
+
+  // Called by ChatPanel when note-assist returns updated content
+  const handleNoteContentUpdate = useCallback((newContent: string) => {
+    setContent(newContent)
+    contentRef.current = newContent
+    isDirtyRef.current = true
+
+    // Save to disk immediately so content isn't lost on refresh
+    if (selectedFile) {
+      fetch(`${API_BASE_URL}/vault/file?extract=false`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: selectedFile, content: newContent }),
+      }).then(() => {
+        isDirtyRef.current = false
+      }).catch((err) => console.error('Error saving note-assist update:', err))
+    }
+  }, [selectedFile])
 
   // Autosave: disk only, no extraction (called by 60s interval)
   const handleAutosave = useCallback(async () => {
@@ -115,7 +156,7 @@ function App() {
       const response = await fetch(`${API_BASE_URL}/vault/file?extract=false`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: selectedFile, content }),
+        body: JSON.stringify({ path: selectedFile, content: contentRef.current }),
       })
       if (!response.ok) {
         throw new Error('Failed to save file')
@@ -127,7 +168,7 @@ function App() {
       console.error('Error saving file:', err)
       setSaveState('idle')
     }
-  }, [selectedFile, content])
+  }, [selectedFile])
 
   // Explicit save: disk + extraction (Cmd+S)
   const handleSave = useCallback(async () => {
@@ -138,7 +179,7 @@ function App() {
       const response = await fetch(`${API_BASE_URL}/vault/file?extract=true`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: selectedFile, content }),
+        body: JSON.stringify({ path: selectedFile, content: contentRef.current }),
       })
       if (!response.ok) {
         throw new Error('Failed to save file')
@@ -150,7 +191,7 @@ function App() {
       console.error('Error saving file:', err)
       setSaveState('idle')
     }
-  }, [selectedFile, content])
+  }, [selectedFile])
 
   // Extract on file switch if content is dirty
   const prevFileRef = useRef<string | undefined>(selectedFile)
@@ -161,12 +202,25 @@ function App() {
       fetch(`${API_BASE_URL}/vault/file?extract=true`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: prevFile, content }),
+        body: JSON.stringify({ path: prevFile, content: contentRef.current }),
       }).catch((err) => console.error('Error saving on file switch:', err))
       isDirtyRef.current = false
     }
     prevFileRef.current = selectedFile
-  }, [selectedFile, content])
+  }, [selectedFile])
+
+  // Deep link: load file from ?file= query param (supports browser back/forward)
+  const fileParam = searchParams.get('file')
+  useEffect(() => {
+    if (fileParam && fileParam !== selectedFile) {
+      fetchFileContent(fileParam).then((fileContent) => {
+        setContent(fileContent)
+        contentRef.current = fileContent
+        isDirtyRef.current = false
+        setSelectedFile(fileParam)
+      })
+    }
+  }, [fileParam, selectedFile, fetchFileContent])
 
   // Toggle sidebar visibility
   const toggleSidebar = useCallback(() => {
@@ -183,35 +237,35 @@ function App() {
     const year = today.getFullYear()
     const month = String(today.getMonth() + 1).padStart(2, '0')
     const day = String(today.getDate()).padStart(2, '0')
-    const dailyNotePath = `Daily-Notes/${year}-${month}/${year}-${month}-${day}.md`
+    const dateStr = `${year}-${month}-${day}`
+    const dailyNotePath = `Daily-Notes/${year}-${month}/${dateStr}.md`
 
+    let isNewNote = false
     try {
-      // Try to create the daily note via API (it will return existing content if file exists)
-      const response = await fetch(`${API_BASE_URL}/vault/daily-note`, {
+      const res = await fetch(`${API_BASE_URL}/calendar/daily-note`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: `${year}-${month}-${day}` }),
+        body: JSON.stringify({ date: dateStr }),
       })
-
-      if (response.ok) {
-        // Switch to editor view and select the daily note
-        setView('editor')
-        setSelectedFile(dailyNotePath)
-        fetchFileContent(dailyNotePath)
-      } else {
-        // Fallback: just try to open the file directly
-        setView('editor')
-        setSelectedFile(dailyNotePath)
-        fetchFileContent(dailyNotePath)
+      if (res.ok) {
+        const data = await res.json()
+        isNewNote = data.created
       }
     } catch (err) {
       console.error('Error creating daily note:', err)
-      // Fallback: try to open the file anyway
-      setView('editor')
-      setSelectedFile(dailyNotePath)
-      fetchFileContent(dailyNotePath)
     }
-  }, [fetchFileContent])
+    // Always open the file - fetch content first, then set selectedFile
+    const fileContent = await fetchFileContent(dailyNotePath)
+    setContent(fileContent)
+    navigate(`/editor?file=${encodeURIComponent(dailyNotePath)}`)
+    setSelectedFile(dailyNotePath)
+
+    // Auto-expand chat with welcome prompt for new notes
+    if (isNewNote) {
+      setIsChatExpanded(true)
+      setChatInitialMessage(`I just created today's daily note. What should I focus on today?`)
+    }
+  }, [fetchFileContent, navigate])
 
   // Open command palette
   const openCommandPalette = useCallback(() => {
@@ -235,22 +289,24 @@ function App() {
 
   // Handle search result selection
   const handleSearchSelect = useCallback(
-    (path: string) => {
-      setView('editor')
+    async (path: string) => {
+      const fileContent = await fetchFileContent(path)
+      setContent(fileContent)
       setSelectedFile(path)
-      fetchFileContent(path)
+      navigate(`/editor?file=${encodeURIComponent(path)}`)
     },
-    [fetchFileContent]
+    [fetchFileContent, navigate]
   )
 
   // Handle template creation result
   const handleTemplateSelect = useCallback(
-    (path: string) => {
-      setView('editor')
+    async (path: string) => {
+      const fileContent = await fetchFileContent(path)
+      setContent(fileContent)
       setSelectedFile(path)
-      fetchFileContent(path)
+      navigate(`/editor?file=${encodeURIComponent(path)}`)
     },
-    [fetchFileContent]
+    [fetchFileContent, navigate]
   )
 
   // Handle calendar day selection
@@ -259,31 +315,31 @@ function App() {
       const [year, month] = date.split('-')
       const dailyNotePath = `Daily-Notes/${year}-${month}/${date}.md`
 
-      if (hasNote) {
-        // Open existing note
-        setView('editor')
-        setSelectedFile(dailyNotePath)
-        fetchFileContent(dailyNotePath)
-      } else {
-        // Create new note via API
+      if (!hasNote) {
+        // Create new note via API first
         try {
-          const response = await fetch(`${API_BASE_URL}/calendar/daily-note`, {
+          await fetch(`${API_BASE_URL}/calendar/daily-note`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ date }),
           })
-
-          if (response.ok) {
-            setView('editor')
-            setSelectedFile(dailyNotePath)
-            fetchFileContent(dailyNotePath)
-          }
         } catch (err) {
           console.error('Error creating daily note:', err)
         }
       }
+      // Fetch content first, then set selectedFile
+      const fileContent = await fetchFileContent(dailyNotePath)
+      setContent(fileContent)
+      setSelectedFile(dailyNotePath)
+      navigate(`/editor?file=${encodeURIComponent(dailyNotePath)}`)
+
+      // Auto-expand chat with welcome prompt for new notes
+      if (!hasNote) {
+        setIsChatExpanded(true)
+        setChatInitialMessage(`I just created a daily note for ${date}. What should I focus on?`)
+      }
     },
-    [fetchFileContent]
+    [fetchFileContent, navigate]
   )
 
   // Command palette commands
@@ -294,15 +350,15 @@ function App() {
         onToggleSidebar: toggleSidebar,
         onCreateDailyNote: createDailyNote,
         onOpenCommandPalette: openCommandPalette,
-        onSwitchToEditor: () => setView('editor'),
-        onSwitchToDashboard: () => setView('dashboard'),
-        onSwitchToKanban: () => setView('kanban'),
-        onSwitchToCalendar: () => setView('calendar'),
+        onSwitchToEditor: () => navigate('/editor'),
+        onSwitchToDashboard: () => navigate('/dashboard'),
+        onSwitchToKanban: () => navigate('/kanban'),
+        onSwitchToCalendar: () => navigate('/calendar'),
         onSearch: openSearch,
         onNewFromTemplate: openTemplatePicker,
         onQuickCapture: openQuickCapture,
       }),
-    [handleSave, toggleSidebar, createDailyNote, openCommandPalette, openSearch, openTemplatePicker, openQuickCapture]
+    [handleSave, toggleSidebar, createDailyNote, openCommandPalette, navigate, openSearch, openTemplatePicker, openQuickCapture]
   )
 
   // Keyboard shortcuts
@@ -363,9 +419,9 @@ function App() {
   const sidebarContent = (
     <div className="flex flex-col h-full">
       {/* Sidebar tab buttons */}
-      <div className="flex border-b">
+      <div className="flex border-b border-border/50">
         <button
-          className={`flex-1 flex items-center justify-center gap-1 px-2 py-2 text-xs font-medium transition-colors min-h-[44px] ${
+          className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 sm:py-1 text-xs font-medium transition-colors min-h-[44px] sm:min-h-0 ${
             sidebarTab === 'files'
               ? 'bg-accent text-accent-foreground border-b-2 border-primary'
               : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
@@ -377,7 +433,7 @@ function App() {
           Files
         </button>
         <button
-          className={`flex-1 flex items-center justify-center gap-1 px-2 py-2 text-xs font-medium transition-colors min-h-[44px] ${
+          className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 sm:py-1 text-xs font-medium transition-colors min-h-[44px] sm:min-h-0 ${
             sidebarTab === 'tags'
               ? 'bg-accent text-accent-foreground border-b-2 border-primary'
               : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
@@ -389,7 +445,7 @@ function App() {
           Tags
         </button>
         <button
-          className={`flex-1 flex items-center justify-center gap-1 px-2 py-2 text-xs font-medium transition-colors min-h-[44px] ${
+          className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 sm:py-1 text-xs font-medium transition-colors min-h-[44px] sm:min-h-0 ${
             sidebarTab === 'links'
               ? 'bg-accent text-accent-foreground border-b-2 border-primary'
               : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
@@ -430,10 +486,102 @@ function App() {
     </div>
   )
 
+  // Editor view element (used by both / and /editor routes)
+  const editorElement = (
+    <>
+      {/* Desktop Sidebar */}
+      {!isMobile && !isTablet && isSidebarVisible && (
+        <aside className="w-64 bg-card border-r border-border/50 flex flex-col overflow-hidden">
+          {sidebarContent}
+        </aside>
+      )}
+
+      {/* Mobile/Tablet Sidebar Drawer */}
+      {(isMobile || isTablet) && (
+        <Drawer
+          isOpen={isMobileSidebarOpen}
+          onClose={() => setIsMobileSidebarOpen(false)}
+          position="left"
+          title="Files"
+        >
+          {sidebarContent}
+        </Drawer>
+      )}
+
+      {/* Editor + Chat below */}
+      <section className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        {selectedFile ? (
+          <div className="flex-1 overflow-auto p-3 sm:p-6">
+            <MarkdownEditor
+              key={selectedFile}
+              content={content}
+              onChange={handleContentChange}
+              onAutosave={handleAutosave}
+            />
+          </div>
+        ) : (
+          <div className="flex items-center justify-center h-full text-muted-foreground p-4 text-center">
+            <p>
+              {isMobile || isTablet
+                ? 'Tap the menu to select a file'
+                : 'Select a file to start editing'}
+            </p>
+          </div>
+        )}
+
+        {/* Desktop Chat panel — below editor, collapsible */}
+        {!isMobile && !isTablet && (
+          <>
+            <button
+              onClick={() => setIsChatExpanded(prev => !prev)}
+              className="flex items-center justify-center gap-2 px-3 py-2 border-t border-border/50 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+            >
+              <MessageSquare className="h-3.5 w-3.5" />
+              <span>{isChatExpanded ? 'Hide Chat' : 'Chat'}</span>
+              {isChatExpanded
+                ? <ChevronDown className="h-3.5 w-3.5" />
+                : <ChevronUp className="h-3.5 w-3.5" />
+              }
+            </button>
+            {isChatExpanded && (
+              <div className="h-72 border-t border-border/50 flex flex-col overflow-hidden">
+                <ChatPanel
+                  apiBaseUrl={API_BASE_URL}
+                  currentFile={selectedFile}
+                  currentContent={content}
+                  onContentUpdate={handleNoteContentUpdate}
+                  initialMessage={chatInitialMessage}
+                />
+              </div>
+            )}
+          </>
+        )}
+      </section>
+
+      {/* Mobile/Tablet Chat Drawer */}
+      {(isMobile || isTablet) && (
+        <Drawer
+          isOpen={isMobileChatOpen}
+          onClose={() => setIsMobileChatOpen(false)}
+          position={isMobile ? 'bottom' : 'right'}
+          title="Chat"
+        >
+          <ChatPanel
+            apiBaseUrl={API_BASE_URL}
+            currentFile={selectedFile}
+            currentContent={content}
+            onContentUpdate={handleNoteContentUpdate}
+            initialMessage={chatInitialMessage}
+          />
+        </Drawer>
+      )}
+    </>
+  )
+
   return (
-    <div className={`min-h-screen flex flex-col ${isMobile ? 'pb-16' : ''}`}>
+    <div className={`h-screen flex flex-col overflow-hidden ${isMobile ? 'pb-16' : ''}`}>
       {/* Header */}
-      <header className="border-b px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between">
+      <header className="bg-card border-b border-border/50 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-2 sm:gap-4">
           {/* Mobile menu button */}
           {(isMobile || isTablet) && view === 'editor' && (
@@ -448,7 +596,7 @@ function App() {
             </Button>
           )}
 
-          <h1 className="text-base sm:text-lg font-semibold truncate">
+          <h1 className="text-sm sm:text-base font-semibold tracking-tight truncate">
             {isMobile ? 'UM' : 'Unstructured Minds'}
           </h1>
 
@@ -458,7 +606,7 @@ function App() {
               <Button
                 variant={view === 'editor' ? 'secondary' : 'ghost'}
                 size="sm"
-                onClick={() => setView('editor')}
+                onClick={() => navigate('/editor')}
                 className="gap-1"
               >
                 <FileText className="w-4 h-4" />
@@ -467,7 +615,7 @@ function App() {
               <Button
                 variant={view === 'dashboard' ? 'secondary' : 'ghost'}
                 size="sm"
-                onClick={() => setView('dashboard')}
+                onClick={() => navigate('/dashboard')}
                 className="gap-1"
               >
                 <LayoutDashboard className="w-4 h-4" />
@@ -476,7 +624,7 @@ function App() {
               <Button
                 variant={view === 'kanban' ? 'secondary' : 'ghost'}
                 size="sm"
-                onClick={() => setView('kanban')}
+                onClick={() => navigate('/kanban')}
                 className="gap-1"
               >
                 <Kanban className="w-4 h-4" />
@@ -485,7 +633,7 @@ function App() {
               <Button
                 variant={view === 'calendar' ? 'secondary' : 'ghost'}
                 size="sm"
-                onClick={() => setView('calendar')}
+                onClick={() => navigate('/calendar')}
                 className="gap-1"
               >
                 <Calendar className="w-4 h-4" />
@@ -523,7 +671,7 @@ function App() {
             onClick={openSearch}
             aria-label="Search notes"
             title="Search notes (Cmd+Shift+F)"
-            className="min-w-[44px] min-h-[44px] p-0 sm:p-2"
+            className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 p-0 sm:p-2"
           >
             <Search className="w-4 h-4 sm:w-4 sm:h-4" />
           </Button>
@@ -532,7 +680,7 @@ function App() {
             size="sm"
             onClick={toggleTheme}
             aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-            className="min-w-[44px] min-h-[44px] p-0 sm:p-2"
+            className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 p-0 sm:p-2"
           >
             {theme === 'dark' ? (
               <Sun className="w-4 h-4" />
@@ -544,7 +692,7 @@ function App() {
             variant="outline"
             size="sm"
             onClick={() => setIsSettingsOpen(true)}
-            className="gap-1 min-h-[44px] sm:min-h-0"
+            className="gap-1 min-h-[44px] sm:min-h-0 sm:h-8"
           >
             <Settings className="w-4 h-4" />
             <span className="hidden sm:inline">Settings</span>
@@ -554,93 +702,39 @@ function App() {
 
       {/* Main content */}
       <main className="flex-1 flex overflow-hidden">
-        {view === 'editor' ? (
-          <>
-            {/* Desktop Sidebar */}
-            {!isMobile && !isTablet && isSidebarVisible && (
-              <aside className="w-64 border-r flex flex-col">
-                {sidebarContent}
-              </aside>
-            )}
-
-            {/* Mobile/Tablet Sidebar Drawer */}
-            {(isMobile || isTablet) && (
-              <Drawer
-                isOpen={isMobileSidebarOpen}
-                onClose={() => setIsMobileSidebarOpen(false)}
-                position="left"
-                title="Files"
-              >
-                {sidebarContent}
-              </Drawer>
-            )}
-
-            {/* Editor */}
-            <section className="flex-1 overflow-auto">
-              {selectedFile ? (
-                <div className="h-full p-2 sm:p-4">
-                  <MarkdownEditor
-                    content={content}
-                    onChange={handleContentChange}
-                    onAutosave={handleAutosave}
-                  />
-                </div>
-              ) : (
-                <div className="flex items-center justify-center h-full text-muted-foreground p-4 text-center">
-                  <p>
-                    {isMobile || isTablet
-                      ? 'Tap the menu to select a file'
-                      : 'Select a file to start editing'}
-                  </p>
-                </div>
-              )}
-            </section>
-
-            {/* Desktop Chat panel */}
-            {!isMobile && !isTablet && (
-              <aside className="w-80 border-l">
-                <ChatPanel apiBaseUrl={API_BASE_URL} />
-              </aside>
-            )}
-
-            {/* Mobile/Tablet Chat Drawer */}
-            {(isMobile || isTablet) && (
-              <Drawer
-                isOpen={isMobileChatOpen}
-                onClose={() => setIsMobileChatOpen(false)}
-                position={isMobile ? 'bottom' : 'right'}
-                title="Chat"
-              >
-                <ChatPanel apiBaseUrl={API_BASE_URL} />
-              </Drawer>
-            )}
-          </>
-        ) : view === 'dashboard' ? (
-          <Suspense fallback={<ViewLoadingFallback />}>
-            <section className="flex-1 overflow-auto bg-background">
-              <Dashboard apiUrl={API_BASE_URL} />
-            </section>
-          </Suspense>
-        ) : view === 'kanban' ? (
-          <Suspense fallback={<ViewLoadingFallback />}>
-            <section className="flex-1 overflow-auto bg-background">
-              <KanbanBoard apiUrl={API_BASE_URL} />
-            </section>
-          </Suspense>
-        ) : (
-          <Suspense fallback={<ViewLoadingFallback />}>
-            <section className="flex-1 overflow-auto bg-background">
-              <CalendarView
-                apiUrl={API_BASE_URL}
-                onDaySelect={handleCalendarDaySelect}
-              />
-            </section>
-          </Suspense>
-        )}
+        <Routes>
+          <Route path="/dashboard" element={
+            <Suspense fallback={<ViewLoadingFallback />}>
+              <section className="flex-1 overflow-auto bg-background">
+                <Dashboard apiUrl={API_BASE_URL} />
+              </section>
+            </Suspense>
+          } />
+          <Route path="/kanban" element={
+            <Suspense fallback={<ViewLoadingFallback />}>
+              <section className="flex-1 overflow-auto bg-background">
+                <KanbanBoard apiUrl={API_BASE_URL} onFileSelect={handleFileSelect} />
+              </section>
+            </Suspense>
+          } />
+          <Route path="/calendar" element={
+            <Suspense fallback={<ViewLoadingFallback />}>
+              <section className="flex-1 overflow-auto bg-background">
+                <CalendarView
+                  apiUrl={API_BASE_URL}
+                  onDaySelect={handleCalendarDaySelect}
+                />
+              </section>
+            </Suspense>
+          } />
+          <Route path="/editor" element={editorElement} />
+          <Route path="/" element={editorElement} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
       </main>
 
       {/* Mobile bottom navigation */}
-      {isMobile && <MobileNav currentView={view} onViewChange={setView} />}
+      {isMobile && <MobileNav currentView={view} onViewChange={(v) => navigate(v === 'editor' ? '/editor' : `/${v}`)} />}
 
       {/* Command Palette */}
       <CommandPalette

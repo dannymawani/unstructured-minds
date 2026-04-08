@@ -348,7 +348,13 @@ class ExtractionPipeline:
         tasks: list[dict[str, Any]],
         source_file: str,
     ) -> int:
-        """Store tasks in database.
+        """Store tasks in database, respecting previously completed tasks.
+
+        On re-extraction:
+        1. Load existing tasks for this source_file
+        2. Skip any task whose description already exists (regardless of status)
+        3. Remove stale backlog tasks from this file that are no longer in the note
+        4. Insert genuinely new tasks
 
         Args:
             date: Date string
@@ -361,10 +367,44 @@ class ExtractionPipeline:
         if not tasks:
             return 0
 
+        # Map extraction statuses to API-standard values
+        STATUS_MAP = {
+            "todo": "backlog",
+            "done": "done",
+            "in_progress": "in_progress",
+            "cancelled": "cancelled",
+        }
+
+        # Load all existing tasks for this source file
+        existing_rows = self.db.execute(
+            "SELECT id, description, status FROM tasks WHERE source_file = ?",
+            [source_file],
+        ).fetchall()
+        existing_by_desc: dict[str, tuple[str, str]] = {
+            row[1]: (row[0], row[2]) for row in existing_rows  # desc -> (id, status)
+        }
+
+        # Collect descriptions from current extraction
+        new_descriptions = {task.get("description", "") for task in tasks}
+
+        # Remove stale backlog tasks that are no longer in the note
+        # (keep done/cancelled/in_progress — those were acted on by the user)
+        for desc, (task_id, status) in existing_by_desc.items():
+            if desc not in new_descriptions and status == "backlog":
+                self.db.execute("DELETE FROM tasks WHERE id = ?", [task_id])
+
         records = 0
         for task in tasks:
+            description = task.get("description", "")
+
+            # Skip if this task already exists for this source file
+            if description in existing_by_desc:
+                continue
+
             task_id = self._generate_id()
-            completed_at = datetime.now() if task.get("status") == "done" else None
+            raw_status = task.get("status", "todo")
+            status = STATUS_MAP.get(raw_status, raw_status)
+            completed_at = datetime.now() if status in ("done", "cancelled") else None
 
             self.db.execute(
                 """
@@ -375,8 +415,8 @@ class ExtractionPipeline:
                 [
                     task_id,
                     date,
-                    task.get("description", ""),
-                    task.get("status", "todo"),
+                    description,
+                    status,
                     completed_at,
                     task.get("category"),
                     task.get("priority"),

@@ -37,7 +37,7 @@ export function DashboardSummary({ apiUrl = 'http://localhost:8000' }: Dashboard
     return (
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4" data-testid="summary-loading">
         {[...Array(4)].map((_, i) => (
-          <div key={i} className="bg-card border rounded-lg p-3 sm:p-4 animate-pulse h-20 sm:h-24" />
+          <div key={i} className="bg-card rounded-md shadow-sm p-3 sm:p-4 animate-pulse h-20 sm:h-24" />
         ))}
       </div>
     );
@@ -83,7 +83,7 @@ export function DashboardSummary({ apiUrl = 'http://localhost:8000' }: Dashboard
       {cards.map((card) => (
         <div
           key={card.label}
-          className="bg-card border rounded-lg p-3 sm:p-4 flex flex-col"
+          className="bg-card rounded-md shadow-sm p-3 sm:p-4 flex flex-col"
         >
           <div className="flex items-center gap-2 text-muted-foreground text-xs sm:text-sm mb-1 sm:mb-2">
             <card.icon className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${card.color}`} />
