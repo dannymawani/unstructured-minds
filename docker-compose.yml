@@ -53,6 +53,8 @@ services:
       - ${VAULT_PATH:-./vault}:/app/vault:rw
       # Mount data directory for DuckDB and CSVs
       - ${DATA_PATH:-./data}:/app/data:rw
+      # Uncomment for hot reload (DEBUG=true auto-enables --reload)
+      # - ./backend/src:/app/src:ro
     environment:
       # AI (optional — app works without it)
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}

@@ -24,11 +24,11 @@ up-postgres: ## Start with bundled Postgres
 down: ## Stop all services
 	docker compose --profile postgres down
 
-dev: ## Start dev mode with hot reload
-	docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+dev: ## Start with DEBUG=true (backend hot reload)
+	DEBUG=true docker compose up --build
 
-dev-postgres: ## Start dev mode with Postgres
-	docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile postgres up
+dev-postgres: ## Start with DEBUG + Postgres
+	DEBUG=true docker compose --profile postgres up --build
 
 logs: ## Tail logs from all services
 	docker compose logs -f

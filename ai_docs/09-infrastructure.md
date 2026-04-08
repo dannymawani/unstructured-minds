@@ -33,11 +33,11 @@ services:
     networks: [app-network]
 ```
 
-### Development (`docker-compose.dev.yml`)
+### Development Mode
 
-- Frontend: Vite dev server on port 5173 with hot reload
-- Backend: FastAPI with `--reload` flag on port 8000
-- Volumes: Live code reload
+Single compose file. Set `DEBUG=true` for backend hot reload (`uvicorn --reload`).
+Uncomment `./backend/src:/app/src:ro` volume mount for live code changes.
+Frontend always builds to nginx (no separate Vite dev server needed).
 
 ### Nginx (Production Frontend)
 

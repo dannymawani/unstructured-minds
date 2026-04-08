@@ -137,6 +137,16 @@ docker compose --profile postgres up -d
 | `basic` | `AUTH_MODE=basic` + username/password in `.env` | Simple password protection |
 | `clerk` | `AUTH_MODE=clerk` + Clerk keys | Multi-user SaaS deployment |
 
+## Remote Access (Tailscale)
+
+Access from your phone, tablet, or anywhere — encrypted, no port forwarding needed.
+
+1. Install [Tailscale](https://tailscale.com/) on your server + devices
+2. Add your Tailscale hostname to `CORS_ORIGINS` in `.env`
+3. Open `http://your-hostname:3000` from any device on your tailnet
+
+See [`docs/LAN_ACCESS.md`](./docs/LAN_ACCESS.md) for full setup including LAN-only access.
+
 ## Documentation
 
 | Document | Description |
