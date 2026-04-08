@@ -1,0 +1,12 @@
+export { Dashboard } from './Dashboard';
+export { WeeklyActivityChart } from './WeeklyActivityChart';
+export { MetricsTrends } from './MetricsTrends';
+export { ExerciseProgress } from './ExerciseProgress';
+export { DashboardSummary } from './DashboardSummary';
+export { ActivityHeatmap } from './ActivityHeatmap';
+export { SleepTrends } from './SleepTrends';
+export { MoodCorrelation } from './MoodCorrelation';
+export { DateRangeSelector } from './DateRangeSelector';
+export { InsightsCard } from './InsightsCard';
+export { WidgetConfigPanel, useWidgetConfig, AVAILABLE_WIDGETS } from './WidgetConfig';
+export type { WidgetConfig, WidgetDefinition } from './WidgetConfig';
