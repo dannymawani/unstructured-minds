@@ -1,6 +1,5 @@
 """Skill registry for managing available skills."""
 
-from typing import Optional
 
 from .base import Skill, SkillContext, SkillResult
 from .daily import DailyNoteSkill
@@ -20,7 +19,7 @@ class SkillRegistry:
         """
         self._skills[skill.name] = skill
 
-    def get(self, name: str) -> Optional[Skill]:
+    def get(self, name: str) -> Skill | None:
         """Get a skill by name.
 
         Args:
@@ -61,7 +60,7 @@ class SkillRegistry:
         return await skill.execute(context)
 
 
-_default_registry: Optional[SkillRegistry] = None
+_default_registry: SkillRegistry | None = None
 
 
 def get_default_registry() -> SkillRegistry:

@@ -82,7 +82,7 @@ def validate_file_path(
     # Check for dangerous patterns
     for pattern in PATH_TRAVERSAL_PATTERNS:
         if re.search(pattern, path, re.IGNORECASE):
-            raise PathValidationError(f"Invalid path: contains prohibited pattern")
+            raise PathValidationError("Invalid path: contains prohibited pattern")
 
     # Normalize the path
     try:

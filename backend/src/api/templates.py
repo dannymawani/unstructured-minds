@@ -2,14 +2,12 @@
 
 import re
 from datetime import datetime
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from ..storage import StorageBackend
 from .dependencies import get_storage as _dep_get_storage
-
 
 router = APIRouter()
 
@@ -42,7 +40,7 @@ class CreateFromTemplateRequest(BaseModel):
 
     template_name: str
     title: str
-    folder: Optional[str] = None  # Optional folder path for the new note
+    folder: str | None = None  # Optional folder path for the new note
 
 
 class CreateFromTemplateResponse(BaseModel):

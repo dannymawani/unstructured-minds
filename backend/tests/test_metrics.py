@@ -1,11 +1,10 @@
 """Tests for request metrics."""
 
-import pytest
 
 from src.middleware.request_logging import (
     RequestMetrics,
-    get_metrics,
     _normalize_path,
+    get_metrics,
 )
 
 

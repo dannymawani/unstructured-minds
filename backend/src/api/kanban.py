@@ -1,14 +1,14 @@
 """Kanban API endpoints backed by DuckDB kanban_tasks table."""
 
 from datetime import date, datetime
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from ..db import DatabaseManager
 from ..db.sql_compat import get_dialect, placeholder, user_filter
-from .dependencies import get_db as _dep_get_db, get_user_id
+from .dependencies import get_db as _dep_get_db
+from .dependencies import get_user_id
 
 router = APIRouter(prefix="/kanban", tags=["kanban"])
 
@@ -21,15 +21,15 @@ router = APIRouter(prefix="/kanban", tags=["kanban"])
 class KanbanTask(BaseModel):
     id: str
     title: str
-    phase: Optional[str] = None
-    priority: Optional[str] = None
+    phase: str | None = None
+    priority: str | None = None
     status: str
-    branch: Optional[str] = None
-    depends_on: Optional[str] = None
-    description: Optional[str] = None
-    content: Optional[str] = None
-    deadline: Optional[date] = None
-    completed_at: Optional[str] = None
+    branch: str | None = None
+    depends_on: str | None = None
+    description: str | None = None
+    content: str | None = None
+    deadline: date | None = None
+    completed_at: str | None = None
 
 
 class KanbanColumn(BaseModel):
@@ -44,25 +44,25 @@ class KanbanBoard(BaseModel):
 
 class KanbanTaskCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
-    phase: Optional[str] = None
-    priority: Optional[str] = None
-    branch: Optional[str] = None
-    depends_on: Optional[str] = None
-    description: Optional[str] = None
-    content: Optional[str] = None
-    deadline: Optional[date] = Field(None, description="Deadline date (YYYY-MM-DD)")
+    phase: str | None = None
+    priority: str | None = None
+    branch: str | None = None
+    depends_on: str | None = None
+    description: str | None = None
+    content: str | None = None
+    deadline: date | None = Field(None, description="Deadline date (YYYY-MM-DD)")
 
 
 class KanbanTaskUpdate(BaseModel):
-    title: Optional[str] = Field(None, min_length=1, max_length=200)
-    phase: Optional[str] = None
-    priority: Optional[str] = None
-    status: Optional[str] = Field(None, pattern=r"^(not_started|in_progress|done)$")
-    branch: Optional[str] = None
-    depends_on: Optional[str] = None
-    description: Optional[str] = None
-    content: Optional[str] = None
-    deadline: Optional[date] = Field(None, description="Deadline date (YYYY-MM-DD)")
+    title: str | None = Field(None, min_length=1, max_length=200)
+    phase: str | None = None
+    priority: str | None = None
+    status: str | None = Field(None, pattern=r"^(not_started|in_progress|done)$")
+    branch: str | None = None
+    depends_on: str | None = None
+    description: str | None = None
+    content: str | None = None
+    deadline: date | None = Field(None, description="Deadline date (YYYY-MM-DD)")
 
 
 class TaskNote(BaseModel):
@@ -115,7 +115,7 @@ def _row_to_task(row: tuple, columns: list[str]) -> KanbanTask:
 
 @router.get("/board", response_model=KanbanBoard)
 async def get_kanban_board(
-    phase: Optional[str] = Query(None, description="Filter by phase"),
+    phase: str | None = Query(None, description="Filter by phase"),
     db: DatabaseManager = Depends(get_db),
     user_id: str = Depends(get_user_id),
 ) -> KanbanBoard:
@@ -364,7 +364,6 @@ async def add_task_update(
         raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
 
     if dialect == "postgres":
-        cols = ["task_id", "note", "user_id"]
         vals = [task_id, request.note, user_id]
         result = db.execute(
             "INSERT INTO kanban_task_updates (task_id, note, user_id) VALUES (%s, %s, %s) RETURNING id, task_id, note, created_at",

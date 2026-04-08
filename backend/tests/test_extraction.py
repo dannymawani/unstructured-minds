@@ -6,13 +6,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from src.extraction import EXTRACTION_SCHEMAS, get_schema, ExtractionPipeline, ExtractionResult
+from src.extraction import EXTRACTION_SCHEMAS, ExtractionPipeline, get_schema
 
 
 @pytest.fixture
 def test_settings(tmp_path: Path):
     """Create test settings with temp paths."""
-    with patch("src.config.Settings") as mock_settings_cls:
+    with patch("src.config.Settings"):
         mock_settings = MagicMock()
         mock_settings.vault_path = tmp_path / "vault"
         mock_settings.data_path = tmp_path / "data"
@@ -248,8 +248,8 @@ class TestExtractionAPI:
 
     def test_extract_requires_claude(self, test_settings):
         """Test extraction requires Claude configuration."""
-        from src.main import app
         from src.api.extraction import get_claude
+        from src.main import app
 
         # Override Claude dependency to return unconfigured client
         unconfigured = MagicMock()
@@ -298,7 +298,7 @@ class TestStripSuggestions:
 - **Focus**: Upper Body
 
 > **Suggested Workout (from 2026-02-10)** — edit below to log
-> 
+>
 > | Exercise | Last | Suggested | Reps | Sets |
 > |----------|------|-----------|------|------|
 > | Squat | 100kg | 102.5kg | 5 | 3 |
@@ -308,7 +308,7 @@ class TestStripSuggestions:
 - Deadlift: 120kg x 3 x 3"""
 
         result = pipeline._strip_suggestions(content)
-        
+
         assert "| Squat |" not in result
         assert "Suggested Workout" not in result
         assert "Bench Press" in result
@@ -318,7 +318,7 @@ class TestStripSuggestions:
         """Test stripping old-format 'Last session' blockquote tables."""
         pipeline = ExtractionPipeline(mock_db)
         content = """> **Last session (2026-02-08)** — edit below
-> 
+>
 > | Exercise | Last | Suggested | Reps | Sets |
 > |----------|------|-----------|------|------|
 > | Row | 60kg | 62.5kg | 8 | 3 |
@@ -327,7 +327,7 @@ class TestStripSuggestions:
 - Pull-ups: BW x 10 x 3"""
 
         result = pipeline._strip_suggestions(content)
-        
+
         assert "| Row |" not in result
         assert "Last session" not in result
         assert "Pull-ups" in result
@@ -342,7 +342,7 @@ class TestStripSuggestions:
 - Something important"""
 
         result = pipeline._strip_suggestions(content)
-        
+
         assert "regular blockquote" in result
         assert "Just some text here" in result
         assert "Something important" in result
@@ -351,7 +351,7 @@ class TestStripSuggestions:
         """Test stripping AI-generated 'Suggested Workout' header variant."""
         pipeline = ExtractionPipeline(mock_db)
         content = """> **Suggested Workout**
-> 
+>
 > | Exercise | Weight | Reps | Sets |
 > |----------|--------|------|------|
 > | Turkish Get-Up | 16kg | 3 | 3 |
@@ -360,7 +360,7 @@ Actual exercises:
 - Leg Curl 40kg 3x12"""
 
         result = pipeline._strip_suggestions(content)
-        
+
         assert "Turkish Get-Up" not in result
         assert "Suggested Workout" not in result
         assert "Leg Curl" in result
@@ -373,7 +373,7 @@ Actual exercises:
 - Bench: 80kg x 5 x 3"""
 
         result = pipeline._strip_suggestions(content)
-        
+
         assert result == content
 
     def test_handles_multiple_blockquote_blocks(self, mock_db):
@@ -383,7 +383,7 @@ Actual exercises:
 > Just notes
 
 > **Suggested Workout**
-> 
+>
 > | Exercise | Reps |
 > |----------|------|
 > | Squat | 5 |
@@ -395,7 +395,7 @@ Actual exercises:
 - Deadlift: 120kg"""
 
         result = pipeline._strip_suggestions(content)
-        
+
         # Regular blockquotes should stay
         assert "Regular blockquote" in result
         assert "Another blockquote" in result
@@ -407,7 +407,7 @@ Actual exercises:
     def test_empty_content(self, mock_db):
         """Test handling of empty content."""
         pipeline = ExtractionPipeline(mock_db)
-        
+
         result = pipeline._strip_suggestions("")
         assert result == ""
 
@@ -422,5 +422,5 @@ Actual exercises:
 > | Squat | 5 |"""
 
         result = pipeline._strip_suggestions(content)
-        
+
         assert "| Squat |" not in result

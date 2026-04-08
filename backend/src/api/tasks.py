@@ -3,15 +3,16 @@
 import re
 import uuid
 from datetime import date, datetime, timedelta
-from typing import Optional
 
-from fastapi import APIRouter, Depends, Request, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from ..db import DatabaseManager
 from ..db.sql_compat import get_dialect, placeholder, user_filter
 from ..storage import StorageBackend
-from .dependencies import get_db as _dep_get_db, get_storage as _dep_get_storage, get_user_id
+from .dependencies import get_db as _dep_get_db
+from .dependencies import get_storage as _dep_get_storage
+from .dependencies import get_user_id
 from .settings import resolve_daily_note_path
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
@@ -26,13 +27,13 @@ class TaskOut(BaseModel):
     id: str
     date: str
     description: str
-    status: Optional[str] = None
-    completed_at: Optional[str] = None
-    category: Optional[str] = None
-    priority: Optional[int] = None
-    source_file: Optional[str] = None
-    deadline: Optional[str] = None
-    notes: Optional[str] = None
+    status: str | None = None
+    completed_at: str | None = None
+    category: str | None = None
+    priority: int | None = None
+    source_file: str | None = None
+    deadline: str | None = None
+    notes: str | None = None
 
 
 class TaskListResponse(BaseModel):
@@ -41,20 +42,20 @@ class TaskListResponse(BaseModel):
 
 
 class TaskUpdateRequest(BaseModel):
-    status: Optional[str] = Field(None, pattern=r"^(backlog|in_progress|done|cancelled)$")
-    description: Optional[str] = Field(None, min_length=1, max_length=500)
-    category: Optional[str] = None
-    priority: Optional[int] = Field(None, ge=1, le=3)
-    deadline: Optional[date] = None
-    notes: Optional[str] = Field(None, max_length=5000)
+    status: str | None = Field(None, pattern=r"^(backlog|in_progress|done|cancelled)$")
+    description: str | None = Field(None, min_length=1, max_length=500)
+    category: str | None = None
+    priority: int | None = Field(None, ge=1, le=3)
+    deadline: date | None = None
+    notes: str | None = Field(None, max_length=5000)
 
 
 class TaskCreateRequest(BaseModel):
     description: str = Field(..., min_length=1, max_length=500)
-    category: Optional[str] = None
-    priority: Optional[int] = Field(None, ge=1, le=3)
-    deadline: Optional[date] = None
-    notes: Optional[str] = Field(None, max_length=5000)
+    category: str | None = None
+    priority: int | None = Field(None, ge=1, le=3)
+    deadline: date | None = None
+    notes: str | None = Field(None, max_length=5000)
 
 
 class BulkCompleteRequest(BaseModel):
@@ -79,10 +80,10 @@ class RolloverTaskOut(BaseModel):
     date: str
     description: str
     status: str
-    category: Optional[str] = None
-    priority: Optional[int] = None
-    deadline: Optional[str] = None
-    deadline_status: Optional[str] = None  # "overdue" | "due_today" | "upcoming" | None
+    category: str | None = None
+    priority: int | None = None
+    deadline: str | None = None
+    deadline_status: str | None = None  # "overdue" | "due_today" | "upcoming" | None
     auto_select: bool = False  # True for in_progress + overdue/due_today
 
 
@@ -188,10 +189,10 @@ async def _sync_description_to_markdown(
 
 @router.get("", response_model=TaskListResponse)
 async def list_tasks(
-    status: Optional[str] = Query(None, description="Filter by status"),
-    category: Optional[str] = Query(None, description="Filter by category"),
-    date_from: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
-    date_to: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
+    status: str | None = Query(None, description="Filter by status"),
+    category: str | None = Query(None, description="Filter by category"),
+    date_from: str | None = Query(None, description="Start date (YYYY-MM-DD)"),
+    date_to: str | None = Query(None, description="End date (YYYY-MM-DD)"),
     hide_old: bool = Query(True, description="Hide done/cancelled tasks older than 7 days"),
     done_limit: int = Query(10, ge=0, le=100, description="Max done/cancelled tasks to return"),
     limit: int = Query(100, ge=1, le=500),
@@ -211,7 +212,7 @@ async def list_tasks(
     # so we can cap done tasks at done_limit.
     if not status:
         # Active tasks (backlog, in_progress) — no cap
-        active_conds: list[str] = [f"status IN ('backlog', 'in_progress')"]
+        active_conds: list[str] = ["status IN ('backlog', 'in_progress')"]
         active_params: list = []
         user_filter(dialect, user_id, active_conds, active_params)
         if category:
@@ -233,7 +234,7 @@ async def list_tasks(
         active_rows = active_result.fetchall()
 
         # Done/cancelled tasks — capped and filtered by age
-        done_conds: list[str] = [f"status IN ('done', 'cancelled')"]
+        done_conds: list[str] = ["status IN ('done', 'cancelled')"]
         done_params: list = []
         user_filter(dialect, user_id, done_conds, done_params)
         if hide_old:
@@ -322,7 +323,7 @@ async def get_rollover_tasks(
     window_start = (target - timedelta(days=14)).isoformat()
 
     conditions: list[str] = [
-        f"status IN ('backlog', 'in_progress')",
+        "status IN ('backlog', 'in_progress')",
         f"date >= {ph}",
         f"date < {ph}",
     ]

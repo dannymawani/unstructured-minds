@@ -1,8 +1,7 @@
 """Postgres connection management via psycopg3 connection pool."""
 
-import re
+from collections.abc import Callable
 from contextlib import contextmanager
-from typing import Callable, Optional
 
 import psycopg
 from psycopg.rows import tuple_row
@@ -23,7 +22,7 @@ class _PgResult:
     def fetchall(self) -> list[tuple]:
         return self._cursor.fetchall()
 
-    def fetchone(self) -> Optional[tuple]:
+    def fetchone(self) -> tuple | None:
         return self._cursor.fetchone()
 
 
@@ -60,10 +59,10 @@ class PostgresManager:
         connection_string: str,
         pool_min: int = 2,
         pool_max: int = 10,
-        token_callback: Optional[Callable[[], str]] = None,
+        token_callback: Callable[[], str] | None = None,
     ) -> None:
         self._conninfo = connection_string
-        self._pool: Optional[ConnectionPool | NullConnectionPool] = None
+        self._pool: ConnectionPool | NullConnectionPool | None = None
         self._pool_min = pool_min
         self._pool_max = pool_max
         self._token_callback = token_callback
@@ -125,7 +124,7 @@ class PostgresManager:
             with conn.cursor() as cur:
                 yield cur
 
-    def execute(self, query: str, params: Optional[list] = None) -> _PgResult:
+    def execute(self, query: str, params: list | None = None) -> _PgResult:
         """Execute a query and return a result wrapper.
 
         Auto-converts ? placeholders to %s for Postgres.

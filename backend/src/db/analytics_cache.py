@@ -5,7 +5,6 @@ and refreshed periodically in the background.
 """
 
 import asyncio
-from typing import Optional
 
 from ..logging_config import get_logger
 from .connection import DatabaseManager
@@ -154,8 +153,8 @@ class AnalyticsCacheManager:
     def __init__(self, pg, duckdb: DatabaseManager) -> None:
         self._pg = pg
         self._duckdb = duckdb
-        self._user_id: Optional[str] = None
-        self._refresh_task: Optional[asyncio.Task] = None
+        self._user_id: str | None = None
+        self._refresh_task: asyncio.Task | None = None
 
     def init_cache_schema(self) -> None:
         """Create DuckDB tables for the analytics cache."""

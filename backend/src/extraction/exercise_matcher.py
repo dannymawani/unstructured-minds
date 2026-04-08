@@ -196,7 +196,7 @@ class ExerciseMatcher:
                 data = json.load(f)
             self._ai_cache = {k.lower(): v for k, v in data.items()}
             logger.info("ai_cache_loaded", count=len(self._ai_cache), path=str(path))
-        except (json.JSONDecodeError, IOError) as e:
+        except (OSError, json.JSONDecodeError) as e:
             logger.warning("ai_cache_load_failed", error=str(e))
 
     def update_ai_cache(self, mappings: dict[str, str], path: Path) -> None:
@@ -221,7 +221,7 @@ class ExerciseMatcher:
                 tmp_path = Path(tmp.name)
             tmp_path.rename(path)
             logger.info("ai_cache_updated", count=len(cache_to_write), path=str(path))
-        except IOError as e:
+        except OSError as e:
             logger.warning("ai_cache_write_failed", error=str(e))
 
     def load_ai_cache_from_settings(self, settings_store) -> None:

@@ -1,9 +1,8 @@
 """Tests for DuckDB database layer."""
 
-import pytest
 from pathlib import Path
 
-from src.db import DatabaseManager, init_database, get_table_names
+from src.db import DatabaseManager, get_table_names, init_database
 
 
 class TestSchema:

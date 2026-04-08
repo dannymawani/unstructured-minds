@@ -2,7 +2,7 @@
 
 import json
 import re
-from typing import Any, Optional
+from typing import Any
 
 import duckdb
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -11,10 +11,9 @@ from pydantic import BaseModel, Field
 from ..claude import ClaudeClient
 from ..db import DatabaseManager
 from ..middleware import limiter
-from .dependencies import get_analytics_db
 from ..middleware.rate_limit import RATE_LIMIT_CLAUDE_API
 from ..middleware.validation import MAX_QUERY_LENGTH
-
+from .dependencies import get_analytics_db
 
 router = APIRouter()
 
@@ -107,11 +106,11 @@ class QueryResponse(BaseModel):
     """Response from natural language query."""
 
     answer: str
-    sql: Optional[str] = None
-    data: Optional[list[dict[str, Any]]] = None
-    columns: Optional[list[str]] = None
+    sql: str | None = None
+    data: list[dict[str, Any]] | None = None
+    columns: list[str] | None = None
     row_count: int = 0
-    error: Optional[str] = None
+    error: str | None = None
 
 
 def get_db(request: Request):

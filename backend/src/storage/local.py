@@ -1,8 +1,9 @@
 """Local filesystem storage backend."""
 
+from pathlib import Path
+
 import aiofiles
 import aiofiles.os
-from pathlib import Path
 
 
 class LocalFilesystem:

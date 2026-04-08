@@ -1,8 +1,9 @@
 """Tests for LLM client (provider-agnostic via LiteLLM)."""
 
-import pytest
-from unittest.mock import MagicMock, patch, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import litellm
+import pytest
 
 from src.llm.client import LLMClient
 
