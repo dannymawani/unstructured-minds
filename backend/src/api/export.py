@@ -11,15 +11,15 @@ from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from ..config import settings
+from ..config import settings  # noqa: F401 — patched in tests
 from ..db import DatabaseManager, get_table_names
 from ..db.sql_compat import get_dialect
-from .dependencies import get_db as _dep_get_db, get_storage as _dep_get_storage
-from ..middleware import limiter, validate_file_size, FileSizeError
+from ..middleware import FileSizeError, limiter, validate_file_size
 from ..middleware.rate_limit import RATE_LIMIT_IMPORT
 from ..middleware.validation import MAX_FILE_SIZE_BYTES, sanitize_sql_identifier
 from ..storage import StorageBackend
-
+from .dependencies import get_db as _dep_get_db
+from .dependencies import get_storage as _dep_get_storage
 
 router = APIRouter(prefix="/export", tags=["export"])
 
@@ -210,7 +210,7 @@ async def export_data(
                     data = _export_table_to_json(db, table_name)
                     content = json.dumps(data, indent=2, default=str)
                     zf.writestr(f"{table_name}.json", content)
-            except Exception as e:
+            except Exception:
                 # Skip tables that fail to export
                 continue
 

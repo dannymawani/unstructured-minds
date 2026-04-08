@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
 from ..storage import StorageBackend
 
@@ -12,8 +12,8 @@ class SkillContext:
     """Context for skill execution."""
 
     storage: StorageBackend
-    current_date: Optional[str] = None  # YYYY-MM-DD format
-    user_input: Optional[str] = None
+    current_date: str | None = None  # YYYY-MM-DD format
+    user_input: str | None = None
 
 
 @dataclass
@@ -22,8 +22,8 @@ class SkillResult:
 
     success: bool
     message: str
-    data: Optional[dict[str, Any]] = None
-    file_path: Optional[str] = None
+    data: dict[str, Any] | None = None
+    file_path: str | None = None
 
 
 class Skill(ABC):

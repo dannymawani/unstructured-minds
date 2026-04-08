@@ -1,9 +1,8 @@
 """Insights API endpoints - AI-powered suggestions based on user data."""
 
 from datetime import date, timedelta
-from typing import Optional
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 
 from ..claude import ClaudeClient
@@ -24,7 +23,7 @@ class Insight(BaseModel):
     title: str
     message: str
     priority: int  # 1=high, 2=medium, 3=low
-    data_source: Optional[str] = None
+    data_source: str | None = None
 
 
 class DailyInsightsResponse(BaseModel):

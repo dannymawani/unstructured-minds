@@ -54,14 +54,8 @@ frontend/build/
 .env.local
 .env.*.local
 
-# Data — personal data files (keep schemas and exercise defs only)
-data/*.duckdb
-data/*.duckdb.wal
-data/*.csv
-data/*.json
-data/neon-export/
-!data/schemas/
-!data/exercise_definitions.json
+# Data — runtime data (schemas and exercise defs live in shared/)
+data/
 !data/.gitkeep
 
 # Backend runtime data

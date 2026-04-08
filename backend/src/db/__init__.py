@@ -1,10 +1,10 @@
 """Database Layer — DuckDB + Postgres."""
 
 from .connection import DatabaseManager
-from .schema import init_database, get_table_names
 from .postgres import PostgresManager
 from .postgres_schema import init_postgres_schema
-from .sql_compat import upsert, get_dialect
+from .schema import get_table_names, init_database
+from .sql_compat import get_dialect, upsert
 
 __all__ = [
     "DatabaseManager",

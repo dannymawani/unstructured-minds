@@ -1,21 +1,17 @@
 """Settings API endpoints."""
 
 import json
-from typing import Optional
-
-from fastapi import APIRouter, Depends, Request
-from pydantic import BaseModel
-
 from datetime import datetime as dt
 
-from fastapi import HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel
 
 from ..config import settings
 from ..db.sql_compat import get_dialect
 from ..db.user_settings import UserSettingsStore
 from ..storage.datastore import DataStore
-from .dependencies import get_user_id, get_datastore as _dep_get_datastore
-
+from .dependencies import get_datastore as _dep_get_datastore
+from .dependencies import get_user_id
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -38,7 +34,7 @@ def _load_settings_sync() -> dict:
         try:
             with open(SETTINGS_FILE) as f:
                 return json.load(f)
-        except (json.JSONDecodeError, IOError):
+        except (OSError, json.JSONDecodeError):
             pass
     return {"theme": "dark"}
 
@@ -49,7 +45,7 @@ def get_daily_note_template() -> str:
     return stored.get("daily_note_path_template", DEFAULT_DAILY_NOTE_TEMPLATE)
 
 
-def resolve_daily_note_path(date_str: str, template: Optional[str] = None) -> str:
+def resolve_daily_note_path(date_str: str, template: str | None = None) -> str:
     """Resolve a daily note path template for a given date.
 
     Args:
@@ -122,9 +118,9 @@ class SettingsResponse(BaseModel):
 class SettingsUpdateRequest(BaseModel):
     """Request to update settings."""
 
-    theme: Optional[str] = None
-    daily_note_path_template: Optional[str] = None
-    show_month_names: Optional[bool] = None
+    theme: str | None = None
+    daily_note_path_template: str | None = None
+    show_month_names: bool | None = None
 
 
 class ThemeResponse(BaseModel):

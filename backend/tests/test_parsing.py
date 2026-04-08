@@ -1,14 +1,11 @@
 """Tests for parsing utilities (tags and wiki-links)."""
 
-import pytest
 
 from src.parsing import (
     extract_tags,
     extract_wiki_links,
-    parse_markdown_for_links,
     normalize_link_target,
-    TAG_PATTERN,
-    WIKI_LINK_PATTERN,
+    parse_markdown_for_links,
 )
 
 

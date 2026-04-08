@@ -1,15 +1,15 @@
 """Tests for the templates API."""
 
-import pytest
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock
 
+import pytest
 from fastapi.testclient import TestClient
 
 from src.api.templates import (
-    substitute_variables,
     extract_template_description,
     router,
+    substitute_variables,
 )
 
 

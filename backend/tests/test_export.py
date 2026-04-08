@@ -1,7 +1,6 @@
 """Tests for Export and Import API endpoints."""
 
 import io
-import json
 import zipfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -9,13 +8,11 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from src.config import LOCAL_USER_ID
-
 
 @pytest.fixture
 def test_settings(tmp_path: Path):
     """Create test settings with temp paths."""
-    with patch("src.config.Settings") as mock_settings_cls:
+    with patch("src.config.Settings"):
         mock_settings = MagicMock()
         mock_settings.vault_path = tmp_path / "vault"
         mock_settings.data_path = tmp_path / "data"

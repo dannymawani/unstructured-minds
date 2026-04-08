@@ -115,7 +115,7 @@ See `.env.example` for the full list. Key ones:
 |----------|---------|-------------|
 | `LLM_PROVIDER` | auto-detected | `anthropic`, `openai`, `ollama` |
 | `LLM_API_KEY` | — | API key for your provider |
-| `USE_CLOUD` | `false` | Use Postgres instead of DuckDB |
+| `STORAGE_MODE` | `local` | `local` (DuckDB) or `postgres` |
 | `AUTH_MODE` | `none` | `none`, `basic`, `clerk` |
 | `DEBUG` | `false` | Enable debug logging + hot reload |
 

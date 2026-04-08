@@ -4,8 +4,8 @@
 
 Unstructured Minds has two modes with clean auth boundaries:
 
-- **Local mode** (`USE_CLOUD=false`): DuckDB + filesystem, zero auth, single implicit user (`LOCAL_USER_ID = "local"`)
-- **Cloud mode** (`USE_CLOUD=true` + `DATABASE_URL`): Postgres + Clerk auth, user identity always from JWT
+- **Local mode** (`STORAGE_MODE=local`): DuckDB + filesystem, zero auth, single implicit user (`LOCAL_USER_ID = "local"`)
+- **Postgres mode** (`STORAGE_MODE=postgres` + `DATABASE_URL`): Postgres + optional auth (none/basic/clerk)
 
 There is no `DEFAULT_USER_ID` — in cloud mode identity comes from Clerk; in local mode there's one hardcoded user.
 
@@ -87,8 +87,8 @@ All database queries are scoped by `user_id` in cloud mode.
 
 | Mode | Auth | User ID Source |
 |------|------|---------------|
-| Local (`USE_CLOUD=false`) | Disabled | `LOCAL_USER_ID = "local"` (hardcoded) |
-| Cloud (`USE_CLOUD=true` + `DATABASE_URL`) | Always enabled | `uuid5(NAMESPACE_URL, clerk_sub)` from JWT |
+| Local (`STORAGE_MODE=local`) | Disabled | `LOCAL_USER_ID = "local"` (hardcoded) |
+| Postgres (`STORAGE_MODE=postgres` + `DATABASE_URL`) | Configurable (none/basic/clerk) | `uuid5(NAMESPACE_URL, clerk_sub)` from JWT or `LOCAL_USER_ID` |
 
 If cloud mode is active but Clerk credentials are missing, the first API request returns HTTP 500 with a clear error message.
 

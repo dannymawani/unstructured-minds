@@ -1,16 +1,15 @@
 """Schema management API endpoints."""
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
 
-logger = logging.getLogger(__name__)
-
 from ..extraction.schemas import EXTRACTION_SCHEMAS
 from ..storage.datastore import DataStore
 
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/schemas", tags=["schemas"])
 
@@ -36,12 +35,12 @@ class SchemaField(BaseModel):
         description="Field type: string, integer, number, boolean, array",
     )
     required: bool = Field(default=False, description="Whether the field is required")
-    description: Optional[str] = Field(
+    description: str | None = Field(
         None, max_length=500, description="Field description"
     )
-    min: Optional[float] = Field(None, description="Minimum value (for numbers)")
-    max: Optional[float] = Field(None, description="Maximum value (for numbers)")
-    enum: Optional[list[str]] = Field(
+    min: float | None = Field(None, description="Minimum value (for numbers)")
+    max: float | None = Field(None, description="Maximum value (for numbers)")
+    enum: list[str] | None = Field(
         None, description="Allowed values (for string enums)"
     )
 
@@ -78,7 +77,7 @@ class SchemaDefinition(BaseModel):
     fields: list[SchemaField] = Field(
         ..., min_length=1, max_length=50, description="List of fields to extract"
     )
-    extraction_hints: Optional[str] = Field(
+    extraction_hints: str | None = Field(
         None,
         max_length=1000,
         description="Hints for the AI on how to extract data",
@@ -122,7 +121,7 @@ class SchemaResponse(BaseModel):
     description: str
     is_builtin: bool
     fields: list[SchemaField]
-    extraction_hints: Optional[str] = None
+    extraction_hints: str | None = None
     json_schema: dict[str, Any]
 
 
@@ -152,7 +151,7 @@ def _schema_path(name: str) -> str:
     return f"{SCHEMAS_PREFIX}/{name}.json"
 
 
-async def _load_custom_schema(datastore: DataStore, name: str) -> Optional[dict[str, Any]]:
+async def _load_custom_schema(datastore: DataStore, name: str) -> dict[str, Any] | None:
     """Load a custom schema from the datastore."""
     data = await datastore.read_json(_schema_path(name))
     if data and "name" in data:

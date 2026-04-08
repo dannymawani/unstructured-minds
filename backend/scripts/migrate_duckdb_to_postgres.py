@@ -142,7 +142,7 @@ def main():
         sys.exit(1)
 
     user_id = args.user_id
-    print(f"Migration: DuckDB → Postgres")
+    print("Migration: DuckDB → Postgres")
     print(f"  DuckDB: {duckdb_path}")
     print(f"  Postgres: {database_url[:50]}...")
     print(f"  User ID: {user_id}")
@@ -169,7 +169,7 @@ def main():
     settings_count = migrate_json_settings(pg, user_id, settings.data_path)
 
     # Summary
-    print(f"\n=== Migration Complete ===")
+    print("\n=== Migration Complete ===")
     print(f"  Tables: {len(TABLES)}")
     print(f"  Total rows: {total_rows}")
     print(f"  JSON settings: {settings_count}")

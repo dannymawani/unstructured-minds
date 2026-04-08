@@ -1,7 +1,7 @@
 """CRUD for per-user JSON settings stored in Postgres user_settings table."""
 
 import json
-from typing import Any, Optional
+from typing import Any
 
 from ..logging_config import get_logger
 
@@ -18,7 +18,7 @@ class UserSettingsStore:
         self._db = db
         self._user_id = user_id
 
-    def get(self, key: str) -> Optional[dict[str, Any]]:
+    def get(self, key: str) -> dict[str, Any] | None:
         """Read a settings value by key.
 
         Returns None if not found.

@@ -6,7 +6,6 @@ Usage:
 Or automatically on startup when DEMO_MODE=true.
 """
 
-import json
 import random
 from datetime import date, timedelta
 from pathlib import Path
@@ -166,6 +165,7 @@ def seed_database(db, days: int = 14) -> dict[str, int]:
 
 if __name__ == "__main__":
     import argparse
+
     from ..db import DatabaseManager
 
     parser = argparse.ArgumentParser(description="Seed demo data")

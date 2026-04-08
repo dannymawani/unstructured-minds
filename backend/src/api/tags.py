@@ -7,7 +7,7 @@ Provides endpoints for:
 """
 
 from fastapi import APIRouter, Depends, Query, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from ..cache import tag_cache
 from ..middleware import limiter
@@ -16,7 +16,6 @@ from ..middleware.validation import MAX_FILE_PATH_LENGTH
 from ..parsing import extract_tags, extract_wiki_links, normalize_link_target
 from ..storage import StorageBackend
 from .dependencies import get_storage as _dep_get_storage
-
 
 router = APIRouter(prefix="/tags", tags=["tags"])
 

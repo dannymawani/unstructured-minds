@@ -7,12 +7,12 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from ..claude import ClaudeClient
 from ..config import settings
 from ..db import DatabaseManager
-from ..db.sql_compat import upsert, get_dialect
+from ..db.sql_compat import get_dialect, upsert
 from ..logging_config import get_logger
 from .exercise_matcher import ExerciseMatcher
 from .schemas import COMBINED_EXTRACTION_SCHEMA, EXTRACTION_SCHEMAS
@@ -27,8 +27,8 @@ class ExtractionResult:
     success: bool
     file_path: str
     file_hash: str
-    data: Optional[dict[str, Any]] = None
-    error: Optional[str] = None
+    data: dict[str, Any] | None = None
+    error: str | None = None
     records_inserted: dict[str, int] = field(default_factory=dict)
 
 
@@ -38,8 +38,8 @@ class ExtractionPipeline:
     def __init__(
         self,
         db: DatabaseManager,
-        claude: Optional[ClaudeClient] = None,
-        user_id: Optional[str] = None,
+        claude: ClaudeClient | None = None,
+        user_id: str | None = None,
     ) -> None:
         """Initialize extraction pipeline.
 
@@ -62,7 +62,7 @@ class ExtractionPipeline:
         self._exercise_matcher = ExerciseMatcher(exercise_defs_path)
         self._exercise_matcher.load_ai_cache(settings.data_path / "ai_exercise_cache.json")
 
-    def _load_custom_schema(self, name: str) -> Optional[dict[str, Any]]:
+    def _load_custom_schema(self, name: str) -> dict[str, Any] | None:
         """Load a custom schema from disk and convert to JSON Schema format.
 
         Args:
@@ -81,7 +81,7 @@ class ExtractionPipeline:
 
             # Convert SchemaDefinition format to JSON Schema
             return self._convert_definition_to_json_schema(schema_def)
-        except (json.JSONDecodeError, IOError, KeyError):
+        except (OSError, json.JSONDecodeError, KeyError):
             return None
 
     def _convert_definition_to_json_schema(
@@ -98,28 +98,28 @@ class ExtractionPipeline:
         properties = {}
         required = []
 
-        for field in schema_def.get("fields", []):
-            field_schema: dict[str, Any] = {"type": field["type"]}
+        for fld in schema_def.get("fields", []):
+            field_schema: dict[str, Any] = {"type": fld["type"]}
 
-            if field.get("description"):
-                field_schema["description"] = field["description"]
+            if fld.get("description"):
+                field_schema["description"] = fld["description"]
 
-            if field["type"] in ("integer", "number"):
-                if field.get("min") is not None:
-                    field_schema["minimum"] = field["min"]
-                if field.get("max") is not None:
-                    field_schema["maximum"] = field["max"]
+            if fld["type"] in ("integer", "number"):
+                if fld.get("min") is not None:
+                    field_schema["minimum"] = fld["min"]
+                if fld.get("max") is not None:
+                    field_schema["maximum"] = fld["max"]
 
-            if field["type"] == "string" and field.get("enum"):
-                field_schema["enum"] = field["enum"]
+            if fld["type"] == "string" and fld.get("enum"):
+                field_schema["enum"] = fld["enum"]
 
-            if field["type"] == "array":
+            if fld["type"] == "array":
                 field_schema["items"] = {"type": "string"}
 
-            properties[field["name"]] = field_schema
+            properties[fld["name"]] = field_schema
 
-            if field.get("required"):
-                required.append(field["name"])
+            if fld.get("required"):
+                required.append(fld["name"])
 
         json_schema: dict[str, Any] = {
             "type": "object",
@@ -139,7 +139,7 @@ class ExtractionPipeline:
 
         return json_schema
 
-    def get_schema(self, name: Optional[str] = None) -> dict[str, Any]:
+    def get_schema(self, name: str | None = None) -> dict[str, Any]:
         """Get a schema by name.
 
         Args:
@@ -188,7 +188,7 @@ class ExtractionPipeline:
         """
         dialect = get_dialect(self.db)
         ph = "%s" if dialect == "postgres" else "?"
-        conditions = [f"file_path = {ph}", f"success = TRUE"]
+        conditions = [f"file_path = {ph}", "success = TRUE"]
         params: list = [file_path]
         if dialect == "postgres" and self.user_id:
             conditions.append(f"user_id = {ph}")
@@ -206,7 +206,7 @@ class ExtractionPipeline:
         file_path: str,
         file_hash: str,
         success: bool,
-        error: Optional[str] = None,
+        error: str | None = None,
     ) -> None:
         """Log extraction attempt.
 
@@ -229,7 +229,7 @@ class ExtractionPipeline:
             vals,
         )
 
-    def _extract_date_from_path(self, file_path: str) -> Optional[str]:
+    def _extract_date_from_path(self, file_path: str) -> str | None:
         """Try to extract date from file path.
 
         Expects format like Daily-Notes/YYYY-MM/YYYY-MM-DD.md
@@ -644,7 +644,7 @@ class ExtractionPipeline:
             return 0
 
         # Map extraction statuses to API-standard values
-        STATUS_MAP = {
+        status_map = {
             "todo": "backlog",
             "done": "done",
             "in_progress": "in_progress",
@@ -717,7 +717,7 @@ class ExtractionPipeline:
 
             task_id = self._generate_id()
             raw_status = task.get("status", "todo")
-            status = STATUS_MAP.get(raw_status, raw_status)
+            status = status_map.get(raw_status, raw_status)
             completed_at = datetime.now() if status in ("done", "cancelled") else None
 
             cols = ["id", "date", "description", "status", "completed_at", "category", "priority", "source_file"]
@@ -963,14 +963,14 @@ class ExtractionPipeline:
             else:
                 if block:
                     # Keep the block only if it doesn't look like a suggestion table
-                    has_table = any("|" in l for l in block)
+                    has_table = any("|" in ln for ln in block)
                     if not has_table:
                         result.extend(block)
                     block = []
                 result.append(line)
         # Handle trailing blockquote
         if block:
-            has_table = any("|" in l for l in block)
+            has_table = any("|" in ln for ln in block)
             if not has_table:
                 result.extend(block)
         return "\n".join(result)
@@ -980,7 +980,7 @@ class ExtractionPipeline:
         file_path: str,
         content: str,
         force: bool = False,
-        schema_name: Optional[str] = None,
+        schema_name: str | None = None,
     ) -> ExtractionResult:
         """Extract structured data from markdown content.
 

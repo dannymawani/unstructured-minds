@@ -5,7 +5,6 @@ These schemas define the structure Claude should extract from markdown notes.
 
 from typing import Any
 
-
 # Schema for extracting exercise/workout data
 EXERCISE_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -64,8 +63,6 @@ EXERCISE_SCHEMA: dict[str, Any] = {
                                         },
                                     },
                                 },
-                                "weight_kg": {"type": "number", "description": "Weight in kg (legacy, prefer sets array)"},
-                                "reps": {"type": "integer", "description": "Number of reps (legacy, prefer sets array)"},
                                 "duration_minutes": {"type": "integer", "description": "Duration in minutes"},
                                 "distance_km": {"type": "number", "description": "Distance in km"},
                             },

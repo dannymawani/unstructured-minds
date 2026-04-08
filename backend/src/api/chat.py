@@ -4,19 +4,20 @@ import json
 import logging
 import re
 from datetime import date, datetime, timedelta
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from ..claude import ClaudeClient
 from ..cache import invalidate_all
+from ..claude import ClaudeClient
 from ..middleware import limiter
 from ..middleware.rate_limit import RATE_LIMIT_CLAUDE_API
 from ..middleware.validation import MAX_QUERY_LENGTH
 from ..storage import StorageBackend
 from ..templates.daily_note import render_daily_note as render_fallback_template
-from .dependencies import get_storage as _dep_get_storage, get_user_id
+from .dependencies import get_storage as _dep_get_storage
+from .dependencies import get_user_id
 from .settings import resolve_daily_note_path
 
 logger = logging.getLogger(__name__)
@@ -167,9 +168,9 @@ class ImageData(BaseModel):
 
 class ChatMessageRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=MAX_QUERY_LENGTH)
-    file_path: Optional[str] = None
-    file_content: Optional[str] = Field(default=None, max_length=MAX_QUERY_LENGTH * 10)
-    images: Optional[list[ImageData]] = Field(default=None, max_length=5)
+    file_path: str | None = None
+    file_content: str | None = Field(default=None, max_length=MAX_QUERY_LENGTH * 10)
+    images: list[ImageData] | None = Field(default=None, max_length=5)
 
 
 class CreatedNote(BaseModel):
@@ -181,15 +182,15 @@ class CreatedNote(BaseModel):
 class QueryData(BaseModel):
     columns: list[str]
     data: list[dict[str, Any]]
-    sql: Optional[str] = None
+    sql: str | None = None
     row_count: int = 0
 
 
 class ChatMessageResponse(BaseModel):
     reply: str
-    note_update: Optional[str] = None
-    created_notes: Optional[list[CreatedNote]] = None
-    query_data: Optional[QueryData] = None
+    note_update: str | None = None
+    created_notes: list[CreatedNote] | None = None
+    query_data: QueryData | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -476,13 +477,13 @@ async def _handle_catchup(
 # Query logic (reuses query module internals)
 # ---------------------------------------------------------------------------
 
-async def _handle_query(question: str, request: Request) -> tuple[Optional[QueryData], str]:
+async def _handle_query(question: str, request: Request) -> tuple[QueryData | None, str]:
     """Run the query pipeline. Returns (query_data, answer_text)."""
     from .query import (
-        SQL_GENERATION_SYSTEM_PROMPT,
         RESPONSE_FORMATTING_SYSTEM_PROMPT,
-        validate_sql,
+        SQL_GENERATION_SYSTEM_PROMPT,
         extract_sql_from_response,
+        validate_sql,
     )
 
     claude: ClaudeClient = request.app.state.claude

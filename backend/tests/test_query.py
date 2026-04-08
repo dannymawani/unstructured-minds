@@ -1,22 +1,16 @@
 """Tests for natural language query API endpoints."""
 
-import tempfile
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import duckdb
 import pytest
 from fastapi.testclient import TestClient
 
-from src.main import app
 from src.api.query import (
-    validate_sql,
     extract_sql_from_response,
-    ALLOWED_QUERY_TABLES,
-    BLOCKED_TABLE_PATTERNS,
-    DANGEROUS_FUNCTIONS,
+    validate_sql,
 )
 from src.db.connection import DatabaseManager
+from src.main import app
 
 
 @pytest.fixture

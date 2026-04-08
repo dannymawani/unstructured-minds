@@ -4,16 +4,17 @@ import logging
 import re
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Request, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from ..cache import file_list_cache, invalidate_all
 from ..db import DatabaseManager
-from ..middleware import validate_file_path, PathValidationError
+from ..middleware import PathValidationError, validate_file_path
 from ..middleware.validation import MAX_FILE_PATH_LENGTH, MAX_QUERY_LENGTH
 from ..storage import StorageBackend
 from ..templates.daily_note import render_daily_note
-from .dependencies import get_storage as _dep_get_storage, get_user_id
+from .dependencies import get_storage as _dep_get_storage
+from .dependencies import get_user_id
 from .settings import resolve_daily_note_path
 
 logger = logging.getLogger(__name__)
@@ -435,7 +436,7 @@ async def migrate_daily_notes(
     """
     from .settings import get_daily_note_template
 
-    template = get_daily_note_template()
+    get_daily_note_template()
     details: list[str] = []
     moved = 0
 

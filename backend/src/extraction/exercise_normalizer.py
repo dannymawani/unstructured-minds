@@ -8,7 +8,6 @@ so the AI call only happens once per new name.
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 from ..claude import ClaudeClient
 from ..db import DatabaseManager
@@ -32,7 +31,7 @@ class NormalizationStats:
 async def normalize_exercises(
     db: DatabaseManager,
     matcher: ExerciseMatcher,
-    claude: Optional[ClaudeClient],
+    claude: ClaudeClient | None,
     cache_path: Path,
     user_settings_store=None,
 ) -> NormalizationStats:

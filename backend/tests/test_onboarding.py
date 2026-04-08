@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 @pytest.fixture
 def test_settings(tmp_path: Path):
     """Create test settings with temp paths."""
-    with patch("src.config.Settings") as mock_settings_cls:
+    with patch("src.config.Settings"):
         mock_settings = MagicMock()
         mock_settings.vault_path = tmp_path / "vault"
         mock_settings.data_path = tmp_path / "data"
@@ -68,8 +68,8 @@ class TestDemoDataGeneration:
         assert len(data["daily_metrics"]) == 30
 
     def test_all_records_have_demo_source_file(self):
-        from src.onboarding.demo_data import generate_demo_data
         from src.onboarding.constants import DEMO_SOURCE_FILE
+        from src.onboarding.demo_data import generate_demo_data
 
         data = generate_demo_data(today=date(2026, 2, 16))
         for table, rows in data.items():
@@ -138,8 +138,8 @@ class TestDemoDataGeneration:
 
 class TestSeedAndLifecycle:
     def test_seed_inserts_data(self, db):
-        from src.onboarding.seed import seed_demo_data
         from src.config import LOCAL_USER_ID
+        from src.onboarding.seed import seed_demo_data
 
         counts = seed_demo_data(db, LOCAL_USER_ID)
         assert counts["daily_metrics"] == 30
@@ -152,8 +152,8 @@ class TestSeedAndLifecycle:
         assert result[0] == 30
 
     def test_seed_is_idempotent(self, db):
-        from src.onboarding.seed import seed_demo_data
         from src.config import LOCAL_USER_ID
+        from src.onboarding.seed import seed_demo_data
 
         counts1 = seed_demo_data(db, LOCAL_USER_ID)
         counts2 = seed_demo_data(db, LOCAL_USER_ID)
@@ -166,9 +166,9 @@ class TestSeedAndLifecycle:
         assert result[0] == 30
 
     def test_clear_all_demo_data(self, db):
-        from src.onboarding.seed import seed_demo_data
-        from src.onboarding.lifecycle import clear_all_demo_data
         from src.config import LOCAL_USER_ID
+        from src.onboarding.lifecycle import clear_all_demo_data
+        from src.onboarding.seed import seed_demo_data
 
         seed_demo_data(db, LOCAL_USER_ID)
         deleted = clear_all_demo_data(db, LOCAL_USER_ID)
@@ -180,9 +180,9 @@ class TestSeedAndLifecycle:
             assert result[0] == 0, f"Demo data still in {table}"
 
     def test_cleanup_demo_for_date(self, db):
-        from src.onboarding.seed import seed_demo_data
-        from src.onboarding.lifecycle import cleanup_demo_for_date
         from src.config import LOCAL_USER_ID
+        from src.onboarding.lifecycle import cleanup_demo_for_date
+        from src.onboarding.seed import seed_demo_data
 
         seed_demo_data(db, LOCAL_USER_ID)
 
@@ -198,17 +198,17 @@ class TestSeedAndLifecycle:
         assert result[0] == 29  # 30 - 1
 
     def test_get_demo_data_count(self, db):
-        from src.onboarding.seed import seed_demo_data
-        from src.onboarding.lifecycle import get_demo_data_count
         from src.config import LOCAL_USER_ID
+        from src.onboarding.lifecycle import get_demo_data_count
+        from src.onboarding.seed import seed_demo_data
 
         assert get_demo_data_count(db, LOCAL_USER_ID) == 0
         seed_demo_data(db, LOCAL_USER_ID)
         assert get_demo_data_count(db, LOCAL_USER_ID) > 0
 
     def test_get_real_data_count(self, db):
-        from src.onboarding.lifecycle import get_real_data_count
         from src.config import LOCAL_USER_ID
+        from src.onboarding.lifecycle import get_real_data_count
 
         assert get_real_data_count(db, LOCAL_USER_ID) == 0
 
@@ -220,14 +220,14 @@ class TestSeedAndLifecycle:
         assert get_real_data_count(db, LOCAL_USER_ID) == 1
 
     def test_check_graduation_below_threshold(self, db):
-        from src.onboarding.lifecycle import check_graduation
         from src.config import LOCAL_USER_ID
+        from src.onboarding.lifecycle import check_graduation
 
         assert check_graduation(db, LOCAL_USER_ID) is False
 
     def test_check_graduation_above_threshold(self, db):
-        from src.onboarding.lifecycle import check_graduation
         from src.config import LOCAL_USER_ID
+        from src.onboarding.lifecycle import check_graduation
 
         # Insert 7+ real daily notes
         today = date.today()

@@ -1,20 +1,19 @@
 """Tests for security middleware and validation."""
 
+
 import pytest
-from pathlib import Path
 
 from src.middleware.validation import (
-    validate_file_path,
-    validate_query_length,
-    validate_file_size,
-    sanitize_sql_identifier,
-    PathValidationError,
-    QueryValidationError,
-    FileSizeError,
-    MAX_QUERY_LENGTH,
-    MAX_SEARCH_QUERY_LENGTH,
     MAX_FILE_PATH_LENGTH,
     MAX_FILE_SIZE_BYTES,
+    MAX_QUERY_LENGTH,
+    FileSizeError,
+    PathValidationError,
+    QueryValidationError,
+    sanitize_sql_identifier,
+    validate_file_path,
+    validate_file_size,
+    validate_query_length,
 )
 
 

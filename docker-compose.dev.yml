@@ -50,7 +50,7 @@ services:
       # Clerk auth keys are loaded from root .env via env_file above.
       # Cloud mode requires CLERK_SECRET_KEY and CLERK_DOMAIN.
       # To force local mode in dev, uncomment:
-      # - USE_CLOUD=false
+      # - STORAGE_MODE=local
     # Override command for hot reload
     command: ["python", "-m", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     # Expose debug port for remote debugging
