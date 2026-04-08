@@ -16,7 +16,7 @@ services:
       - ${DATA_PATH:-./data}:/app/data:rw
     environment:
       LLM_PROVIDER, LLM_API_KEY, LLM_MODEL_FAST, LLM_MODEL_SMART,
-      ANTHROPIC_API_KEY (legacy), USE_CLOUD, DATABASE_URL,
+      ANTHROPIC_API_KEY (legacy), STORAGE_MODE, DATABASE_URL,
       AUTH_MODE, BASIC_AUTH_USERNAME, BASIC_AUTH_PASSWORD,
       VAULT_PATH=/app/vault, DATA_PATH=/app/data, HOST=0.0.0.0, PORT=8000, DEBUG,
       CLERK_SECRET_KEY, CLERK_DOMAIN
@@ -71,7 +71,7 @@ services:
 
 | Variable | Required | Purpose |
 |----------|----------|---------|
-| `USE_CLOUD` | No | `true` enables cloud mode |
+| `STORAGE_MODE` | `local` | `local` or `postgres` |
 | `DATABASE_URL` | Yes* | `postgresql://user:pass@host:port/db` |
 | `DB_POOL_MIN` / `DB_POOL_MAX` | No | Connection pool (default 2/10) |
 | `BASIC_AUTH_USERNAME` | No** | Username for basic auth |
@@ -79,7 +79,7 @@ services:
 | `CLERK_SECRET_KEY` | No*** | JWT signing key |
 | `CLERK_DOMAIN` | No*** | Clerk issuer domain |
 
-\* Required when `USE_CLOUD=true`
+\* Required when `STORAGE_MODE=postgres`
 \*\* Required when `AUTH_MODE=basic`
 \*\*\* Required when `AUTH_MODE=clerk`
 

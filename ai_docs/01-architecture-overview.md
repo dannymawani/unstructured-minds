@@ -33,8 +33,8 @@ The system runs in one of two modes, determined by environment variables:
 
 | Aspect | Local Mode | Cloud Mode |
 |--------|-----------|------------|
-| **Trigger** | `USE_CLOUD=false` (default) | `USE_CLOUD=true` + `DATABASE_URL` |
-| **Primary DB** | DuckDB file (`data/unstructured.duckdb`) | Postgres (Neon) |
+| **Trigger** | `STORAGE_MODE=local` (default) | `STORAGE_MODE=postgres` + `DATABASE_URL` |
+| **Primary DB** | DuckDB file (`data/unstructured.duckdb`) | Postgres |
 | **Analytics DB** | Same DuckDB file | In-memory DuckDB cache |
 | **Vault storage** | Local filesystem (`vault/`) | Postgres `vault_files` table |
 | **Settings** | JSON files in `data/` | Postgres `user_settings` JSONB |

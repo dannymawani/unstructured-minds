@@ -33,7 +33,7 @@
 - **Postgres** is the source of truth for all data
 - **DuckDB** runs in-memory as an analytics cache
 - Notes stored in Postgres (supports multi-user)
-- Enable with `USE_CLOUD=true` + `DATABASE_URL`
+- Enable with `STORAGE_MODE=postgres` + `DATABASE_URL`
 
 ## Why Two Database Engines?
 

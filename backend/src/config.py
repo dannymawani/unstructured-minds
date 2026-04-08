@@ -47,9 +47,12 @@ class Settings(BaseSettings):
     # Legacy: still works for backward compatibility
     anthropic_api_key: Optional[str] = None
 
-    # Cloud mode: explicit flag + Postgres connection string
-    use_cloud: bool = False
+    # Storage mode: "local" (DuckDB) or "postgres"
+    storage_mode: str = "local"
     database_url: Optional[str] = None
+
+    # Legacy: USE_CLOUD=true still works (mapped in model_post_init)
+    use_cloud: Optional[bool] = None
 
     # Postgres connection pool sizing
     db_pool_min: int = 2
@@ -70,6 +73,11 @@ class Settings(BaseSettings):
     clerk_secret_key: Optional[str] = None
     clerk_domain: Optional[str] = None  # e.g. "your-app.clerk.accounts.dev"
 
+    def model_post_init(self, __context: object) -> None:
+        """Handle backward compat: USE_CLOUD=true → storage_mode=postgres."""
+        if self.use_cloud is True and self.storage_mode == "local":
+            object.__setattr__(self, "storage_mode", "postgres")
+
     @property
     def use_token_auth(self) -> bool:
         """True when managed identity is enabled with a Postgres host."""
@@ -77,8 +85,8 @@ class Settings(BaseSettings):
 
     @property
     def is_cloud_mode(self) -> bool:
-        """True when USE_CLOUD=true and DATABASE_URL or managed identity is set."""
-        return self.use_cloud and (self.database_url is not None or self.use_token_auth)
+        """True when storage_mode=postgres and a database connection is available."""
+        return self.storage_mode == "postgres" and (self.database_url is not None or self.use_token_auth)
 
     @property
     def auth_enabled(self) -> bool:

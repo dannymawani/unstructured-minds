@@ -131,7 +131,7 @@ make test-frontend # frontend only
 | Mode | Setup | Best For |
 |------|-------|----------|
 | **Local** (default) | Zero config | Personal use, single machine |
-| **Postgres** | `USE_CLOUD=true` + `DATABASE_URL` | Multi-user, server deployment |
+| **Postgres** | `STORAGE_MODE=postgres` + `DATABASE_URL` | Multi-user, server deployment |
 
 With Postgres mode, DuckDB still runs in-memory as a fast analytics cache.
 

@@ -12,7 +12,7 @@ Controlled by `AUTH_MODE` env var (default: `none`). Auth mode is independent of
 | `basic` | HTTP Basic Auth (`BASIC_AUTH_USERNAME` / `BASIC_AUTH_PASSWORD`) | `LOCAL_USER_ID = "local"` |
 | `clerk` | Clerk JWT verification | `uuid5(NAMESPACE_URL, clerk_sub)` |
 
-Backward compat: if `AUTH_MODE` is not set but `USE_CLOUD=true` + `CLERK_SECRET_KEY` is present, auth is enabled automatically.
+Backward compat: if `AUTH_MODE` is not set but `STORAGE_MODE=postgres` + `CLERK_SECRET_KEY` is present, auth is enabled automatically.
 
 ## Auth Flow (Cloud Mode)
 

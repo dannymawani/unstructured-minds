@@ -17,10 +17,10 @@ Natural language notes → structured, queryable data via AI + DuckDB/Postgres.
 
 | Mode | Trigger | Storage |
 |------|---------|---------|
-| **Local** | `USE_CLOUD=false` | DuckDB file + local filesystem |
-| **Cloud** | `USE_CLOUD=true` + `DATABASE_URL` | Postgres + in-memory DuckDB cache |
+| **Local** | `STORAGE_MODE=local` (default) | DuckDB file + local filesystem |
+| **Postgres** | `STORAGE_MODE=postgres` + `DATABASE_URL` | Postgres + in-memory DuckDB cache |
 
-Env vars: `LLM_PROVIDER`, `LLM_API_KEY` (AI features), `USE_CLOUD`, `DATABASE_URL` (cloud only), `AUTH_MODE` (none/basic/clerk).
+Env vars: `LLM_PROVIDER`, `LLM_API_KEY` (AI features), `STORAGE_MODE`, `DATABASE_URL` (postgres only), `AUTH_MODE` (none/basic/clerk).
 
 ## Deep Documentation → `ai_docs/`
 

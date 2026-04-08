@@ -61,7 +61,7 @@ services:
       - LLM_MODEL_FAST=${LLM_MODEL_FAST:-}
       - LLM_MODEL_SMART=${LLM_MODEL_SMART:-}
       # Storage mode
-      - USE_CLOUD=${USE_CLOUD:-false}
+      - STORAGE_MODE=${STORAGE_MODE:-local}
       - DATABASE_URL=${DATABASE_URL:-}
       # Paths
       - VAULT_PATH=/app/vault

@@ -69,12 +69,12 @@ class Settings(BaseSettings):
     vault_path, data_path, host, port, debug, cors_origins
     llm_provider, llm_api_key, llm_model_fast, llm_model_smart
     anthropic_api_key  # legacy compat
-    use_cloud, database_url, db_pool_min, db_pool_max
+    storage_mode, database_url, db_pool_min, db_pool_max
     auth_mode  # none / basic / clerk
     basic_auth_username, basic_auth_password
     clerk_secret_key, clerk_domain
 
-    @property is_cloud_mode: use_cloud AND database_url is not None
+    @property is_cloud_mode: storage_mode == "postgres" AND database_url is not None
     @property auth_enabled: auth_mode != "none" OR (is_cloud_mode AND clerk_secret_key)
     @property llm_enabled: llm_api_key OR anthropic_api_key is not None
 ```
