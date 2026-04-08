@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { X, Folder, Palette, Check, Loader2, Download, Upload, Database, Archive, ExternalLink, Sparkles } from 'lucide-react'
+import { X, Folder, Palette, Check, Loader2, Download, Upload, Database, Archive } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -120,11 +120,11 @@ export function SettingsPanel({
     }
   }
 
-  const handleExportData = async (format: 'csv' | 'json') => {
+  const handleExportData = async () => {
     setIsExporting(true)
     setExportStatus(null)
     try {
-      const response = await fetch(`${apiBaseUrl}/export/data?format=${format}`)
+      const response = await fetch(`${apiBaseUrl}/export/data?format=csv`)
       if (!response.ok) {
         throw new Error('Failed to export data')
       }
@@ -144,7 +144,7 @@ export function SettingsPanel({
       window.URL.revokeObjectURL(url)
       document.body.removeChild(a)
 
-      setExportStatus(`Data exported as ${format.toUpperCase()}`)
+      setExportStatus('Data exported as ZIP')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Export failed')
     } finally {
@@ -290,39 +290,23 @@ export function SettingsPanel({
                         <Database className="w-4 h-4 text-muted-foreground" />
                         <span className="text-sm text-muted-foreground">Export Data</span>
                       </div>
-                      <div className="flex gap-1">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleExportData('csv')}
-                          disabled={isExporting}
-                          className="h-7 px-2 text-xs"
-                        >
-                          {isExporting ? (
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                          ) : (
-                            <Download className="w-3 h-3" />
-                          )}
-                          <span className="ml-1">CSV</span>
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleExportData('json')}
-                          disabled={isExporting}
-                          className="h-7 px-2 text-xs"
-                        >
-                          {isExporting ? (
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                          ) : (
-                            <Download className="w-3 h-3" />
-                          )}
-                          <span className="ml-1">JSON</span>
-                        </Button>
-                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleExportData}
+                        disabled={isExporting}
+                        className="h-7 px-2 text-xs"
+                      >
+                        {isExporting ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <Download className="w-3 h-3" />
+                        )}
+                        <span className="ml-1">ZIP</span>
+                      </Button>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Download extracted data tables
+                      Download all extracted data tables as a ZIP archive
                     </p>
                   </div>
 
@@ -370,26 +354,6 @@ export function SettingsPanel({
                 </div>
               </section>
 
-              {/* Upgrade Plan */}
-              <section>
-                <div className="flex items-center gap-2 mb-3">
-                  <Sparkles className="w-4 h-4 text-amber-400" />
-                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                    Plan
-                  </h3>
-                </div>
-                <a
-                  href="https://unstructuredminds.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-between bg-muted rounded-lg p-3 hover:bg-muted/80 transition-colors group"
-                >
-                  <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
-                    Upgrade Plan
-                  </span>
-                  <ExternalLink className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-                </a>
-              </section>
             </>
           ) : null}
         </div>
