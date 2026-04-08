@@ -261,7 +261,7 @@ export function SettingsPanel({
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <Folder className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm text-muted-foreground">Export Vault</span>
+                        <span className="text-sm text-muted-foreground">Export Notes</span>
                       </div>
                       <Button
                         variant="outline"
@@ -279,7 +279,7 @@ export function SettingsPanel({
                       </Button>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Download all vault files as a ZIP archive
+                      Your raw markdown notes
                     </p>
                   </div>
 
@@ -306,7 +306,7 @@ export function SettingsPanel({
                       </Button>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Download all extracted data tables as a ZIP archive
+                      Extracted tables (exercises, food, metrics, tasks) as CSV
                     </p>
                   </div>
 
