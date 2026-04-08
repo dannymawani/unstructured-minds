@@ -5,6 +5,13 @@
 .DEFAULT_GOAL := help
 
 # ---------------------------------------------------------------------------
+# Setup
+# ---------------------------------------------------------------------------
+
+setup: ## Interactive .env setup wizard
+	@./setup.sh
+
+# ---------------------------------------------------------------------------
 # Run
 # ---------------------------------------------------------------------------
 
@@ -64,4 +71,4 @@ ps: ## Show running services
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-18s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: up up-postgres down dev dev-postgres logs build build-no-cache test test-backend test-frontend typecheck clean ps help
+.PHONY: setup up up-postgres down dev dev-postgres logs build build-no-cache test test-backend test-frontend typecheck clean ps help

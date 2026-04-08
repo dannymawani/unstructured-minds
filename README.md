@@ -17,8 +17,9 @@
 
 ---
 
-<!-- TODO: Add screenshot of the editor + dashboard side by side -->
-<!-- <p align="center"><img src="assets/images/screenshot.png" width="720" /></p> -->
+<p align="center">
+  <img src="assets/screenshots/dashboard.png" alt="Dashboard — activity heatmap, nutrition, insights" width="720" />
+</p>
 
 ## How It Works
 
@@ -75,27 +76,15 @@
 ```bash
 git clone https://github.com/dannymawani/unstructured_minds.git
 cd unstructured_minds
+
+# Interactive setup — walks you through LLM, storage, and auth
+make setup
+
+# Or do it manually
 cp .env.example .env
 ```
 
-### 2. Set your LLM provider (optional)
-
-Edit `.env` and uncomment the provider you want:
-
-```bash
-# Anthropic
-LLM_PROVIDER=anthropic
-LLM_API_KEY=sk-ant-...
-
-# Or OpenAI
-# LLM_PROVIDER=openai
-# LLM_API_KEY=sk-...
-
-# Or Ollama (free, local)
-# LLM_PROVIDER=ollama
-```
-
-### 3. Start
+### 2. Start
 
 ```bash
 # Development (hot reload)
