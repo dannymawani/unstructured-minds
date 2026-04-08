@@ -17,8 +17,9 @@
 
 ---
 
-<!-- TODO: Add screenshot of the editor + dashboard side by side -->
-<!-- <p align="center"><img src="assets/images/screenshot.png" width="720" /></p> -->
+<p align="center">
+  <img src="assets/screenshots/dashboard.png" alt="Dashboard — activity heatmap, nutrition, insights" width="720" />
+</p>
 
 ## How It Works
 
@@ -75,27 +76,15 @@
 ```bash
 git clone https://github.com/dannymawani/unstructured_minds.git
 cd unstructured_minds
+
+# Interactive setup — walks you through LLM, storage, and auth
+make setup
+
+# Or do it manually
 cp .env.example .env
 ```
 
-### 2. Set your LLM provider (optional)
-
-Edit `.env` and uncomment the provider you want:
-
-```bash
-# Anthropic
-LLM_PROVIDER=anthropic
-LLM_API_KEY=sk-ant-...
-
-# Or OpenAI
-# LLM_PROVIDER=openai
-# LLM_API_KEY=sk-...
-
-# Or Ollama (free, local)
-# LLM_PROVIDER=ollama
-```
-
-### 3. Start
+### 2. Start
 
 ```bash
 # Development (hot reload)
@@ -147,6 +136,16 @@ docker compose --profile postgres up -d
 | `none` (default) | Zero config | Local / trusted network |
 | `basic` | `AUTH_MODE=basic` + username/password in `.env` | Simple password protection |
 | `clerk` | `AUTH_MODE=clerk` + Clerk keys | Multi-user SaaS deployment |
+
+## Remote Access (Tailscale)
+
+Access from your phone, tablet, or anywhere — encrypted, no port forwarding needed.
+
+1. Install [Tailscale](https://tailscale.com/) on your server + devices
+2. Add your Tailscale hostname to `CORS_ORIGINS` in `.env`
+3. Open `http://your-hostname:3000` from any device on your tailnet
+
+See [`docs/LAN_ACCESS.md`](./docs/LAN_ACCESS.md) for full setup including LAN-only access.
 
 ## Documentation
 
