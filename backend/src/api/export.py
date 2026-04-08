@@ -334,10 +334,3 @@ async def import_vault(
         files_imported=files_imported,
         extraction_triggered=trigger_extraction,
     )
-
-
-# Combine routers for easy inclusion
-def include_export_routes(app):
-    """Include export and import routes in the app."""
-    app.include_router(router)
-    app.include_router(import_router)

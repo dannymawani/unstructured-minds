@@ -1,2 +1,1 @@
-export { FileTree } from './FileTree'
-export { FileTreeItem, type FileNode } from './FileTreeItem'
+export { buildTree, flattenTree, type FileInfo, type FlattenedNode, type FileNode } from './treeUtils'

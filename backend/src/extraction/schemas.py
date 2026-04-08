@@ -249,7 +249,6 @@ COMBINED_EXTRACTION_SCHEMA: dict[str, Any] = {
             "properties": DAILY_METRICS_SCHEMA["properties"],
         },
         "activities": EXERCISE_SCHEMA["properties"]["activities"],
-        "tasks": TASKS_SCHEMA["properties"]["tasks"],
         "meals": FOOD_LOG_SCHEMA["properties"]["meals"],
     },
     "required": [],

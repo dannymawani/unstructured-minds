@@ -156,58 +156,64 @@ export function ChatMessage({ message, onOpenNote }: ChatMessageProps) {
   const isUser = message.role === 'user'
 
   return (
-    <div className={cn('flex gap-2.5 px-1', isUser ? '' : '')}>
-      <div
-        className={cn(
-          'flex items-center justify-center h-7 w-7 rounded-lg shrink-0 mt-0.5',
+    <div className={cn('flex gap-3 px-2', isUser ? 'justify-end' : '')}>
+      {!isUser && (
+        <div className="flex items-center justify-center h-8 w-8 rounded-full shrink-0 mt-1 bg-teal-500/10 ring-1 ring-teal-500/20">
+          <Bot className="h-4 w-4 text-teal-500" />
+        </div>
+      )}
+      <div className={cn(
+        'min-w-0 max-w-[85%] space-y-1',
+        isUser ? 'items-end' : '',
+      )}>
+        <div className={cn(
+          'rounded-2xl px-4 py-3',
           isUser
-            ? 'bg-slate-200 dark:bg-slate-700'
-            : 'bg-teal-500/10'
-        )}
-      >
-        {isUser ? (
-          <User className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" />
-        ) : (
-          <Bot className="h-3.5 w-3.5 text-teal-500" />
-        )}
-      </div>
-      <div className="flex-1 min-w-0 space-y-0.5">
-        <div className="flex items-baseline gap-2">
-          <span className="text-xs font-semibold">
-            {isUser ? 'You' : 'Assistant'}
-          </span>
+            ? 'bg-teal-500 text-white rounded-br-md'
+            : 'bg-muted/60 border border-border/40 rounded-bl-md'
+        )}>
+          {message.images && message.images.length > 0 && (
+            <div className="flex gap-2 flex-wrap mb-2">
+              {message.images.map((img, i) => (
+                <img
+                  key={i}
+                  src={img.preview || `data:${img.media_type};base64,${img.data}`}
+                  alt={`Attachment ${i + 1}`}
+                  className="h-20 w-20 object-cover rounded-xl border border-white/20"
+                />
+              ))}
+            </div>
+          )}
+          <div className={cn(
+            'text-[13px] leading-relaxed whitespace-pre-wrap break-words',
+            isUser ? 'text-white' : 'text-foreground',
+          )}>
+            {message.content}
+          </div>
+        </div>
+        <div className={cn('flex items-center gap-2 px-1', isUser ? 'justify-end' : '')}>
           {message.timestamp && (
-            <span className="text-[10px] text-muted-foreground">
+            <span className="text-[10px] text-muted-foreground/70">
               {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </span>
           )}
+          {message.noteUpdated && (
+            <span className="inline-flex items-center gap-1 text-[10px] text-teal-600 dark:text-teal-400">
+              <FileCheck className="h-2.5 w-2.5" />
+              Note updated
+            </span>
+          )}
         </div>
-        {message.images && message.images.length > 0 && (
-          <div className="flex gap-2 flex-wrap mt-1">
-            {message.images.map((img, i) => (
-              <img
-                key={i}
-                src={img.preview || `data:${img.media_type};base64,${img.data}`}
-                alt={`Attachment ${i + 1}`}
-                className="h-16 w-16 object-cover rounded-lg border"
-              />
-            ))}
-          </div>
-        )}
-        <div className="text-sm leading-relaxed whitespace-pre-wrap break-words">
-          {message.content}
-        </div>
-        {message.noteUpdated && (
-          <div className="flex items-center gap-1.5 text-[11px] text-teal-600 dark:text-teal-400 mt-1">
-            <FileCheck className="h-3 w-3" />
-            <span>Note updated</span>
-          </div>
-        )}
         {message.createdNotes && message.createdNotes.length > 0 && (
           <CreatedNotesList notes={message.createdNotes} onOpenNote={onOpenNote} />
         )}
         {message.queryData && <DataTable queryData={message.queryData} />}
       </div>
+      {isUser && (
+        <div className="flex items-center justify-center h-8 w-8 rounded-full shrink-0 mt-1 bg-slate-200 dark:bg-slate-700 ring-1 ring-slate-300/50 dark:ring-slate-600/50">
+          <User className="h-4 w-4 text-slate-600 dark:text-slate-300" />
+        </div>
+      )}
     </div>
   )
 }

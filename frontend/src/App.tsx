@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router'
 import { SignedIn, SignedOut, SignInButton, UserButton, useAuth } from '@clerk/clerk-react'
 import { Button } from '@/components/ui/button'
-import { FileTree } from '@/components/FileTree'
 import { MarkdownEditor } from '@/components/Editor/MarkdownEditor'
 import { ChatPanel } from '@/components/Chat'
 import { SettingsPanel } from '@/components/Settings'
@@ -10,9 +9,9 @@ import { CommandPalette, createDefaultCommands } from '@/components/CommandPalet
 import { SearchModal } from '@/components/Search'
 import { TemplatePicker } from '@/components/TemplatePicker'
 import { QuickCapture } from '@/components/QuickCapture'
+import { QuickNotes } from '@/components/QuickNotes'
+import { DailyNotes } from '@/components/DailyNotes'
 import { DailyNoteWizard } from '@/components/DailyNoteWizard'
-import { TagsPanel } from '@/components/TagsPanel'
-import { BacklinksPanel } from '@/components/BacklinksPanel'
 import { MobileNav } from '@/components/MobileNav'
 import { Drawer } from '@/components/Drawer'
 import { useKeyboardShortcuts, type KeyboardShortcut } from '@/hooks/useKeyboardShortcuts'
@@ -24,13 +23,10 @@ import {
   LayoutDashboard,
   FileText,
   Kanban,
-  User,
   Sun,
   Moon,
   Settings,
   Search,
-  Hash,
-  Link2,
   Loader2,
   Menu,
   MessageSquare,
@@ -48,8 +44,7 @@ function SignInGate() {
     <div className="h-screen flex items-center justify-center bg-background">
       <div className="text-center space-y-6 max-w-sm mx-auto px-4">
         <div className="flex items-center gap-3">
-          <img src="/um-logo.svg" alt="Unstructured Minds" className="w-8 h-8 logo-dark" />
-          <img src="/um-logo-light.svg" alt="Unstructured Minds" className="w-8 h-8 logo-light" />
+          <img src="/um-icon.svg" alt="Unstructured Minds" className="w-8 h-8 rounded" />
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">Unstructured Minds</h1>
         </div>
         <p className="text-muted-foreground">Sign in to access your notes and data.</p>
@@ -242,36 +237,18 @@ function App() {
   useKeyboardShortcuts(shortcuts)
 
   const sidebarContent = (
-    <div className="flex flex-col h-full">
-      <div className="flex border-b border-border/50">
-        {(['files', 'tags', 'links'] as const).map((tab) => (
-          <button
-            key={tab}
-            className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 sm:py-1 text-xs font-medium transition-colors min-h-[44px] sm:min-h-0 ${
-              ui.sidebarTab === tab
-                ? 'bg-accent text-accent-foreground border-b-2 border-primary'
-                : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
-            }`}
-            onClick={() => ui.setSidebarTab(tab)}
-            title={tab.charAt(0).toUpperCase() + tab.slice(1)}
-          >
-            {tab === 'files' && <FileText className="h-4 w-4" />}
-            {tab === 'tags' && <Hash className="h-4 w-4" />}
-            {tab === 'links' && <Link2 className="h-4 w-4" />}
-            {tab.charAt(0).toUpperCase() + tab.slice(1)}
-          </button>
-        ))}
-      </div>
-      <div className="flex-1 overflow-hidden">
-        {ui.sidebarTab === 'files' && (
-          <FileTree onFileSelect={handleFileSelect} selectedFile={file.selectedFile} apiBaseUrl={api.baseUrl}
-            onCreateDailyNote={createDailyNote} onOpenTemplatePicker={ui.openTemplatePicker}
-            onDeleteFile={file.handleDeleteFile} onRenameFile={file.handleRenameFile}
-            refreshTrigger={fileTreeRefresh} />
-        )}
-        {ui.sidebarTab === 'tags' && <TagsPanel onFileSelect={handleFileSelect} apiBaseUrl={api.baseUrl} />}
-        {ui.sidebarTab === 'links' && <BacklinksPanel currentFile={file.selectedFile} onFileSelect={handleFileSelect} apiBaseUrl={api.baseUrl} />}
-      </div>
+    <div className="flex flex-col h-full overflow-auto">
+      <DailyNotes
+        onFileSelect={handleFileSelect}
+        selectedFile={file.selectedFile}
+        refreshTrigger={fileTreeRefresh}
+        onCreateDailyNote={createDailyNote}
+      />
+      <QuickNotes
+        onFileSelect={handleFileSelect}
+        selectedFile={file.selectedFile}
+        refreshTrigger={fileTreeRefresh}
+      />
     </div>
   )
 
@@ -303,9 +280,9 @@ function App() {
           </button>
         )}
         {!ui.isMobile && !ui.isTablet && ui.isChatExpanded && (
-          <div className="h-[28rem] border-t border-border/50 flex flex-col overflow-hidden relative">
+          <div className="h-[32rem] border-t border-border/50 flex flex-col overflow-hidden relative">
             <button onClick={() => ui.setIsChatExpanded(false)}
-              className="absolute top-2 right-2 z-10 p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
+              className="absolute top-3 right-3 z-10 p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
               title="Close chat">
               <ChevronDown className="h-4 w-4" />
             </button>
@@ -337,13 +314,12 @@ function App() {
             </Button>
           )}
           <div className="flex items-center gap-1.5 sm:gap-2">
-            <img src="/um-logo.svg" alt="" className="w-5 h-5 sm:w-6 sm:h-6 logo-dark" />
-            <img src="/um-logo-light.svg" alt="" className="w-5 h-5 sm:w-6 sm:h-6 logo-light" />
+            <img src="/um-icon.svg" alt="" className="w-5 h-5 sm:w-6 sm:h-6 rounded" />
             <h1 className="text-sm sm:text-base font-semibold tracking-tight truncate">{ui.isMobile ? 'UM' : 'Unstructured Minds'}</h1>
           </div>
           {!ui.isMobile && (
             <div className="hidden sm:flex items-center gap-1 bg-muted rounded-lg p-1">
-              {([['editor', FileText, 'Editor'], ['dashboard', LayoutDashboard, 'Dashboard'], ['kanban', Kanban, 'Kanban'], ['profile', User, 'Profile']] as const).map(([v, Icon, label]) => (
+              {([['editor', FileText, 'Editor'], ['dashboard', LayoutDashboard, 'Dashboard'], ['kanban', Kanban, 'Kanban']] as const).map(([v, Icon, label]) => (
                 <Button key={v} variant={view === v ? 'secondary' : 'ghost'} size="sm" onClick={() => navigate(v === 'editor' ? '/editor' : `/${v}`)} className="gap-1">
                   <Icon className="w-4 h-4" /><span className="hidden lg:inline">{label}</span>
                 </Button>

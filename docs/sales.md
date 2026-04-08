@@ -140,7 +140,7 @@ Claude translates your question to SQL. DuckDB returns results instantly. Visual
 | Layer | Technology | Why |
 |-------|-----------|-----|
 | **Frontend** | React 19 + Milkdown 7 + Tailwind 4 | Modern, reactive, beautiful UI. Milkdown gives you WYSIWYG without sacrificing markdown power. |
-| **Backend** | Python 3.14 + FastAPI | Fast, async-ready. Native integration with Claude API. Perfect for AI-driven extraction. |
+| **Backend** | Python 3.12+ + FastAPI | Fast, async-ready. Native integration with Claude API. Perfect for AI-driven extraction. |
 | **Database** | DuckDB 1.4 | Lightweight SQL engine for personal data warehouses. No server overhead. Runs on your machine. |
 | **AI** | Claude API | Haiku 4.5 for extraction (fast, cheap). Sonnet 4.5 for queries (accurate, nuanced). |
 | **Deployment** | Docker Compose | Single command startup. Works on macOS, Linux, Windows. Consistent environment everywhere. |
@@ -260,4 +260,3 @@ Welcome to your second brain with a SQL engine underneath.
 
 **Have feedback?** Open an issue on GitHub or reach out.
 
-**Want to contribute?** See `CONTRIBUTING.md` for the development workflow.

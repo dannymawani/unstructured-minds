@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
-import { LayoutDashboard } from 'lucide-react';
+import { useState, useMemo, useEffect, useCallback, Component, type ReactNode } from 'react';
+import { LayoutDashboard, AlertTriangle } from 'lucide-react';
 import { DashboardSummary } from './DashboardSummary';
 import { WeeklyActivityChart } from './WeeklyActivityChart';
 import { MetricsTrends } from './MetricsTrends';
@@ -16,6 +16,26 @@ import { InsightsCard } from './InsightsCard';
 import { WidgetConfigPanel, useWidgetConfig } from './WidgetConfig';
 import { DemoBanner } from './DemoBanner';
 import { OnboardingOverlay } from '../Onboarding/OnboardingOverlay';
+
+class WidgetErrorBoundary extends Component<{ name: string; children: ReactNode }, { error: Error | null }> {
+  state = { error: null as Error | null };
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  componentDidCatch(error: Error) { console.error(`Widget "${this.props.name}" crashed:`, error); }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="bg-card rounded-md shadow-sm p-4 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2 mb-1">
+            <AlertTriangle className="w-4 h-4 text-destructive" />
+            <span className="font-medium text-foreground">{this.props.name} failed to load</span>
+          </div>
+          <p className="text-xs">{this.state.error.message}</p>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 interface OnboardingStatus {
   is_new_user: boolean;
@@ -130,55 +150,55 @@ export function Dashboard({ apiUrl = 'http://localhost:8000', onCreateNote }: Da
       )}
 
       {/* Summary Cards */}
-      {isVisible('summary') && <DashboardSummary apiUrl={apiUrl} days={dateRange} key={`summary-${refreshKey}`} />}
+      {isVisible('summary') && <WidgetErrorBoundary name="Summary"><DashboardSummary apiUrl={apiUrl} days={dateRange} key={`summary-${refreshKey}`} /></WidgetErrorBoundary>}
 
       {/* AI Insights */}
-      {isVisible('insights') && <InsightsCard apiUrl={apiUrl} key={`insights-${refreshKey}`} />}
+      {isVisible('insights') && <WidgetErrorBoundary name="Insights"><InsightsCard apiUrl={apiUrl} key={`insights-${refreshKey}`} /></WidgetErrorBoundary>}
 
       {/* Heatmap + Nutrition - Side by side */}
       {(isVisible('heatmap') || isVisible('nutrition')) && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
           {isVisible('heatmap') && (
-              <ActivityHeatmap
+              <WidgetErrorBoundary name="Activity Heatmap"><ActivityHeatmap
                 apiUrl={apiUrl}
                 onDayClick={handleHeatmapDayClick}
                 key={`heatmap-${refreshKey}`}
-              />
+              /></WidgetErrorBoundary>
           )}
-          {isVisible('nutrition') && <NutritionTile apiUrl={apiUrl} days={dateRange} key={`nutrition-${refreshKey}`} />}
+          {isVisible('nutrition') && <WidgetErrorBoundary name="Nutrition"><NutritionTile apiUrl={apiUrl} days={dateRange} key={`nutrition-${refreshKey}`} /></WidgetErrorBoundary>}
         </div>
       )}
 
       {/* Charts Grid - Row 1 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-        {isVisible('weeklyActivity') && <WeeklyActivityChart apiUrl={apiUrl} days={dateRange} key={`weekly-${refreshKey}`} />}
-        {isVisible('metricsTrends') && <MetricsTrends apiUrl={apiUrl} days={dateRange} key={`metrics-${refreshKey}`} />}
+        {isVisible('weeklyActivity') && <WidgetErrorBoundary name="Weekly Activity"><WeeklyActivityChart apiUrl={apiUrl} days={dateRange} key={`weekly-${refreshKey}`} /></WidgetErrorBoundary>}
+        {isVisible('metricsTrends') && <WidgetErrorBoundary name="Metrics Trends"><MetricsTrends apiUrl={apiUrl} days={dateRange} key={`metrics-${refreshKey}`} /></WidgetErrorBoundary>}
       </div>
 
       {/* Charts Grid - Row 2 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {isVisible('sleepTrends') && (
-          <SleepTrends apiUrl={apiUrl} days={dateRange} onDayClick={handleSleepDayClick} key={`sleep-${refreshKey}`} />
+          <WidgetErrorBoundary name="Sleep Trends"><SleepTrends apiUrl={apiUrl} days={dateRange} onDayClick={handleSleepDayClick} key={`sleep-${refreshKey}`} /></WidgetErrorBoundary>
         )}
-        {isVisible('moodCorrelation') && <MoodCorrelation apiUrl={apiUrl} days={dateRange} key={`mood-${refreshKey}`} />}
+        {isVisible('moodCorrelation') && <WidgetErrorBoundary name="Mood Correlation"><MoodCorrelation apiUrl={apiUrl} days={dateRange} key={`mood-${refreshKey}`} /></WidgetErrorBoundary>}
       </div>
 
       {/* Muscle Groups + Body Weight */}
       {(isVisible('muscleGroups') || isVisible('bodyWeight')) && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-          {isVisible('muscleGroups') && <MuscleGroupMap apiUrl={apiUrl} days={dateRange} key={`muscles-${refreshKey}`} />}
-          {isVisible('bodyWeight') && <BodyWeightChart apiUrl={apiUrl} days={dateRange} key={`weight-${refreshKey}`} />}
+          {isVisible('muscleGroups') && <WidgetErrorBoundary name="Muscle Groups"><MuscleGroupMap apiUrl={apiUrl} days={dateRange} key={`muscles-${refreshKey}`} /></WidgetErrorBoundary>}
+          {isVisible('bodyWeight') && <WidgetErrorBoundary name="Body Weight"><BodyWeightChart apiUrl={apiUrl} days={dateRange} key={`weight-${refreshKey}`} /></WidgetErrorBoundary>}
         </div>
       )}
 
       {/* Exercise Table */}
       {isVisible('exerciseProgress') && (
-        <ExerciseTable apiUrl={apiUrl} key={`exercise-${refreshKey}`} />
+        <WidgetErrorBoundary name="Exercise Table"><ExerciseTable apiUrl={apiUrl} key={`exercise-${refreshKey}`} /></WidgetErrorBoundary>
       )}
 
       {/* Endurance Log */}
       {isVisible('enduranceLog') && (
-        <EnduranceLog apiUrl={apiUrl} key={`endurance-${refreshKey}`} />
+        <WidgetErrorBoundary name="Endurance Log"><EnduranceLog apiUrl={apiUrl} key={`endurance-${refreshKey}`} /></WidgetErrorBoundary>
       )}
 
       {/* Empty state when no widgets visible */}

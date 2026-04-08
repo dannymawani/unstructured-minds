@@ -39,16 +39,16 @@ Based on the project's data extraction patterns:
 ### Food Log
 - `date` (DATE)
 - `meal_type` (VARCHAR): breakfast, lunch, dinner, snack
-- `food_item` (VARCHAR)
+- `description` (VARCHAR)
 - `calories`, `protein_g`, `carbs_g`, `fat_g` (NUMERIC)
 
 ### Daily Metrics
 - `date` (DATE): Primary key
 - `sleep_hours` (DECIMAL)
-- `sleep_quality` (INTEGER): 1-5 scale
-- `energy` (INTEGER): 1-5 scale
-- `mood` (INTEGER): 1-5 scale
-- `stress` (INTEGER): 1-5 scale
+- `sleep_quality` (INTEGER): 1-10 scale
+- `energy` (INTEGER): 1-10 scale
+- `mood` (INTEGER): 1-10 scale
+- `stress` (INTEGER): 1-10 scale
 - `notes` (VARCHAR)
 - `source_file` (VARCHAR)
 

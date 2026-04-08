@@ -8,7 +8,6 @@ export function useUIState() {
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [isTemplatePickerOpen, setIsTemplatePickerOpen] = useState(false)
   const [isQuickCaptureOpen, setIsQuickCaptureOpen] = useState(false)
-  const [sidebarTab, setSidebarTab] = useState<'files' | 'tags' | 'links'>('files')
 
   // Mobile state
   const { isMobile, isTablet } = useMobile()
@@ -39,8 +38,6 @@ export function useUIState() {
   return {
     // Sidebar
     isSidebarVisible,
-    sidebarTab,
-    setSidebarTab,
     toggleSidebar,
 
     // Modals

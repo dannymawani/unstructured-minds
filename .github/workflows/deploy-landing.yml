@@ -15,7 +15,7 @@ on:
   push:
     branches: [main]
     paths:
-      - "landing/**"
+      - "website/**"
   workflow_dispatch:
 
 permissions:
@@ -32,4 +32,4 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy landing/ --project-name=unstructured-minds-landing
+          command: pages deploy website/ --project-name=unstructured-minds-landing
