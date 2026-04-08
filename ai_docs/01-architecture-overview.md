@@ -20,9 +20,9 @@ Unstructured Minds transforms natural language markdown notes into structured, q
 │                   (Python 3.12+, async)                      │
 ├─────────────────────────────────────────────────────────────┤
 │  ┌──────────────┐  ┌──────────────┐  ┌───────────────────┐ │
-│  │ DuckDB /     │  │ Claude API   │  │ Storage Backend   │ │
-│  │ Postgres     │  │ (Haiku 4.5   │  │ (Filesystem or    │ │
-│  │ (data)       │  │  + Sonnet)   │  │  Postgres)        │ │
+│  │ DuckDB /     │  │ LLM Provider │  │ Storage Backend   │ │
+│  │ Postgres     │  │ (via LiteLLM │  │ (Filesystem or    │ │
+│  │ (data)       │  │  agnostic)   │  │  Postgres)        │ │
 │  └──────────────┘  └──────────────┘  └───────────────────┘ │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -38,9 +38,9 @@ The system runs in one of two modes, determined by environment variables:
 | **Analytics DB** | Same DuckDB file | In-memory DuckDB cache |
 | **Vault storage** | Local filesystem (`vault/`) | Postgres `vault_files` table |
 | **Settings** | JSON files in `data/` | Postgres `user_settings` JSONB |
-| **Auth** | None (`user_id = "local"`) | Clerk JWT → UUID via `uuid5` |
-| **User isolation** | N/A (single user) | All queries scoped by `user_id` |
-| **Required env** | `VAULT_PATH`, `DATA_PATH` | + `DATABASE_URL`, `CLERK_*` |
+| **Auth** | Configurable: none / basic / clerk | Configurable: none / basic / clerk |
+| **User isolation** | N/A (single user, `user_id = "local"`) | All queries scoped by `user_id` |
+| **Required env** | `VAULT_PATH`, `DATA_PATH` | + `DATABASE_URL`, `AUTH_MODE` |
 
 ## Project Structure
 

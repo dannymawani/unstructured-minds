@@ -1,15 +1,18 @@
 # Auth & Security
 
-Clerk authentication, JWT flow, security headers, SQL validation, and testing auth bypass.
+Authentication modes, security headers, SQL validation, and testing auth bypass.
 
 ## Auth Modes
 
-| Mode | Auth | User ID Source |
-|------|------|---------------|
-| Local (`USE_CLOUD=false`) | Disabled | `LOCAL_USER_ID = "local"` (hardcoded) |
-| Cloud (`USE_CLOUD=true` + `DATABASE_URL`) | Clerk JWT | `uuid5(NAMESPACE_URL, clerk_sub)` |
+Controlled by `AUTH_MODE` env var (default: `none`). Auth mode is independent of storage mode.
 
-There is no `DEFAULT_USER_ID` — local mode has one hardcoded user, cloud mode derives identity from JWT.
+| Mode | How it works | User ID Source |
+|------|-------------|---------------|
+| `none` (default) | No authentication | `LOCAL_USER_ID = "local"` (hardcoded) |
+| `basic` | HTTP Basic Auth (`BASIC_AUTH_USERNAME` / `BASIC_AUTH_PASSWORD`) | `LOCAL_USER_ID = "local"` |
+| `clerk` | Clerk JWT verification | `uuid5(NAMESPACE_URL, clerk_sub)` |
+
+Backward compat: if `AUTH_MODE` is not set but `USE_CLOUD=true` + `CLERK_SECRET_KEY` is present, auth is enabled automatically.
 
 ## Auth Flow (Cloud Mode)
 
@@ -58,9 +61,10 @@ user_id = str(uuid.uuid5(CLERK_NAMESPACE, clerk_jwt_payload["sub"]))
 
 | File | Role |
 |------|------|
-| `config.py` | `LOCAL_USER_ID` constant; `auth_enabled` = `is_cloud_mode` |
+| `config.py` | `LOCAL_USER_ID` constant; `auth_mode` (none/basic/clerk); `auth_enabled` property |
 | `middleware/clerk_auth.py` | `verify_clerk_token()` — JWKS fetch, RSA verify, decode |
-| `api/dependencies.py` | `get_user_id()` — local: `LOCAL_USER_ID`; cloud: JWT → UUID |
+| `middleware/basic_auth.py` | HTTP Basic Auth middleware (username/password from env) |
+| `api/dependencies.py` | `get_user_id()` — none/basic: `LOCAL_USER_ID`; clerk: JWT → UUID |
 
 ### JWKS Caching
 
@@ -70,9 +74,12 @@ Backend caches Clerk's JWKS public keys in memory. On key rotation (unknown `kid
 
 | Env Var | Where | Purpose |
 |---------|-------|---------|
+| `AUTH_MODE` | Backend | `none` / `basic` / `clerk` (default: `none`) |
+| `BASIC_AUTH_USERNAME` | Backend | Username for basic auth mode |
+| `BASIC_AUTH_PASSWORD` | Backend | Password for basic auth mode |
 | `VITE_CLERK_PUBLISHABLE_KEY` | Frontend (build arg) | Enables Clerk UI, sign-in gate |
-| `CLERK_SECRET_KEY` | Backend | JWT validation (JWKS fetch) |
-| `CLERK_DOMAIN` | Backend | JWKS URL + JWT issuer validation |
+| `CLERK_SECRET_KEY` | Backend | JWT validation (Clerk mode) |
+| `CLERK_DOMAIN` | Backend | JWKS URL + JWT issuer (Clerk mode) |
 
 ## Security Measures
 

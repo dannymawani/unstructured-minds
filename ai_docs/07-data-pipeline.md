@@ -5,7 +5,7 @@ End-to-end extraction flow, exercise matching, AI classification, and three-tier
 ## Extraction Flow
 
 ```
-Markdown Note → Hash Check (skip if unchanged) → Load Schema → Claude Tool-Use Call
+Markdown Note → Hash Check (skip if unchanged) → Load Schema → LLM Tool-Use Call
     → Parse Response → Upsert into DB → Log to extraction_log
 ```
 
@@ -14,7 +14,7 @@ Markdown Note → Hash Check (skip if unchanged) → Load Schema → Claude Tool
 1. **File written** to vault (via editor save, quick capture, or import)
 2. **Hash check** — compare file content hash with `extraction_log`; skip if unchanged
 3. **Load schemas** from `shared/schemas/` (daily_metrics, exercise_log, food_log, daily_tasks)
-4. **Claude API call** (Haiku 4.5) — tool-use structured extraction with schemas as tools
+4. **LLM API call** (fast model) — tool-use structured extraction with schemas as tools
 5. **Parse response** — extract tool call results into typed objects
 6. **Validate** — check dates, IDs, required fields
 7. **Upsert** into DuckDB/Postgres tables

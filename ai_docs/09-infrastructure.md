@@ -15,8 +15,10 @@ services:
       - ${VAULT_PATH:-./vault}:/app/vault:rw
       - ${DATA_PATH:-./data}:/app/data:rw
     environment:
-      ANTHROPIC_API_KEY, USE_CLOUD, DATABASE_URL, VAULT_PATH=/app/vault,
-      DATA_PATH=/app/data, HOST=0.0.0.0, PORT=8000, DEBUG,
+      LLM_PROVIDER, LLM_API_KEY, LLM_MODEL_FAST, LLM_MODEL_SMART,
+      ANTHROPIC_API_KEY (legacy), USE_CLOUD, DATABASE_URL,
+      AUTH_MODE, BASIC_AUTH_USERNAME, BASIC_AUTH_PASSWORD,
+      VAULT_PATH=/app/vault, DATA_PATH=/app/data, HOST=0.0.0.0, PORT=8000, DEBUG,
       CLERK_SECRET_KEY, CLERK_DOMAIN
     healthcheck: curl -f http://localhost:8000/health (30s)
     networks: [app-network]
@@ -59,7 +61,11 @@ services:
 | `FRONTEND_PORT` | `3000` | Nginx port (Docker) |
 | `DEBUG` | `false` | Verbose logging + hot reload |
 | `CORS_ORIGINS` | `http://localhost:3000,http://localhost:5173` | Comma-separated |
-| `ANTHROPIC_API_KEY` | — | Claude API key |
+| `LLM_PROVIDER` | — | LLM provider (anthropic, openai, ollama, etc.) |
+| `LLM_API_KEY` | — | API key for the LLM provider |
+| `LLM_MODEL_FAST` | — | Fast model override (default per provider) |
+| `LLM_MODEL_SMART` | — | Smart model override (default per provider) |
+| `AUTH_MODE` | `none` | Authentication: none / basic / clerk |
 
 ### Cloud Mode
 
@@ -67,11 +73,15 @@ services:
 |----------|----------|---------|
 | `USE_CLOUD` | No | `true` enables cloud mode |
 | `DATABASE_URL` | Yes* | `postgresql://user:pass@host:port/db` |
-| `CLERK_SECRET_KEY` | Yes* | JWT signing key |
-| `CLERK_DOMAIN` | Yes* | Clerk issuer domain |
 | `DB_POOL_MIN` / `DB_POOL_MAX` | No | Connection pool (default 2/10) |
+| `BASIC_AUTH_USERNAME` | No** | Username for basic auth |
+| `BASIC_AUTH_PASSWORD` | No** | Password for basic auth |
+| `CLERK_SECRET_KEY` | No*** | JWT signing key |
+| `CLERK_DOMAIN` | No*** | Clerk issuer domain |
 
 \* Required when `USE_CLOUD=true`
+\*\* Required when `AUTH_MODE=basic`
+\*\*\* Required when `AUTH_MODE=clerk`
 
 ### Frontend (Vite — baked into JS bundle at build time)
 
