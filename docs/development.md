@@ -101,9 +101,9 @@ unstructured-minds/
 ├── data/                 # DuckDB database (gitignored)
 ├── docs/                 # Documentation
 ├── ai_docs/              # Deep technical docs
-├── docker-compose.yml    # Production
-├── docker-compose.dev.yml # Development overrides
+├── docker-compose.yml    # Docker services (dev + prod)
 ├── Makefile              # Common commands
+├── setup.sh              # Interactive .env setup wizard
 └── .env.example          # Environment template
 ```
 

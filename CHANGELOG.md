@@ -7,15 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Interactive setup wizard (`make setup` / `./setup.sh`) for .env configuration
+- Dashboard screenshot in README
+- Tailscale remote access documentation
+- `STORAGE_MODE` env var (`local` / `postgres`) replacing `USE_CLOUD` boolean
+
 ### Changed
-- Landing page redesigned with realistic app mockups (editor, dashboard, heatmap, kanban, chat)
+- Provider-agnostic AI: LiteLLM replaces Claude-only client (supports Anthropic, OpenAI, Ollama, 100+ providers)
+- Three auth modes: `none` (default) / `basic` / `clerk` — configurable via `AUTH_MODE`
+- Single `docker-compose.yml` for dev and prod (`DEBUG=true` enables hot reload)
+- README rewritten for open-source contributors
+- All docs updated for provider-agnostic LLM and three-mode auth
+- Settings UI: export simplified to single ZIP, removed Upgrade Plan section
+- Landing page redesigned with realistic app mockups
 - Endurance table uses SQL-level pagination instead of Python-side sorting and slicing
 - Insights endpoint consolidates 5 DB queries into 3 using UNION ALL CTEs
-- Move function-level `import re` and `import json` to module-level in dashboard.py
-- Add mtime-based cache to `_load_json_config` to avoid repeated disk reads
+- Resolved all ruff lint issues across 70 files
 
 ### Removed
-- Remove LifeProfile section entirely (backend API, frontend components, tests, docs)
+- `claude/client.py` (599 lines) — replaced by provider-agnostic `llm/client.py`
+- `docker-compose.dev.yml` — merged into single compose file
+- `azure_infrastructure/` — Terraform configs for Azure (not needed for open-source)
+- `ideas/` — moved to GitHub issues
+- `website/moodboards/` — design exploration artifacts
+- `data/schemas/` and `data/exercise_definitions.json` — duplicates of `shared/`
+- `skills-lock.json` and neon-postgres skill
+- LifeProfile section entirely (backend API, frontend components, tests, docs)
 
 ## [v0.9.0] - 2026-03-09
 
