@@ -2,10 +2,10 @@
 
 import asyncio
 import logging
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, Optional
 
-from watchdog.events import FileSystemEventHandler, FileModifiedEvent, FileCreatedEvent
+from watchdog.events import FileCreatedEvent, FileModifiedEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 
 logger = logging.getLogger(__name__)
@@ -29,7 +29,7 @@ class MarkdownEventHandler(FileSystemEventHandler):
         self.on_change = on_change
         self.debounce_seconds = debounce_seconds
         self._pending: dict[str, asyncio.TimerHandle] = {}
-        self._loop: Optional[asyncio.AbstractEventLoop] = None
+        self._loop: asyncio.AbstractEventLoop | None = None
 
     def set_loop(self, loop: asyncio.AbstractEventLoop) -> None:
         """Set the event loop for async callbacks."""
@@ -121,8 +121,8 @@ class FileWatcher:
         self.vault_path = Path(vault_path).resolve()
         self.on_change = on_change
         self.debounce_seconds = debounce_seconds
-        self._observer: Optional[Observer] = None
-        self._handler: Optional[MarkdownEventHandler] = None
+        self._observer: Observer | None = None
+        self._handler: MarkdownEventHandler | None = None
 
     def _make_relative(self, absolute_path: str) -> str:
         """Convert absolute path to relative path from vault.
@@ -144,7 +144,7 @@ class FileWatcher:
         logger.info(f"Processing file change: {relative_path}")
         self.on_change(relative_path)
 
-    def start(self, loop: Optional[asyncio.AbstractEventLoop] = None) -> None:
+    def start(self, loop: asyncio.AbstractEventLoop | None = None) -> None:
         """Start watching for file changes.
 
         Args:

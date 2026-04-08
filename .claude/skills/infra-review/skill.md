@@ -44,9 +44,6 @@ backend/src/config.py
 # Secrets / Environment
 .gitignore
 .env.example (if exists)
-
-# Migration Plan
-docs/azure_migration_plan.md
 ```
 
 ## Security Checklist

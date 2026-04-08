@@ -4,17 +4,17 @@ import json
 import logging
 import uuid
 from datetime import date, datetime, timedelta
-from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from ..config import settings
-from ..db.sql_compat import get_dialect, user_filter, placeholder
+from ..db.sql_compat import get_dialect, placeholder, user_filter
 from ..db.user_settings import UserSettingsStore
 from ..storage.datastore import DataStore
-from .dependencies import get_user_id, get_datastore as _dep_get_datastore
+from .dependencies import get_datastore as _dep_get_datastore
+from .dependencies import get_user_id
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ PROFILE_FILE = settings.data_path / "life_profile.json"
 
 class Overview(BaseModel):
     name: str = ""
-    age: Optional[int] = None
+    age: int | None = None
     location: str = ""
     company: str = ""
     role: str = ""
@@ -67,8 +67,8 @@ class Goal(BaseModel):
     category: str = ""
     description: str = ""
     status: str = "active"
-    target_date: Optional[str] = None
-    progress: Optional[int] = None
+    target_date: str | None = None
+    progress: int | None = None
 
 
 class LifeProfile(BaseModel):
@@ -87,22 +87,22 @@ class ReviewCreateRequest(BaseModel):
     work_highlights: str = ""
     training_summary: str = ""
     personal_wins: list[str] = Field(default_factory=list)
-    health_metrics: Optional[dict] = None
-    goal_progress: Optional[dict] = None
+    health_metrics: dict | None = None
+    goal_progress: dict | None = None
     focus_next: list[str] = Field(default_factory=list)
 
 
 class ReviewUpdateRequest(BaseModel):
-    period_start: Optional[str] = None
-    period_end: Optional[str] = None
-    key_wins: Optional[list[str]] = None
-    challenges: Optional[list[str]] = None
-    work_highlights: Optional[str] = None
-    training_summary: Optional[str] = None
-    personal_wins: Optional[list[str]] = None
-    health_metrics: Optional[dict] = None
-    goal_progress: Optional[dict] = None
-    focus_next: Optional[list[str]] = None
+    period_start: str | None = None
+    period_end: str | None = None
+    key_wins: list[str] | None = None
+    challenges: list[str] | None = None
+    work_highlights: str | None = None
+    training_summary: str | None = None
+    personal_wins: list[str] | None = None
+    health_metrics: dict | None = None
+    goal_progress: dict | None = None
+    focus_next: list[str] | None = None
 
 
 class ReviewOut(BaseModel):
@@ -114,8 +114,8 @@ class ReviewOut(BaseModel):
     work_highlights: str
     training_summary: str
     personal_wins: list[str]
-    health_metrics: Optional[dict]
-    goal_progress: Optional[dict]
+    health_metrics: dict | None
+    goal_progress: dict | None
     focus_next: list[str]
     created_at: str
     updated_at: str
@@ -130,7 +130,7 @@ def _load_profile_sync() -> dict:
         try:
             with open(PROFILE_FILE) as f:
                 return json.load(f)
-        except (json.JSONDecodeError, IOError):
+        except (OSError, json.JSONDecodeError):
             pass
     return LifeProfile().model_dump()
 
@@ -232,7 +232,6 @@ def list_reviews(request: Request, user_id: str = Depends(get_user_id)) -> list[
     """List all progress reviews, newest first."""
     db = request.app.state.db
     dialect = get_dialect(db)
-    ph = placeholder(dialect)
     conditions: list[str] = []
     params: list = []
     user_filter(dialect, user_id, conditions, params)
@@ -631,7 +630,6 @@ async def generate_review(request: Request, user_id: str = Depends(get_user_id),
     # Determine review period
     today = date.today()
     dialect = get_dialect(db)
-    ph = placeholder(dialect)
     try:
         conditions: list[str] = []
         params: list = []

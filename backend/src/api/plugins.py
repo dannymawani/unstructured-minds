@@ -1,7 +1,6 @@
 """Plugin management API endpoints."""
 
 import logging
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Request, status
 from pydantic import BaseModel
@@ -45,10 +44,10 @@ class PluginStatsRequest(BaseModel):
 class PluginStatsResponse(BaseModel):
     """Response with computed stats from plugins."""
 
-    word_count: Optional[int] = None
-    character_count: Optional[int] = None
-    line_count: Optional[int] = None
-    reading_time_minutes: Optional[float] = None
+    word_count: int | None = None
+    character_count: int | None = None
+    line_count: int | None = None
+    reading_time_minutes: float | None = None
 
 
 @router.get("", response_model=PluginListResponse)

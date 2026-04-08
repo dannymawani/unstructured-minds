@@ -54,7 +54,6 @@ Categorize each changed file:
 
 ### For new features (new component directories or significant new files)
 
-- Read `docs/sales.md` feature showcase section
 - Read `README.md` features table
 - Add the new feature if not already listed
 

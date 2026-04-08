@@ -3,8 +3,6 @@
 import json
 from pathlib import Path
 
-import pytest
-
 
 class TestWebhookModels:
     """Tests for webhook data models."""
@@ -72,8 +70,8 @@ class TestWebhookStorage:
 
     def test_create_and_list(self, tmp_path: Path):
         """Test creating and listing webhooks."""
-        from src.webhooks.storage import WebhookStorage
         from src.webhooks.models import Webhook
+        from src.webhooks.storage import WebhookStorage
 
         storage = WebhookStorage(tmp_path)
 
@@ -98,8 +96,8 @@ class TestWebhookStorage:
 
     def test_storage_persistence(self, tmp_path: Path):
         """Test that webhooks persist to file."""
-        from src.webhooks.storage import WebhookStorage
         from src.webhooks.models import Webhook
+        from src.webhooks.storage import WebhookStorage
 
         storage = WebhookStorage(tmp_path)
 
@@ -130,8 +128,8 @@ class TestWebhookStorage:
 
     def test_get_webhook(self, tmp_path: Path):
         """Test getting a specific webhook."""
-        from src.webhooks.storage import WebhookStorage
         from src.webhooks.models import Webhook
+        from src.webhooks.storage import WebhookStorage
 
         storage = WebhookStorage(tmp_path)
 
@@ -152,8 +150,8 @@ class TestWebhookStorage:
 
     def test_update_webhook(self, tmp_path: Path):
         """Test updating a webhook."""
-        from src.webhooks.storage import WebhookStorage
         from src.webhooks.models import Webhook
+        from src.webhooks.storage import WebhookStorage
 
         storage = WebhookStorage(tmp_path)
 
@@ -178,8 +176,8 @@ class TestWebhookStorage:
 
     def test_delete_webhook(self, tmp_path: Path):
         """Test deleting a webhook."""
-        from src.webhooks.storage import WebhookStorage
         from src.webhooks.models import Webhook
+        from src.webhooks.storage import WebhookStorage
 
         storage = WebhookStorage(tmp_path)
 
@@ -203,8 +201,8 @@ class TestWebhookStorage:
 
     def test_get_by_event(self, tmp_path: Path):
         """Test getting webhooks by event."""
-        from src.webhooks.storage import WebhookStorage
         from src.webhooks.models import Webhook
+        from src.webhooks.storage import WebhookStorage
 
         storage = WebhookStorage(tmp_path)
 
@@ -242,8 +240,8 @@ class TestWebhookStorage:
 
     def test_record_success(self, tmp_path: Path):
         """Test recording successful delivery."""
-        from src.webhooks.storage import WebhookStorage
         from src.webhooks.models import Webhook
+        from src.webhooks.storage import WebhookStorage
 
         storage = WebhookStorage(tmp_path)
 
@@ -264,8 +262,8 @@ class TestWebhookStorage:
 
     def test_record_failure(self, tmp_path: Path):
         """Test recording failed delivery."""
-        from src.webhooks.storage import WebhookStorage
         from src.webhooks.models import Webhook
+        from src.webhooks.storage import WebhookStorage
 
         storage = WebhookStorage(tmp_path)
 

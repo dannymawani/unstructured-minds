@@ -2,13 +2,12 @@
 
 import asyncio
 import json
-import re
 import os
-from typing import Any, Optional
+import re
+from typing import Any
 
 import anthropic
 from anthropic import AsyncAnthropic
-
 
 QUERY_SYSTEM_PROMPT = """You are a helpful assistant that answers questions about the user's personal data.
 You have access to their notes, exercise logs, daily metrics, and tasks.
@@ -96,14 +95,14 @@ Formatting guidelines:
 class ClaudeClient:
     """Client for interacting with Claude API using async SDK."""
 
-    def __init__(self, api_key: Optional[str] = None) -> None:
+    def __init__(self, api_key: str | None = None) -> None:
         """Initialize Claude client.
 
         Args:
             api_key: Anthropic API key. If not provided, uses ANTHROPIC_API_KEY env var.
         """
         self.api_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
-        self._client: Optional[AsyncAnthropic] = None
+        self._client: AsyncAnthropic | None = None
         self.model_fast = "claude-haiku-4-5-20251001"
         self.model_smart = "claude-sonnet-4-5-20250929"
 

@@ -1,11 +1,8 @@
 """Tests for file watcher module."""
 
-import asyncio
 import time
 from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock
 
 from src.watcher import FileWatcher
 from src.watcher.file_watcher import MarkdownEventHandler

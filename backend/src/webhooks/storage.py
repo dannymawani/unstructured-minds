@@ -3,7 +3,6 @@
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 from ..logging_config import get_logger
 from .models import Webhook
@@ -32,10 +31,10 @@ class WebhookStorage:
     def _load_webhooks(self) -> list[dict]:
         """Load webhooks from JSON file."""
         try:
-            with open(self._file_path, "r") as f:
+            with open(self._file_path) as f:
                 data = json.load(f)
                 return data.get("webhooks", [])
-        except (json.JSONDecodeError, IOError) as e:
+        except (OSError, json.JSONDecodeError) as e:
             logger.warning("webhook_storage_load_error", error=str(e))
             return []
 
@@ -67,7 +66,7 @@ class WebhookStorage:
                 logger.warning("webhook_parse_error", webhook_id=item.get("id"), error=str(e))
         return webhooks
 
-    def get(self, webhook_id: str) -> Optional[Webhook]:
+    def get(self, webhook_id: str) -> Webhook | None:
         """Get a webhook by ID.
 
         Args:

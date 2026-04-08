@@ -1,15 +1,13 @@
 """Tests for logging configuration."""
 
-import pytest
 import logging
-from unittest.mock import patch, MagicMock
 
 from src.logging_config import (
     configure_logging,
-    get_logger,
     get_api_logger,
     get_db_logger,
     get_extraction_logger,
+    get_logger,
     get_watcher_logger,
 )
 

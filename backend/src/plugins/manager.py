@@ -4,7 +4,7 @@ import importlib.util
 import json
 import logging
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from .base import Plugin, PluginHook, PluginInfo
 
@@ -39,7 +39,7 @@ class PluginManager:
                 with open(self._state_path) as f:
                     data = json.load(f)
                     self._state = data.get("plugins", {})
-            except (json.JSONDecodeError, IOError) as e:
+            except (OSError, json.JSONDecodeError) as e:
                 logger.warning(f"Failed to load plugin state: {e}")
                 self._state = {}
 
@@ -49,10 +49,10 @@ class PluginManager:
         try:
             with open(self._state_path, "w") as f:
                 json.dump({"plugins": self._state}, f, indent=2)
-        except IOError as e:
+        except OSError as e:
             logger.error(f"Failed to save plugin state: {e}")
 
-    async def load_plugin(self, path: str) -> Optional[PluginInfo]:
+    async def load_plugin(self, path: str) -> PluginInfo | None:
         """Load a plugin from a Python file.
 
         Args:
@@ -154,7 +154,7 @@ class PluginManager:
         """
         return [plugin.info for plugin in self._plugins.values()]
 
-    def get_plugin(self, name: str) -> Optional[Plugin]:
+    def get_plugin(self, name: str) -> Plugin | None:
         """Get a plugin by name.
 
         Args:

@@ -1,14 +1,14 @@
 """Webhook data models."""
 
 from datetime import datetime
-from enum import Enum
-from typing import Any, Optional
+from enum import StrEnum
+from typing import Any
 from uuid import uuid4
 
 from pydantic import BaseModel, Field, HttpUrl
 
 
-class WebhookEvent(str, Enum):
+class WebhookEvent(StrEnum):
     """Supported webhook events."""
 
     NOTE_CREATED = "note.created"
@@ -31,13 +31,13 @@ class WebhookCreate(BaseModel):
         min_length=1,
         description="List of events to subscribe to",
     )
-    secret: Optional[str] = Field(
+    secret: str | None = Field(
         None,
         min_length=16,
         max_length=256,
         description="Secret key for signing payloads (optional)",
     )
-    name: Optional[str] = Field(
+    name: str | None = Field(
         None,
         max_length=100,
         description="Human-readable name for the webhook",
@@ -51,12 +51,12 @@ class Webhook(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
     url: str
     events: list[str]
-    secret: Optional[str] = None
-    name: Optional[str] = None
+    secret: str | None = None
+    name: str | None = None
     active: bool = True
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
-    last_triggered: Optional[datetime] = None
+    last_triggered: datetime | None = None
     failure_count: int = 0
 
     class Config:
@@ -70,7 +70,7 @@ class WebhookPayload(BaseModel):
     timestamp: str
     webhook_id: str
     data: dict[str, Any]
-    signature: Optional[str] = None
+    signature: str | None = None
 
 
 class WebhookDeliveryResult(BaseModel):
@@ -79,8 +79,8 @@ class WebhookDeliveryResult(BaseModel):
     webhook_id: str
     event: str
     success: bool
-    status_code: Optional[int] = None
-    error: Optional[str] = None
+    status_code: int | None = None
+    error: str | None = None
     duration_ms: float
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
@@ -91,11 +91,11 @@ class WebhookResponse(BaseModel):
     id: str
     url: str
     events: list[str]
-    name: Optional[str]
+    name: str | None
     active: bool
     created_at: datetime
     updated_at: datetime
-    last_triggered: Optional[datetime]
+    last_triggered: datetime | None
     failure_count: int
 
 
@@ -110,6 +110,6 @@ class WebhookTestResponse(BaseModel):
     """Response model for testing a webhook."""
 
     success: bool
-    status_code: Optional[int]
-    error: Optional[str]
+    status_code: int | None
+    error: str | None
     duration_ms: float

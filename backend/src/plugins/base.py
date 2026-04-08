@@ -2,11 +2,10 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Optional
+from enum import StrEnum
 
 
-class PluginHook(str, Enum):
+class PluginHook(StrEnum):
     """Available plugin hooks."""
 
     # Note lifecycle
@@ -100,7 +99,7 @@ class Plugin(ABC):
         """
         self._hooks[hook] = callback
 
-    def get_hook(self, hook: PluginHook) -> Optional[callable]:
+    def get_hook(self, hook: PluginHook) -> callable | None:
         """Get registered hook callback.
 
         Args:

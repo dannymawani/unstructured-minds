@@ -5,7 +5,7 @@ import hashlib
 import hmac
 import time
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 
@@ -14,7 +14,6 @@ from ..logging_config import get_logger
 from .models import (
     Webhook,
     WebhookDeliveryResult,
-    WebhookEvent,
     WebhookPayload,
 )
 from .storage import WebhookStorage
@@ -74,7 +73,7 @@ class WebhookDispatcher:
             storage: Webhook storage backend
         """
         self._storage = storage
-        self._client: Optional[httpx.AsyncClient] = None
+        self._client: httpx.AsyncClient | None = None
 
     async def _get_client(self) -> httpx.AsyncClient:
         """Get or create HTTP client."""
@@ -89,7 +88,7 @@ class WebhookDispatcher:
             self._client = None
 
     def _create_payload(
-        self, event: str, data: dict[str, Any], webhook_id: str, secret: Optional[str] = None
+        self, event: str, data: dict[str, Any], webhook_id: str, secret: str | None = None
     ) -> tuple[WebhookPayload, str]:
         """Create a webhook payload.
 
@@ -281,7 +280,7 @@ class WebhookDispatcher:
 
 
 # Global dispatcher instance (initialized lazily)
-_dispatcher: Optional[WebhookDispatcher] = None
+_dispatcher: WebhookDispatcher | None = None
 
 
 def get_dispatcher() -> WebhookDispatcher:

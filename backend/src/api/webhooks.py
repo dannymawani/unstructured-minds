@@ -1,18 +1,16 @@
 """Webhooks API endpoints."""
 
-from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field, HttpUrl
 
 from ..config import settings
 from ..logging_config import get_logger
 from ..webhooks import (
+    WEBHOOK_EVENTS,
     Webhook,
-    WebhookCreate,
     WebhookDispatcher,
     WebhookStorage,
-    WEBHOOK_EVENTS,
 )
 from ..webhooks.models import (
     WebhookListResponse,
@@ -59,13 +57,13 @@ class WebhookCreateRequest(BaseModel):
         min_length=1,
         description="List of events to subscribe to",
     )
-    secret: Optional[str] = Field(
+    secret: str | None = Field(
         None,
         min_length=16,
         max_length=256,
         description="Secret key for signing payloads (recommended)",
     )
-    name: Optional[str] = Field(
+    name: str | None = Field(
         None,
         max_length=100,
         description="Human-readable name for the webhook",
@@ -75,24 +73,24 @@ class WebhookCreateRequest(BaseModel):
 class WebhookUpdateRequest(BaseModel):
     """Request to update a webhook."""
 
-    url: Optional[HttpUrl] = Field(None, description="URL to receive webhook events")
-    events: Optional[list[str]] = Field(
+    url: HttpUrl | None = Field(None, description="URL to receive webhook events")
+    events: list[str] | None = Field(
         None,
         min_length=1,
         description="List of events to subscribe to",
     )
-    secret: Optional[str] = Field(
+    secret: str | None = Field(
         None,
         min_length=16,
         max_length=256,
         description="Secret key for signing payloads",
     )
-    name: Optional[str] = Field(
+    name: str | None = Field(
         None,
         max_length=100,
         description="Human-readable name for the webhook",
     )
-    active: Optional[bool] = Field(None, description="Whether the webhook is active")
+    active: bool | None = Field(None, description="Whether the webhook is active")
 
 
 class WebhookEventsResponse(BaseModel):
