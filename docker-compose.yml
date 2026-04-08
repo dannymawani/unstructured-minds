@@ -1,0 +1,116 @@
+# =============================================================================
+# Unstructured Minds - Docker Compose
+# =============================================================================
+#
+# Quick Start:
+#   docker compose up                                # Local mode (DuckDB, zero deps)
+#   docker compose --profile postgres up             # With bundled Postgres
+#   docker compose up  (with DATABASE_URL in .env)   # BYO external Postgres
+#
+# Prerequisites:
+#   1. Copy .env.example to .env
+#   2. (Optional) Set LLM_API_KEY for AI features
+#
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # Postgres — only starts with: docker compose --profile postgres up
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    profiles: ["postgres"]
+    container_name: unstructured-minds-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-um}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-um_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-unstructured_minds}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-um}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  # ---------------------------------------------------------------------------
+  # Backend - FastAPI Python Application
+  # ---------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: unstructured-minds-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount vault for markdown notes
+      - ${VAULT_PATH:-./vault}:/app/vault:rw
+      # Mount data directory for DuckDB and CSVs
+      - ${DATA_PATH:-./data}:/app/data:rw
+      # Uncomment for hot reload (DEBUG=true auto-enables --reload)
+      # - ./backend/src:/app/src:ro
+    env_file: .env
+    environment:
+      # Fixed container paths (override .env values)
+      - VAULT_PATH=/app/vault
+      - DATA_PATH=/app/data
+      - HOST=0.0.0.0
+      - PORT=8000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  # ---------------------------------------------------------------------------
+  # Frontend - React SPA with Nginx
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # Must be a build arg (not runtime env) — Vite bakes VITE_* into JS at build time
+        - VITE_CLERK_PUBLISHABLE_KEY=${VITE_CLERK_PUBLISHABLE_KEY:-}
+    container_name: unstructured-minds-frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/nginx-health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - app-network
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  app-network:
+    driver: bridge
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  pgdata:

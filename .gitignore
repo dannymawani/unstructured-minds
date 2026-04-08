@@ -1,0 +1,98 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+# Python lib directories (not frontend/src/lib)
+/lib/
+/lib64/
+backend/lib/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.venv/
+venv/
+ENV/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs
+frontend/dist/
+frontend/build/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Data — runtime data (schemas and exercise defs live in shared/)
+data/
+!data/.gitkeep
+
+# Backend runtime data
+backend/data/*.duckdb
+backend/data/*.duckdb.wal
+backend/data/*.json
+!backend/data/.gitkeep
+
+# User vault - personal notes (but track templates)
+vault/*
+!vault/Templates/
+
+# Docker
+.docker/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary
+tmp/
+temp/
+.tmp/
+*.tmp
+
+# Claude Code worktrees
+.claude/worktrees/
+
+# Planning scratch files
+next_step.md
+plan.md
+remove_clerk.md
+OPENSOURCE_PREP_PLAN.md
+
+# Claude Desktop personal settings (machine-specific)
+.claude/settings.local.json
