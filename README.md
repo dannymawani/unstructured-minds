@@ -9,6 +9,13 @@
 </p>
 
 <p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/dannymawani/unstructured_minds" alt="License" /></a>
+  <img src="https://img.shields.io/badge/docker-compose-2496ED?logo=docker&logoColor=white" alt="Docker Compose" />
+  <img src="https://img.shields.io/badge/python-3.12+-3776AB?logo=python&logoColor=white" alt="Python 3.12+" />
+  <img src="https://img.shields.io/badge/react-19-61DAFB?logo=react&logoColor=black" alt="React 19" />
+</p>
+
+<p align="center">
   <a href="#quick-start">Quick Start</a> &bull;
   <a href="#features">Features</a> &bull;
   <a href="#how-it-works">How It Works</a> &bull;
@@ -20,6 +27,12 @@
 <p align="center">
   <img src="assets/screenshots/dashboard.png" alt="Dashboard — activity heatmap, nutrition, insights" width="720" />
 </p>
+
+## Why Unstructured Minds?
+
+Most note apps let you write but not **query**. Most data tools need structure upfront. Unstructured Minds bridges the gap — write freely in markdown, and AI turns your notes into a personal data warehouse. Track workouts, food, sleep, mood, or anything else, then ask questions like *"How many times did I squat over 100kg this month?"* and get real answers backed by SQL.
+
+Everything runs on your machine. No cloud required. No vendor lock-in.
 
 ## How It Works
 
@@ -87,14 +100,10 @@ cp .env.example .env
 ### 2. Start
 
 ```bash
-# Development (hot reload)
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
-
-# Or production
-docker compose up -d
+docker compose up --build
 ```
 
-Open **http://localhost:5173** (dev) or **http://localhost:3000** (prod).
+Open **http://localhost:3000**.
 
 ### Without Docker
 

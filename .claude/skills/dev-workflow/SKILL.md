@@ -37,7 +37,7 @@ Plan → Approve → Implement → Test → Review → Deploy
 - Backend: `cd backend && pytest`
 - Frontend: `vitest` in `frontend/`
 - Add tests for new functionality
-- Verify Docker build: `docker compose -f docker-compose.dev.yml build`
+- Verify Docker build: `docker compose build`
 
 ### 5. Review
 - Run `/code-review` before merging
@@ -72,7 +72,7 @@ main (protected)
 
 Before starting any implementation task, verify:
 
-- [ ] Docker is running: `docker compose -f docker-compose.dev.yml up -d`
+- [ ] Docker is running: `docker compose up -d`
 - [ ] Backend tests pass: `cd backend && pytest`
 - [ ] Frontend tests pass: `cd frontend && npm test`
 - [ ] Feature branch created: `git checkout -b feature/{name}`

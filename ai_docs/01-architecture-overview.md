@@ -84,8 +84,7 @@ unstructured_minds/
 │   └── ai_exercise_cache.json  # Claude-generated exercise aliases
 ├── vault/                      # Gitignored, markdown notes
 │   └── YYYY/MM/YYYY-MM-DD.md  # Daily notes by year/month
-├── docker-compose.yml          # Production services
-├── docker-compose.dev.yml      # Development services
+├── docker-compose.yml          # Docker services
 ├── .env                        # Secrets (gitignored)
 ├── ai_docs/                    # This wiki
 └── CLAUDE.md                   # Quick-start routing table

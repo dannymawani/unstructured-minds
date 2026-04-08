@@ -53,8 +53,7 @@
       "Bash(pip3 install:*)",
       "WebFetch(domain:duckdb.org)",
       "Bash(docker ps:*)",
-      "WebFetch(domain:azure.microsoft.com)",
-      "mcp__Neon__run_sql_transaction"
+      "WebFetch(domain:azure.microsoft.com)"
     ]
   }
 }

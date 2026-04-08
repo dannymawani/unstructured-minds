@@ -15,7 +15,7 @@ cp .env.example .env
 make dev
 ```
 
-Frontend at http://localhost:5173, backend at http://localhost:8000.
+Frontend at http://localhost:3000 (Docker) or http://localhost:5173 (direct `npm run dev`), backend at http://localhost:8000.
 
 ### Without Docker
 
