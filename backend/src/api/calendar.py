@@ -3,16 +3,16 @@
 import logging
 from calendar import monthrange
 from datetime import date
-from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from ..claude import ClaudeClient
 from ..db import DatabaseManager
 from ..storage import StorageBackend
-from .dependencies import get_db as _dep_get_db, get_storage as _dep_get_storage
 from ..templates.daily_note import render_daily_note as render_fallback_template
+from .dependencies import get_db as _dep_get_db
+from .dependencies import get_storage as _dep_get_storage
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +81,8 @@ async def get_month_data(
 
     # Get all daily note paths for this month via directory listing
     import re as _re
-    from .settings import resolve_daily_note_path, get_daily_note_template
+
+    from .settings import resolve_daily_note_path
     existing_notes: set[str] = set()
     try:
         # Derive the month directory from the template for a fast directory listing
@@ -206,7 +207,7 @@ async def create_or_get_daily_note(
     # Parse the date
     try:
         year, month, day = request.date.split("-")
-        date_obj = date(int(year), int(month), int(day))
+        date(int(year), int(month), int(day))
     except ValueError:
         from fastapi import HTTPException
         raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
@@ -258,25 +259,25 @@ class WorkoutSuggestionExercise(BaseModel):
     exercise_name: str
     display_name: str = ""
     sets: int = 0
-    reps: Optional[int] = None
-    weight_kg: Optional[float] = None
-    suggested_weight_kg: Optional[float] = None
+    reps: int | None = None
+    weight_kg: float | None = None
+    suggested_weight_kg: float | None = None
 
 
 class WorkoutSuggestionData(BaseModel):
     """Workout suggestion from last strength session."""
 
-    date: Optional[str] = None
+    date: str | None = None
     exercises: list[WorkoutSuggestionExercise] = []
-    focus: Optional[str] = None
+    focus: str | None = None
 
 
 class RolloverTaskForPopulate(BaseModel):
     """A rolled-over task to include in the daily note."""
 
     description: str
-    deadline: Optional[str] = None
-    deadline_status: Optional[str] = None  # "overdue" | "due_today" | "upcoming" | None
+    deadline: str | None = None
+    deadline_status: str | None = None  # "overdue" | "due_today" | "upcoming" | None
 
 
 class PopulateDailyNoteRequest(BaseModel):
@@ -284,16 +285,16 @@ class PopulateDailyNoteRequest(BaseModel):
 
     date: str
     template: str
-    workout: Optional[str] = None
-    sleep: Optional[int] = None
-    energy: Optional[int] = None
-    mood: Optional[int] = None
-    work_priorities: Optional[str] = None
-    personal: Optional[str] = None
-    adhoc: Optional[str] = None
-    activity_details: Optional[str] = None
-    workout_suggestion: Optional[WorkoutSuggestionData] = None
-    rollover_tasks: Optional[list[RolloverTaskForPopulate]] = None
+    workout: str | None = None
+    sleep: int | None = None
+    energy: int | None = None
+    mood: int | None = None
+    work_priorities: str | None = None
+    personal: str | None = None
+    adhoc: str | None = None
+    activity_details: str | None = None
+    workout_suggestion: WorkoutSuggestionData | None = None
+    rollover_tasks: list[RolloverTaskForPopulate] | None = None
 
 
 class PopulateDailyNoteResponse(BaseModel):

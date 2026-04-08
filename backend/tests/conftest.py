@@ -31,8 +31,8 @@ def disable_auth():
     - get_storage/get_datastore take the local branch (is_cloud_mode=False)
     - get_user_id returns LOCAL_USER_ID without JWT verification
     """
-    from src.main import app
     from src.api.dependencies import get_user_id
+    from src.main import app
 
     # DI override — covers endpoints using Depends(get_user_id) directly
     app.dependency_overrides[get_user_id] = lambda: LOCAL_USER_ID

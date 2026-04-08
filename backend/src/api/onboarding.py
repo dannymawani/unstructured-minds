@@ -6,9 +6,8 @@ from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 
 from ..config import settings
-from ..db.sql_compat import get_dialect, placeholder
 from ..db.user_settings import UserSettingsStore
-from ..onboarding.constants import DEMO_SOURCE_FILE, ONBOARDING_SETTINGS_KEY
+from ..onboarding.constants import ONBOARDING_SETTINGS_KEY
 from ..onboarding.lifecycle import (
     check_graduation,
     clear_all_demo_data,
@@ -16,7 +15,7 @@ from ..onboarding.lifecycle import (
     get_real_data_count,
 )
 from ..onboarding.seed import seed_demo_data
-from .dependencies import get_analytics_db, get_user_id
+from .dependencies import get_user_id
 
 router = APIRouter(prefix="/onboarding", tags=["onboarding"])
 
@@ -75,7 +74,7 @@ def _get_onboarding_state(db, user_id: str) -> dict | None:
                 with open(settings_file) as f:
                     data = json.load(f)
                 return data.get(ONBOARDING_SETTINGS_KEY)
-            except (json.JSONDecodeError, IOError):
+            except (OSError, json.JSONDecodeError):
                 pass
         return None
 
@@ -93,7 +92,7 @@ def _set_onboarding_state(db, user_id: str, state: dict) -> None:
             try:
                 with open(settings_file) as f:
                     data = json.load(f)
-            except (json.JSONDecodeError, IOError):
+            except (OSError, json.JSONDecodeError):
                 pass
         data[ONBOARDING_SETTINGS_KEY] = state
         settings_file.parent.mkdir(parents=True, exist_ok=True)

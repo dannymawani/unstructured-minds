@@ -2,7 +2,6 @@
 
 import json
 import re
-from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
@@ -51,7 +50,7 @@ class SuggestResult(BaseModel):
     """Single autocomplete suggestion."""
 
     name: str
-    category: Optional[str] = None
+    category: str | None = None
     muscle_groups: list[str] = []
     source: str  # "builtin" or "community"
 
@@ -202,10 +201,10 @@ def suggest_exercises(
     Returns matching exercise names with source annotation.
     """
     suggestions = matcher.suggest(q, limit=limit)
-    builtin_keys = _get_builtin_keys(matcher)
+    _get_builtin_keys(matcher)
 
     # Load community exercises for metadata annotation
-    dialect = get_dialect(db)
+    get_dialect(db)
     community_map: dict[str, dict] = {}
     try:
         rows = db.execute("SELECT exercise_key, display_name, muscle_groups, category FROM community_exercises").fetchall()

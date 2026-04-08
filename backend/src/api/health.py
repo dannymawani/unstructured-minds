@@ -1,9 +1,8 @@
 """Enhanced health check endpoints for monitoring and observability."""
 
 import time
-from datetime import datetime, timezone
-from enum import Enum
-from typing import Optional
+from datetime import UTC, datetime
+from enum import StrEnum
 
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
@@ -12,7 +11,8 @@ from ..config import settings
 from ..db import DatabaseManager
 from ..logging_config import get_logger
 from ..storage import StorageBackend
-from .dependencies import get_db as _dep_get_db, get_storage as _dep_get_storage
+from .dependencies import get_db as _dep_get_db
+from .dependencies import get_storage as _dep_get_storage
 
 router = APIRouter(tags=["health"])
 logger = get_logger(__name__)
@@ -34,7 +34,7 @@ def get_uptime_seconds() -> float:
     return time.time() - _start_time
 
 
-class HealthStatus(str, Enum):
+class HealthStatus(StrEnum):
     """Health status values."""
 
     HEALTHY = "healthy"
@@ -42,7 +42,7 @@ class HealthStatus(str, Enum):
     UNHEALTHY = "unhealthy"
 
 
-class ComponentStatus(str, Enum):
+class ComponentStatus(StrEnum):
     """Component status values."""
 
     UP = "up"
@@ -68,7 +68,7 @@ class ReadinessResponse(BaseModel):
     status: HealthStatus
     ready: bool
     timestamp: str
-    message: Optional[str] = None
+    message: str | None = None
 
 
 class LivenessResponse(BaseModel):
@@ -85,9 +85,9 @@ class ComponentHealth(BaseModel):
 
     name: str
     status: ComponentStatus
-    latency_ms: Optional[float] = None
-    message: Optional[str] = None
-    details: Optional[dict] = None
+    latency_ms: float | None = None
+    message: str | None = None
+    details: dict | None = None
 
 
 class DetailedHealthResponse(BaseModel):
@@ -139,7 +139,7 @@ async def health() -> BasicHealthResponse:
     """
     return BasicHealthResponse(
         status=HealthStatus.HEALTHY,
-        timestamp=datetime.now(timezone.utc).isoformat(),
+        timestamp=datetime.now(UTC).isoformat(),
     )
 
 
@@ -159,7 +159,7 @@ async def liveness() -> LivenessResponse:
     return LivenessResponse(
         status=HealthStatus.HEALTHY,
         alive=True,
-        timestamp=datetime.now(timezone.utc).isoformat(),
+        timestamp=datetime.now(UTC).isoformat(),
         uptime_seconds=uptime,
     )
 
@@ -178,7 +178,7 @@ async def readiness(
     Returns:
         Readiness status
     """
-    timestamp = datetime.now(timezone.utc).isoformat()
+    timestamp = datetime.now(UTC).isoformat()
     issues: list[str] = []
 
     # Check database
@@ -224,7 +224,7 @@ async def detailed_health(
     Returns:
         Detailed health status for all components
     """
-    timestamp = datetime.now(timezone.utc).isoformat()
+    timestamp = datetime.now(UTC).isoformat()
     components: list[ComponentHealth] = []
     checks: dict[str, bool] = {}
 

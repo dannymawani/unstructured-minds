@@ -7,7 +7,7 @@ allowed-tools: Bash(python3 -m scripts.setup_cloud *)
 
 # Cloud Setup
 
-One-command setup/reset for cloud Postgres (Snowflake, Supabase, Neon, etc.).
+One-command setup/reset for cloud Postgres (any provider).
 
 ## What It Does
 

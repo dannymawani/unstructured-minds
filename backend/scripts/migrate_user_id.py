@@ -68,7 +68,7 @@ def main() -> None:
     from db import PostgresManager
 
     if not settings.is_cloud_mode:
-        print("ERROR: This script requires cloud mode (USE_CLOUD=true + DATABASE_URL).")
+        print("ERROR: This script requires postgres mode (STORAGE_MODE=postgres + DATABASE_URL).")
         sys.exit(1)
 
     pg = PostgresManager(settings.database_url)

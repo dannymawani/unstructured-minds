@@ -1,21 +1,17 @@
 """Settings API endpoints."""
 
 import json
-from typing import Optional
-
-from fastapi import APIRouter, Depends, Request
-from pydantic import BaseModel
-
 from datetime import datetime as dt
 
-from fastapi import HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel
 
 from ..config import settings
 from ..db.sql_compat import get_dialect
 from ..db.user_settings import UserSettingsStore
 from ..storage.datastore import DataStore
-from .dependencies import get_user_id, get_datastore as _dep_get_datastore
-
+from .dependencies import get_datastore as _dep_get_datastore
+from .dependencies import get_user_id
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -38,7 +34,7 @@ def _load_settings_sync() -> dict:
         try:
             with open(SETTINGS_FILE) as f:
                 return json.load(f)
-        except (json.JSONDecodeError, IOError):
+        except (OSError, json.JSONDecodeError):
             pass
     return {"theme": "dark"}
 
@@ -49,7 +45,7 @@ def get_daily_note_template() -> str:
     return stored.get("daily_note_path_template", DEFAULT_DAILY_NOTE_TEMPLATE)
 
 
-def resolve_daily_note_path(date_str: str, template: Optional[str] = None) -> str:
+def resolve_daily_note_path(date_str: str, template: str | None = None) -> str:
     """Resolve a daily note path template for a given date.
 
     Args:
@@ -111,8 +107,8 @@ class SettingsResponse(BaseModel):
 
     vault_path: str
     data_path: str
-    claude_enabled: bool
-    claude_configured: bool
+    llm_enabled: bool
+    llm_configured: bool
     api_key_set: bool
     theme: str
     daily_note_path_template: str
@@ -122,9 +118,9 @@ class SettingsResponse(BaseModel):
 class SettingsUpdateRequest(BaseModel):
     """Request to update settings."""
 
-    theme: Optional[str] = None
-    daily_note_path_template: Optional[str] = None
-    show_month_names: Optional[bool] = None
+    theme: str | None = None
+    daily_note_path_template: str | None = None
+    show_month_names: bool | None = None
 
 
 class ThemeResponse(BaseModel):
@@ -143,9 +139,9 @@ async def get_settings(request: Request, user_id: str = Depends(get_user_id), da
     return SettingsResponse(
         vault_path=str(settings.vault_path),
         data_path=str(settings.data_path),
-        claude_enabled=settings.claude_enabled,
-        claude_configured=claude.is_configured if claude else False,
-        api_key_set=bool(settings.anthropic_api_key),
+        llm_enabled=settings.llm_enabled,
+        llm_configured=claude.is_configured if claude else False,
+        api_key_set=bool(settings.llm_api_key or settings.anthropic_api_key),
         theme=stored.get("theme", "dark"),
         daily_note_path_template=stored.get("daily_note_path_template", DEFAULT_DAILY_NOTE_TEMPLATE),
         show_month_names=stored.get("show_month_names", False),
@@ -177,9 +173,9 @@ async def update_settings(request: Request, update: SettingsUpdateRequest, user_
     return SettingsResponse(
         vault_path=str(settings.vault_path),
         data_path=str(settings.data_path),
-        claude_enabled=settings.claude_enabled,
-        claude_configured=claude.is_configured if claude else False,
-        api_key_set=bool(settings.anthropic_api_key),
+        llm_enabled=settings.llm_enabled,
+        llm_configured=claude.is_configured if claude else False,
+        api_key_set=bool(settings.llm_api_key or settings.anthropic_api_key),
         theme=stored.get("theme", "dark"),
         daily_note_path_template=stored.get("daily_note_path_template", DEFAULT_DAILY_NOTE_TEMPLATE),
         show_month_names=stored.get("show_month_names", False),

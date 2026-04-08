@@ -8,7 +8,6 @@ Supports:
 import re
 from typing import NamedTuple
 
-
 # Pattern for #tags
 # - Must start with # followed by a letter
 # - Can contain letters, numbers, underscores, and hyphens

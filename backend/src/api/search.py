@@ -1,7 +1,6 @@
 """Search API endpoints for full-text search across vault notes."""
 
 import re
-from typing import Optional
 
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field

@@ -13,7 +13,7 @@ from src.skills import DailyNoteSkill, SkillContext, SkillRegistry, get_default_
 @pytest.fixture
 def test_settings(tmp_path: Path):
     """Create test settings with temp paths."""
-    with patch("src.config.Settings") as mock_settings_cls:
+    with patch("src.config.Settings"):
         mock_settings = MagicMock()
         mock_settings.vault_path = tmp_path / "vault"
         mock_settings.data_path = tmp_path / "data"

@@ -1,6 +1,6 @@
 # Unstructured Minds
 
-Natural language notes → structured, queryable data via Claude + DuckDB/Postgres.
+Natural language notes → structured, queryable data via AI + DuckDB/Postgres.
 
 ## Tech Stack
 
@@ -8,19 +8,19 @@ Natural language notes → structured, queryable data via Claude + DuckDB/Postgr
 |-----------|------------|
 | Frontend | React 19 + Milkdown |
 | Backend | Python >=3.12 + FastAPI |
-| Database | DuckDB 1.4 (local) / Neon Postgres (cloud) |
-| AI | Claude API (Haiku 4.5 extraction, Sonnet 4.5 queries) |
-| Auth | Clerk (required for cloud mode) |
+| Database | DuckDB 1.4 (local) / Postgres (cloud) |
+| AI | Any LLM via LiteLLM (Anthropic, OpenAI, Ollama, etc.) |
+| Auth | None / Basic / Clerk (configurable) |
 | Deploy | Docker Compose |
 
 ## Two Modes
 
 | Mode | Trigger | Storage |
 |------|---------|---------|
-| **Local** | `USE_CLOUD=false` | DuckDB file + local filesystem |
-| **Cloud** | `USE_CLOUD=true` + `DATABASE_URL` | Postgres + in-memory DuckDB cache |
+| **Local** | `STORAGE_MODE=local` (default) | DuckDB file + local filesystem |
+| **Postgres** | `STORAGE_MODE=postgres` + `DATABASE_URL` | Postgres + in-memory DuckDB cache |
 
-Env vars: `ANTHROPIC_API_KEY`, `USE_CLOUD`, `DATABASE_URL` (cloud only), `CLERK_SECRET_KEY` + `CLERK_DOMAIN` (cloud only).
+Env vars: `LLM_PROVIDER`, `LLM_API_KEY` (AI features), `STORAGE_MODE`, `DATABASE_URL` (postgres only), `AUTH_MODE` (none/basic/clerk).
 
 ## Deep Documentation → `ai_docs/`
 
@@ -32,10 +32,10 @@ For detailed reference beyond these essentials, see the **`ai_docs/`** wiki. Sta
 | `02-technology-stack` | All technologies, versions, why chosen |
 | `03-development-workflow` | Branching, commits, PRs, testing process |
 | `04-database-architecture` | All table schemas, two-mode data layer, analytics cache |
-| `05-backend` | FastAPI endpoints, DI, Python patterns, Claude integration |
+| `05-backend` | FastAPI endpoints, DI, Python patterns, LLM integration |
 | `06-frontend` | React components, state, Milkdown, build pipeline |
 | `07-data-pipeline` | Extraction flow, exercise matching, AI classification |
-| `08-auth-and-security` | Clerk auth, JWT, CSP, SQL validation, test auth bypass |
+| `08-auth-and-security` | Auth modes (none/basic/clerk), CSP, SQL validation, test auth bypass |
 | `09-infrastructure` | Docker, env vars, cloud setup, backup, LAN access |
 | `10-decisions-log` | Architectural decisions (ADR, append-only) |
 

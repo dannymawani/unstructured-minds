@@ -2,7 +2,6 @@
 
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Optional
 
 import duckdb
 
@@ -33,7 +32,7 @@ class DatabaseManager:
             db_path: Path to database file
         """
         self.db_path = Path(db_path)
-        self._conn: Optional[duckdb.DuckDBPyConnection] = None
+        self._conn: duckdb.DuckDBPyConnection | None = None
 
     def connect(self) -> duckdb.DuckDBPyConnection:
         """Get or create database connection.
@@ -97,7 +96,7 @@ class DatabaseManager:
                 pass
             cursor.close()
 
-    def execute(self, query: str, params: Optional[list] = None) -> _MaterializedResult:
+    def execute(self, query: str, params: list | None = None) -> _MaterializedResult:
         """Execute a query using a per-call cursor for thread safety.
 
         Results are materialized immediately and the cursor is closed,

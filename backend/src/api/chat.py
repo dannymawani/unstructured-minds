@@ -4,19 +4,20 @@ import json
 import logging
 import re
 from datetime import date, datetime, timedelta
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from ..claude import ClaudeClient
 from ..cache import invalidate_all
+from ..claude import ClaudeClient
 from ..middleware import limiter
 from ..middleware.rate_limit import RATE_LIMIT_CLAUDE_API
 from ..middleware.validation import MAX_QUERY_LENGTH
 from ..storage import StorageBackend
 from ..templates.daily_note import render_daily_note as render_fallback_template
-from .dependencies import get_storage as _dep_get_storage, get_user_id
+from .dependencies import get_storage as _dep_get_storage
+from .dependencies import get_user_id
 from .settings import resolve_daily_note_path
 
 logger = logging.getLogger(__name__)
@@ -167,9 +168,9 @@ class ImageData(BaseModel):
 
 class ChatMessageRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=MAX_QUERY_LENGTH)
-    file_path: Optional[str] = None
-    file_content: Optional[str] = Field(default=None, max_length=MAX_QUERY_LENGTH * 10)
-    images: Optional[list[ImageData]] = Field(default=None, max_length=5)
+    file_path: str | None = None
+    file_content: str | None = Field(default=None, max_length=MAX_QUERY_LENGTH * 10)
+    images: list[ImageData] | None = Field(default=None, max_length=5)
 
 
 class CreatedNote(BaseModel):
@@ -181,15 +182,15 @@ class CreatedNote(BaseModel):
 class QueryData(BaseModel):
     columns: list[str]
     data: list[dict[str, Any]]
-    sql: Optional[str] = None
+    sql: str | None = None
     row_count: int = 0
 
 
 class ChatMessageResponse(BaseModel):
     reply: str
-    note_update: Optional[str] = None
-    created_notes: Optional[list[CreatedNote]] = None
-    query_data: Optional[QueryData] = None
+    note_update: str | None = None
+    created_notes: list[CreatedNote] | None = None
+    query_data: QueryData | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -476,26 +477,26 @@ async def _handle_catchup(
 # Query logic (reuses query module internals)
 # ---------------------------------------------------------------------------
 
-async def _handle_query(question: str, request: Request) -> tuple[Optional[QueryData], str]:
+async def _handle_query(question: str, request: Request) -> tuple[QueryData | None, str]:
     """Run the query pipeline. Returns (query_data, answer_text)."""
     from .query import (
-        SQL_GENERATION_SYSTEM_PROMPT,
         RESPONSE_FORMATTING_SYSTEM_PROMPT,
-        validate_sql,
+        SQL_GENERATION_SYSTEM_PROMPT,
         extract_sql_from_response,
+        validate_sql,
     )
 
     claude: ClaudeClient = request.app.state.claude
     db = get_analytics_db(request)
 
     # Generate SQL
-    sql_resp = await claude._call_with_retry(
+    sql_resp = await claude.complete(
         model=claude.model_fast,
         max_tokens=1024,
         system=SQL_GENERATION_SYSTEM_PROMPT,
         messages=[{"role": "user", "content": question}],
     )
-    raw_sql = sql_resp.content[0].text.strip()
+    raw_sql = sql_resp.text.strip()
 
     if raw_sql.startswith("INVALID_QUERY"):
         return None, "I can only answer questions about your personal data (sleep, exercise, nutrition, activities, and tasks)."
@@ -533,13 +534,13 @@ async def _handle_query(question: str, request: Request) -> tuple[Optional[Query
         answer = "No data found matching your question."
     else:
         results_json = json.dumps(data[:20], indent=2, default=str)
-        fmt = await claude._call_with_retry(
+        fmt = await claude.complete(
             model=claude.model_fast,
             max_tokens=1024,
             system=RESPONSE_FORMATTING_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": f"Question: {question}\n\nQuery results:\n{results_json}"}],
         )
-        answer = fmt.content[0].text
+        answer = fmt.text
 
     return qd, answer
 
@@ -559,7 +560,7 @@ async def unified_chat(
 ) -> ChatMessageResponse:
     """Unified chat: data queries, note updates, and multi-day catchup in one endpoint."""
     if not claude.is_configured:
-        raise HTTPException(503, "Claude API not configured. Set ANTHROPIC_API_KEY.")
+        raise HTTPException(503, "LLM not configured. Set LLM_API_KEY or ANTHROPIC_API_KEY.")
 
     today = date.today()
     yesterday = today - timedelta(days=1)
@@ -570,13 +571,15 @@ async def unified_chat(
         yesterday=yesterday.isoformat(),
     )
 
-    # Build multimodal content
+    # Build multimodal content (OpenAI format for LiteLLM)
     parts: list[dict[str, Any]] = []
     if body.images:
         for img in body.images:
             parts.append({
-                "type": "image",
-                "source": {"type": "base64", "media_type": img.media_type, "data": img.data},
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:{img.media_type};base64,{img.data}",
+                },
             })
 
     text_pieces = []
@@ -587,8 +590,8 @@ async def unified_chat(
     text_pieces.append(f"User: {body.message}")
     parts.append({"type": "text", "text": "\n\n".join(text_pieces)})
 
-    # Single Claude call with tools
-    response = await claude._call_with_retry(
+    # Single LLM call with tools
+    response = await claude.complete(
         model=claude.model_smart,
         max_tokens=8192,
         system=system,
@@ -596,42 +599,43 @@ async def unified_chat(
         messages=[{"role": "user", "content": parts}],
     )
 
-    # Parse response blocks
+    # Parse response (OpenAI format via LiteLLM)
     reply_text = ""
     note_update = None
     created_notes = None
     query_data = None
 
-    for block in response.content:
-        if block.type == "text":
-            text = block.text
-            # Extract <note-update> tags
-            m = re.search(r"<note-update>(.*?)</note-update>", text, re.DOTALL)
-            if m:
-                note_update = m.group(1).strip()
-                text = re.sub(r"<note-update>.*?</note-update>", "", text, flags=re.DOTALL).strip()
-            reply_text += text
+    # Handle text content
+    if response.text:
+        text = response.text
+        m = re.search(r"<note-update>(.*?)</note-update>", text, re.DOTALL)
+        if m:
+            note_update = m.group(1).strip()
+            text = re.sub(r"<note-update>.*?</note-update>", "", text, flags=re.DOTALL).strip()
+        reply_text += text
 
-        elif block.type == "tool_use":
-            if block.name == "create_daily_notes":
-                created_notes = await _handle_catchup(
-                    block.input["notes"], storage, request, user_id,
-                )
-                if not reply_text.strip():
-                    new_ct = sum(1 for n in created_notes if n.created)
-                    upd_ct = len(created_notes) - new_ct
-                    dates = [n.date for n in created_notes]
-                    bits = []
-                    if new_ct:
-                        bits.append(f"Created {new_ct} new note{'s' if new_ct != 1 else ''}")
-                    if upd_ct:
-                        bits.append(f"updated {upd_ct} existing note{'s' if upd_ct != 1 else ''}")
-                    reply_text = f"{' and '.join(bits)} for {', '.join(dates)}."
+    # Handle tool calls
+    for tc in response.tool_calls:
+        args = json.loads(tc.function.arguments) if isinstance(tc.function.arguments, str) else tc.function.arguments
+        if tc.function.name == "create_daily_notes":
+            created_notes = await _handle_catchup(
+                args["notes"], storage, request, user_id,
+            )
+            if not reply_text.strip():
+                new_ct = sum(1 for n in created_notes if n.created)
+                upd_ct = len(created_notes) - new_ct
+                dates = [n.date for n in created_notes]
+                bits = []
+                if new_ct:
+                    bits.append(f"Created {new_ct} new note{'s' if new_ct != 1 else ''}")
+                if upd_ct:
+                    bits.append(f"updated {upd_ct} existing note{'s' if upd_ct != 1 else ''}")
+                reply_text = f"{' and '.join(bits)} for {', '.join(dates)}."
 
-            elif block.name == "query_data":
-                query_data, answer = await _handle_query(block.input["question"], request)
-                if not reply_text.strip():
-                    reply_text = answer
+        elif tc.function.name == "query_data":
+            query_data, answer = await _handle_query(args["question"], request)
+            if not reply_text.strip():
+                reply_text = answer
 
     if not reply_text.strip():
         reply_text = "I'm here to help! You can ask about your data, update your current note, or catch up on missed days."

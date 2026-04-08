@@ -34,7 +34,7 @@ Every technology used in Unstructured Minds, its version, purpose, and how it co
 | Python | >=3.12 | Runtime | Type hints, f-string syntax, modern features |
 | FastAPI | >=0.115 | Web framework | Async endpoints, auto OpenAPI docs, DI |
 | Uvicorn | latest (standard) | ASGI server | Runs FastAPI, async I/O |
-| Anthropic SDK | >=0.40 | Claude API client | Extraction (Haiku 4.5), queries (Sonnet 4.5), note assist |
+| LiteLLM | >=1.40 | LLM abstraction | Provider-agnostic AI (Anthropic, OpenAI, Ollama, etc.) |
 | DuckDB | >=1.0 | Embedded analytics DB | Columnar OLAP, single file, in-memory analytics cache |
 | Pydantic | >=2.0 | Data validation | Request/response models, settings |
 | pydantic-settings | latest | Config management | Env vars → typed Settings object |
@@ -65,16 +65,18 @@ Every technology used in Unstructured Minds, its version, purpose, and how it co
 |-----------|---------|---------|
 | Docker Compose | Container orchestration | backend + frontend services |
 | Nginx (alpine) | Production reverse proxy | Static files, `/api/*` proxy, gzip, CSP headers |
-| Neon Postgres | Cloud database | Serverless Postgres for cloud mode |
-| Clerk | Authentication | JWT-based auth for cloud mode |
+| Postgres | Cloud database | Any Postgres provider (Neon, Supabase, self-hosted) |
+| Clerk | Authentication | Optional JWT-based auth (one of three auth modes) |
 | GitHub Actions | CI/CD | Landing page deployment |
 
 ## AI Models
 
-| Model | Used For | Endpoint |
-|-------|---------|----------|
-| Claude Haiku 4.5 | Data extraction, exercise classification, daily note population, query answering | `/extract`, `/query/natural` |
-| Claude Sonnet 4.5 | Multimodal note editing, skill execution | `/note-assist`, `/skills/{name}/execute` |
+Configurable via `LLM_PROVIDER`, `LLM_MODEL_FAST`, and `LLM_MODEL_SMART` env vars.
+
+| Role | Default (Anthropic) | Used For |
+|------|-------------------|----------|
+| Fast model (`llm_model_fast`) | Claude Haiku 4.5 | Extraction, classification, queries |
+| Smart model (`llm_model_smart`) | Claude Sonnet 4.5 | Note editing, skill execution |
 
 ## Performance Characteristics
 

@@ -5,12 +5,10 @@ import uuid
 from fastapi import HTTPException, Request
 
 from ..config import LOCAL_USER_ID, settings
-from ..middleware.clerk_auth import verify_clerk_token
 from ..storage import StorageBackend
 from ..storage.datastore import DataStore
 
 # Deterministic namespace for mapping Clerk IDs to UUIDs.
-# Uses the standard NAMESPACE_URL so the same Clerk sub always yields the same UUID.
 CLERK_NAMESPACE = uuid.UUID("6ba7b811-6ba5-11d1-80b6-00c04fd430c8")
 
 
@@ -45,29 +43,51 @@ def get_datastore(request: Request) -> DataStore:
     return request.app.state.datastore
 
 
+def _resolve_auth_mode() -> str:
+    """Determine the effective auth mode.
+
+    Checks auth_mode setting first. Falls back to cloud mode detection
+    for backward compatibility (cloud mode + Clerk keys = clerk auth).
+    """
+    if settings.auth_mode != "none":
+        return settings.auth_mode
+    # Backward compat: cloud mode with Clerk implies clerk auth
+    if settings.is_cloud_mode and settings.clerk_secret_key:
+        return "clerk"
+    return "none"
+
+
 def get_user_id(request: Request) -> str:
     """Return the authenticated user ID.
 
-    Local mode: returns LOCAL_USER_ID (single implicit user).
-    Cloud mode: verifies Clerk JWT and maps the sub claim to a
-    deterministic UUID via uuid5 so it fits Postgres UUID columns.
+    Auth modes:
+    - none: returns LOCAL_USER_ID (single implicit user)
+    - basic: verifies HTTP Basic Auth, returns LOCAL_USER_ID
+    - clerk: verifies Clerk JWT, maps sub to deterministic UUID
 
-    On the first authenticated request in cloud mode, seeds the
-    analytics cache so the in-memory DuckDB has data for dashboards.
-
-    Results are cached on request.state so that multiple dependencies
-    calling this within the same request only verify the JWT once.
+    Results are cached on request.state so multiple dependencies
+    calling this within the same request only verify once.
     """
     cached = getattr(request.state, "_user_id", None)
     if cached is not None:
         return cached
-    if not settings.is_cloud_mode:
+
+    mode = _resolve_auth_mode()
+
+    if mode == "none":
         uid = LOCAL_USER_ID
-    else:
+
+    elif mode == "basic":
+        from ..middleware.basic_auth import verify_basic_auth
+        verify_basic_auth(request)
+        uid = LOCAL_USER_ID
+
+    elif mode == "clerk":
+        from ..middleware.clerk_auth import verify_clerk_token
         if not settings.clerk_secret_key or not settings.clerk_domain:
             raise HTTPException(
                 500,
-                "Cloud mode requires CLERK_SECRET_KEY and CLERK_DOMAIN",
+                "Clerk auth requires CLERK_SECRET_KEY and CLERK_DOMAIN",
             )
         payload = verify_clerk_token(request)
         uid = str(uuid.uuid5(CLERK_NAMESPACE, payload["sub"]))
@@ -76,6 +96,8 @@ def get_user_id(request: Request) -> str:
         cache_mgr = getattr(request.app.state, "analytics_cache_manager", None)
         if cache_mgr and cache_mgr._user_id is None:
             cache_mgr.refresh(user_id=uid)
+    else:
+        raise HTTPException(500, f"Unknown AUTH_MODE: {mode}")
 
     request.state._user_id = uid
     return uid

@@ -4,7 +4,7 @@ import json
 import re
 import uuid
 from datetime import date, timedelta
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
@@ -46,11 +46,11 @@ class MetricEntry(BaseModel):
     """Single day of metrics."""
 
     date: str
-    sleep_hours: Optional[float] = None
-    sleep_quality: Optional[int] = None
-    energy: Optional[int] = None
-    mood: Optional[int] = None
-    stress: Optional[int] = None
+    sleep_hours: float | None = None
+    sleep_quality: int | None = None
+    energy: int | None = None
+    mood: int | None = None
+    stress: int | None = None
 
 
 class MetricsTrendsResponse(BaseModel):
@@ -64,7 +64,7 @@ class ExerciseProgressEntry(BaseModel):
     """Single day of exercise progress."""
 
     date: str
-    max_weight_kg: Optional[float] = None
+    max_weight_kg: float | None = None
     total_reps: int
     total_sets: int
 
@@ -72,8 +72,8 @@ class ExerciseProgressEntry(BaseModel):
 class ExerciseSummary(BaseModel):
     """Summary statistics for an exercise."""
 
-    current_max: Optional[float] = None
-    all_time_max: Optional[float] = None
+    current_max: float | None = None
+    all_time_max: float | None = None
     total_volume: int
     total_sessions: int
 
@@ -94,8 +94,8 @@ class DashboardSummaryResponse(BaseModel):
     total_exercises: int
     total_daily_notes: int
     streak_days: int
-    last_activity_date: Optional[str] = None
-    last_daily_note_date: Optional[str] = None
+    last_activity_date: str | None = None
+    last_daily_note_date: str | None = None
     period: Period
 
 
@@ -122,24 +122,24 @@ class CorrelationEntry(BaseModel):
     """Single day of correlation data."""
 
     date: str
-    sleep_hours: Optional[float] = None
-    energy: Optional[int] = None
-    mood: Optional[int] = None
-    stress: Optional[int] = None
-    activity_minutes: Optional[int] = None
-    calories: Optional[int] = None
+    sleep_hours: float | None = None
+    energy: int | None = None
+    mood: int | None = None
+    stress: int | None = None
+    activity_minutes: int | None = None
+    calories: int | None = None
 
 
 class Correlations(BaseModel):
     """Correlation coefficients between metrics."""
 
-    sleep_mood: Optional[float] = None
-    sleep_energy: Optional[float] = None
-    activity_mood: Optional[float] = None
-    activity_energy: Optional[float] = None
-    stress_mood: Optional[float] = None
-    calories_mood: Optional[float] = None
-    calories_energy: Optional[float] = None
+    sleep_mood: float | None = None
+    sleep_energy: float | None = None
+    activity_mood: float | None = None
+    activity_energy: float | None = None
+    stress_mood: float | None = None
+    calories_mood: float | None = None
+    calories_energy: float | None = None
 
 
 class CorrelationResponse(BaseModel):
@@ -223,7 +223,7 @@ def get_period(days: int) -> Period:
     )
 
 
-def calculate_correlation(x: list[float], y: list[float]) -> Optional[float]:
+def calculate_correlation(x: list[float], y: list[float]) -> float | None:
     """Calculate Pearson correlation coefficient between two lists.
 
     Returns None if there's insufficient data or no variance.
@@ -316,8 +316,8 @@ def get_nutrition_data(
 class SetDetail(BaseModel):
     """A single set from a session."""
 
-    weight_kg: Optional[float] = None
-    reps: Optional[int] = None
+    weight_kg: float | None = None
+    reps: int | None = None
     set_number: int = 1
 
 
@@ -326,8 +326,8 @@ class ExerciseTableEntry(BaseModel):
 
     exercise_name: str
     last_trained_date: str
-    last_weight_kg: Optional[float] = None
-    max_weight_kg: Optional[float] = None
+    last_weight_kg: float | None = None
+    max_weight_kg: float | None = None
     total_sessions: int
     total_sets: int = 0
     is_pr: bool = False
@@ -350,10 +350,10 @@ class ExerciseCreate(BaseModel):
 
     date: date
     exercise_name: str = Field(..., min_length=1, max_length=200)
-    weight_kg: Optional[float] = None
-    reps: Optional[int] = None
+    weight_kg: float | None = None
+    reps: int | None = None
     set_number: int = 1
-    notes: Optional[str] = None
+    notes: str | None = None
 
 
 class ExerciseCreateResponse(BaseModel):
@@ -917,8 +917,8 @@ def get_activity_groups(
 
 @router.get("/exercise-table", response_model=ExerciseTableResponse)
 def get_exercise_table(
-    search: Optional[str] = Query(default=None, description="Search exercises by name"),
-    muscle_group: Optional[str] = Query(default=None, description="Filter by muscle group"),
+    search: str | None = Query(default=None, description="Search exercises by name"),
+    muscle_group: str | None = Query(default=None, description="Filter by muscle group"),
     limit: int = Query(default=10, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     sort_by: Literal["total_sessions", "last_trained_date", "max_weight_kg", "last_weight_kg", "exercise_name", "total_sets"] = Query(
@@ -1231,17 +1231,17 @@ class LastWorkoutExercise(BaseModel):
     exercise_name: str
     display_name: str
     sets: int
-    reps: Optional[int] = None
-    weight_kg: Optional[float] = None
-    suggested_weight_kg: Optional[float] = None
+    reps: int | None = None
+    weight_kg: float | None = None
+    suggested_weight_kg: float | None = None
 
 
 class LastWorkoutResponse(BaseModel):
     """Response for last strength workout endpoint."""
 
-    date: Optional[str] = None
+    date: str | None = None
     exercises: list[LastWorkoutExercise]
-    focus: Optional[str] = None
+    focus: str | None = None
 
 
 _json_config_cache: dict[str, tuple[float, dict]] = {}
@@ -1434,8 +1434,8 @@ class BodyWeightResponse(BaseModel):
     """Response for body weight endpoint."""
 
     entries: list[BodyWeightEntry]
-    current_kg: Optional[float] = None
-    period_change_kg: Optional[float] = None
+    current_kg: float | None = None
+    period_change_kg: float | None = None
     period: Period
 
 
@@ -1485,9 +1485,9 @@ ENDURANCE_SPORTS = ("running", "cycling", "swimming")
 class EnduranceCreate(BaseModel):
     date: date
     sport: Literal["running", "cycling", "swimming"]
-    distance_km: Optional[float] = Field(None, ge=0)
-    duration_minutes: Optional[int] = Field(None, ge=1)
-    notes: Optional[str] = None
+    distance_km: float | None = Field(None, ge=0)
+    duration_minutes: int | None = Field(None, ge=1)
+    notes: str | None = None
 
 
 class EnduranceCreateResponse(BaseModel):
@@ -1499,11 +1499,11 @@ class EnduranceCreateResponse(BaseModel):
 class EnduranceEntry(BaseModel):
     date: str
     sport: str
-    distance_km: Optional[float] = None
-    duration_minutes: Optional[int] = None
-    pace_min_per_km: Optional[float] = None
-    speed_kmh: Optional[float] = None
-    notes: Optional[str] = None
+    distance_km: float | None = None
+    duration_minutes: int | None = None
+    pace_min_per_km: float | None = None
+    speed_kmh: float | None = None
+    notes: str | None = None
 
 
 class EnduranceTableResponse(BaseModel):
@@ -1515,21 +1515,21 @@ class EnduranceTableResponse(BaseModel):
 
 class EnduranceProgressEntry(BaseModel):
     date: str
-    distance_km: Optional[float] = None
-    duration_minutes: Optional[int] = None
-    pace_min_per_km: Optional[float] = None
-    speed_kmh: Optional[float] = None
+    distance_km: float | None = None
+    duration_minutes: int | None = None
+    pace_min_per_km: float | None = None
+    speed_kmh: float | None = None
 
 
 class EnduranceProgressSummary(BaseModel):
     total_distance_km: float
     total_duration_minutes: int
     total_sessions: int
-    avg_pace_min_per_km: Optional[float] = None
-    best_pace_min_per_km: Optional[float] = None
-    avg_speed_kmh: Optional[float] = None
-    best_speed_kmh: Optional[float] = None
-    longest_distance_km: Optional[float] = None
+    avg_pace_min_per_km: float | None = None
+    best_pace_min_per_km: float | None = None
+    avg_speed_kmh: float | None = None
+    best_speed_kmh: float | None = None
+    longest_distance_km: float | None = None
 
 
 class EnduranceProgressResponse(BaseModel):
@@ -1539,14 +1539,14 @@ class EnduranceProgressResponse(BaseModel):
     period: Period
 
 
-def _calc_pace(distance_km: Optional[float], duration_minutes: Optional[int]) -> Optional[float]:
+def _calc_pace(distance_km: float | None, duration_minutes: int | None) -> float | None:
     """Calculate pace in min/km. Returns None if inputs are missing or zero."""
     if distance_km and duration_minutes and distance_km > 0:
         return round(duration_minutes / distance_km, 2)
     return None
 
 
-def _calc_speed(distance_km: Optional[float], duration_minutes: Optional[int]) -> Optional[float]:
+def _calc_speed(distance_km: float | None, duration_minutes: int | None) -> float | None:
     """Calculate speed in km/h. Returns None if inputs are missing or zero."""
     if distance_km and duration_minutes and duration_minutes > 0:
         return round(distance_km / (duration_minutes / 60), 2)
@@ -1604,7 +1604,7 @@ def create_endurance_activity(
 
 @router.get("/endurance-table", response_model=EnduranceTableResponse)
 def get_endurance_table(
-    sport: Optional[str] = Query(default=None, description="Filter by sport"),
+    sport: str | None = Query(default=None, description="Filter by sport"),
     days: int = Query(default=90, ge=1, le=365),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),

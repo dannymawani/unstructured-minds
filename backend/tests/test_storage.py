@@ -1,7 +1,8 @@
 """Tests for storage abstraction layer."""
 
-import pytest
 from pathlib import Path
+
+import pytest
 
 from src.storage import LocalFilesystem, StorageBackend, get_storage_backend
 

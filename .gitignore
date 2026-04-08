@@ -54,11 +54,8 @@ frontend/build/
 .env.local
 .env.*.local
 
-# Data (keep structure, ignore contents)
-data/*.duckdb
-data/*.duckdb.wal
-data/*.csv
-data/ai_exercise_cache.json
+# Data — runtime data (schemas and exercise defs live in shared/)
+data/
 !data/.gitkeep
 
 # Backend runtime data
@@ -87,5 +84,9 @@ tmp/
 temp/
 *.tmp
 
+# Claude Code worktrees
+.claude/worktrees/
+
 # Planning scratch files
 next_step.md
+plan.md

@@ -1,7 +1,6 @@
 """Azure Entra ID token acquisition for Postgres authentication."""
 
 import time
-from typing import Optional
 
 from ..logging_config import get_logger
 
@@ -10,7 +9,7 @@ logger = get_logger(__name__)
 POSTGRES_SCOPE = "https://ossrdbms-aad.database.windows.net/.default"
 
 _credential = None
-_cached_token: Optional[str] = None
+_cached_token: str | None = None
 _token_expires_at: float = 0
 
 

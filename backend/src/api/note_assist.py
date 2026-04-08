@@ -1,6 +1,5 @@
 """Note-aware chat assistant API endpoint."""
 
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -9,7 +8,6 @@ from ..claude import ClaudeClient
 from ..middleware import limiter
 from ..middleware.rate_limit import RATE_LIMIT_CLAUDE_API
 from ..middleware.validation import MAX_QUERY_LENGTH
-
 
 router = APIRouter()
 
@@ -25,16 +23,16 @@ class NoteAssistRequest(BaseModel):
     """Request for note-aware chat assistance."""
 
     message: str = Field(..., min_length=1, max_length=MAX_QUERY_LENGTH)
-    file_path: Optional[str] = None
-    file_content: Optional[str] = Field(default=None, max_length=MAX_QUERY_LENGTH * 10)
-    images: Optional[list[ImageData]] = Field(default=None, max_length=5)
+    file_path: str | None = None
+    file_content: str | None = Field(default=None, max_length=MAX_QUERY_LENGTH * 10)
+    images: list[ImageData] | None = Field(default=None, max_length=5)
 
 
 class NoteAssistResponse(BaseModel):
     """Response from note assistant."""
 
     reply: str
-    updated_content: Optional[str] = None
+    updated_content: str | None = None
 
 
 def get_claude(request: Request) -> ClaudeClient:
@@ -62,7 +60,7 @@ async def note_assist(
     if not claude.is_configured:
         raise HTTPException(
             status_code=503,
-            detail="Claude API not configured. Set ANTHROPIC_API_KEY environment variable.",
+            detail="LLM not configured. Set LLM_API_KEY or ANTHROPIC_API_KEY.",
         )
 
     # Convert image models to dicts

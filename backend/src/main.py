@@ -7,35 +7,37 @@ from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
-from .config import settings
-from .logging_config import configure_logging, get_logger
-from .api.routes import router
-from .api.skills import router as skills_router
-from .api.extraction import router as extraction_router
-from .api.dashboard import router as dashboard_router
-from .api.settings import router as settings_router
-from .api.schemas import router as schemas_router
-from .api.kanban import router as kanban_router
-from .api.search import router as search_router
-from .api.query import router as query_router
-from .api.export import router as export_router, import_router
 from .api.calendar import router as calendar_router
-from .api.templates import router as templates_router
+from .api.chat import router as chat_router
+from .api.dashboard import router as dashboard_router
+from .api.exercises import router as exercises_router
+from .api.export import import_router
+from .api.export import router as export_router
+from .api.extraction import router as extraction_router
+from .api.health import router as health_router
+from .api.health import set_start_time
+from .api.insights import router as insights_router
+from .api.kanban import router as kanban_router
+from .api.metrics import router as metrics_router
+from .api.note_assist import router as note_assist_router
+from .api.onboarding import router as onboarding_router
+from .api.query import router as query_router
+from .api.routes import router
+from .api.schemas import router as schemas_router
+from .api.search import router as search_router
+from .api.settings import router as settings_router
+from .api.skills import router as skills_router
 from .api.tags import router as tags_router
 from .api.tasks import router as tasks_router
-from .api.health import router as health_router, set_start_time
-from .api.metrics import router as metrics_router
-from .api.insights import router as insights_router
-from .api.note_assist import router as note_assist_router
-from .api.chat import router as chat_router
-from .api.exercises import router as exercises_router
-from .api.onboarding import router as onboarding_router
-from .claude import ClaudeClient
+from .api.templates import router as templates_router
+from .config import settings
 from .db import DatabaseManager, PostgresManager, init_postgres_schema
 from .db.analytics_cache import AnalyticsCacheManager
 from .extraction.exercise_matcher import ExerciseMatcher
 from .extraction.exercise_normalizer import normalize_exercises
-from .middleware import limiter, SecurityHeadersMiddleware, RequestLoggingMiddleware
+from .llm import LLMClient
+from .logging_config import configure_logging, get_logger
+from .middleware import RequestLoggingMiddleware, SecurityHeadersMiddleware, limiter
 from .storage import get_storage_backend
 from .storage.datastore import DataStore
 
@@ -57,7 +59,7 @@ async def lifespan(app: FastAPI):
         "application_starting",
         vault_path=str(settings.vault_path),
         data_path=str(settings.data_path),
-        claude_enabled=settings.claude_enabled,
+        llm_enabled=settings.llm_enabled,
         debug=settings.debug,
         mode="cloud" if settings.is_cloud_mode else "local",
     )
@@ -131,10 +133,10 @@ async def lifespan(app: FastAPI):
     app.state.datastore = DataStore(data_storage)
     app.state.analytics_cache_manager = analytics_cache_manager
 
-    # Initialize Claude client
-    claude = ClaudeClient()
-    app.state.claude = claude
-    logger.info("claude_client_initialized", configured=claude.is_configured)
+    # Initialize LLM client (supports Anthropic, OpenAI, Ollama, etc.)
+    llm = LLMClient()
+    app.state.claude = llm  # Keep attribute name for backward compat with API deps
+    logger.info("llm_client_initialized", configured=llm.is_configured, provider=llm.provider)
 
     # Initialize exercise matcher and run normalization
     from pathlib import Path
@@ -172,7 +174,7 @@ async def lifespan(app: FastAPI):
         await normalize_exercises(
             db=app.state.db,
             matcher=exercise_matcher,
-            claude=claude,
+            claude=llm,
             cache_path=settings.data_path / "ai_exercise_cache.json",
             user_settings_store=user_settings_store,
         )

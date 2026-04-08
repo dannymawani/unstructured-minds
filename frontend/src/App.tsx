@@ -89,11 +89,19 @@ function resolveDailyNotePath(template: string, date: Date): string {
     .replace(/\{DD\}/g, day) + '.md'
 }
 
+function useClerkLoaded(): boolean {
+  if (!CLERK_ENABLED) return true
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const { isLoaded } = useAuth()
+  return isLoaded
+}
+
 function App() {
   const navigate = useNavigate()
   const location = useLocation()
   const { theme, toggleTheme, setTheme } = useTheme()
-  const { isLoaded: clerkLoaded } = useAuth()
+  // useAuth is only safe inside ClerkProvider — use a safe wrapper when Clerk is disabled
+  const clerkLoaded = useClerkLoaded()
 
   // Fetch daily note path template from settings
   const [dailyNoteTemplate, setDailyNoteTemplate] = useState(DEFAULT_DAILY_NOTE_TEMPLATE)

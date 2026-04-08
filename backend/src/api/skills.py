@@ -1,6 +1,6 @@
 """Skills API endpoints."""
 
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
@@ -8,7 +8,6 @@ from pydantic import BaseModel
 from ..skills import SkillContext, SkillRegistry, get_default_registry
 from ..storage import StorageBackend
 from .dependencies import get_storage as _dep_get_storage
-
 
 router = APIRouter()
 
@@ -30,8 +29,8 @@ class SkillExecuteRequest(BaseModel):
     """Request to execute a skill."""
 
     skill: str
-    date: Optional[str] = None  # Optional date parameter (YYYY-MM-DD)
-    input: Optional[str] = None  # Optional user input
+    date: str | None = None  # Optional date parameter (YYYY-MM-DD)
+    input: str | None = None  # Optional user input
 
 
 class SkillExecuteResponse(BaseModel):
@@ -39,8 +38,8 @@ class SkillExecuteResponse(BaseModel):
 
     success: bool
     message: str
-    data: Optional[dict[str, Any]] = None
-    file_path: Optional[str] = None
+    data: dict[str, Any] | None = None
+    file_path: str | None = None
 
 
 def get_storage(request: Request) -> StorageBackend:

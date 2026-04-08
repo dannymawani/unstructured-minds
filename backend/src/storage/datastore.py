@@ -1,7 +1,7 @@
 """DataStore: JSON-aware wrapper around StorageBackend for config/data files."""
 
 import json
-from typing import Any, Optional
+from typing import Any
 
 from .base import StorageBackend
 
@@ -21,7 +21,7 @@ class DataStore:
         """Access the underlying StorageBackend."""
         return self._storage
 
-    async def read_json(self, path: str) -> Optional[dict[str, Any]]:
+    async def read_json(self, path: str) -> dict[str, Any] | None:
         """Read and parse a JSON file.
 
         Args:
@@ -46,7 +46,7 @@ class DataStore:
         content = json.dumps(data, indent=2, ensure_ascii=False).encode("utf-8")
         await self._storage.write(path, content)
 
-    async def read_bytes(self, path: str) -> Optional[bytes]:
+    async def read_bytes(self, path: str) -> bytes | None:
         """Read raw bytes from a file.
 
         Returns None instead of raising if file doesn't exist.

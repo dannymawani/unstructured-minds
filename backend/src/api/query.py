@@ -2,7 +2,7 @@
 
 import json
 import re
-from typing import Any, Optional
+from typing import Any
 
 import duckdb
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -11,10 +11,9 @@ from pydantic import BaseModel, Field
 from ..claude import ClaudeClient
 from ..db import DatabaseManager
 from ..middleware import limiter
-from .dependencies import get_analytics_db
 from ..middleware.rate_limit import RATE_LIMIT_CLAUDE_API
 from ..middleware.validation import MAX_QUERY_LENGTH
-
+from .dependencies import get_analytics_db
 
 router = APIRouter()
 
@@ -107,11 +106,11 @@ class QueryResponse(BaseModel):
     """Response from natural language query."""
 
     answer: str
-    sql: Optional[str] = None
-    data: Optional[list[dict[str, Any]]] = None
-    columns: Optional[list[str]] = None
+    sql: str | None = None
+    data: list[dict[str, Any]] | None = None
+    columns: list[str] | None = None
     row_count: int = 0
-    error: Optional[str] = None
+    error: str | None = None
 
 
 def get_db(request: Request):
@@ -250,7 +249,7 @@ async def natural_language_query(
     if not claude.is_configured:
         raise HTTPException(
             status_code=503,
-            detail="Claude API not configured. Set ANTHROPIC_API_KEY environment variable.",
+            detail="LLM not configured. Set LLM_API_KEY or ANTHROPIC_API_KEY.",
         )
 
     question = body.question.strip()
@@ -260,13 +259,13 @@ async def natural_language_query(
     try:
         # Step 1: Generate SQL from natural language
         # Safety rules go in system prompt (harder to override via prompt injection)
-        sql_response = await claude._call_with_retry(
+        sql_response = await claude.complete(
             model=claude.model_fast,
             max_tokens=1024,
             system=SQL_GENERATION_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": question}],
         )
-        raw_sql = sql_response.content[0].text.strip()
+        raw_sql = sql_response.text.strip()
 
         # Handle INVALID_QUERY response from Claude
         if raw_sql == "INVALID_QUERY" or raw_sql.startswith("INVALID_QUERY"):
@@ -322,13 +321,13 @@ async def natural_language_query(
         else:
             # Prepare results for formatting
             results_json = json.dumps(data[:20], indent=2, default=str)  # Limit context size
-            format_response = await claude._call_with_retry(
+            format_response = await claude.complete(
                 model=claude.model_fast,
                 max_tokens=1024,
                 system=RESPONSE_FORMATTING_SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": f"Question: {question}\n\nQuery results (as JSON):\n{results_json}"}],
             )
-            answer = format_response.content[0].text
+            answer = format_response.text
 
         return QueryResponse(
             answer=answer,

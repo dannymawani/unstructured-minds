@@ -1,7 +1,6 @@
 """Application configuration."""
 
 from pathlib import Path
-from typing import Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -38,12 +37,21 @@ class Settings(BaseSettings):
     # CORS
     cors_origins: str = "http://localhost:3000,http://localhost:5173"
 
-    # Claude API (optional)
-    anthropic_api_key: Optional[str] = None
+    # LLM provider (optional — app works without it, AI features disabled)
+    llm_provider: str | None = None  # anthropic, openai, ollama, etc.
+    llm_api_key: str | None = None
+    llm_model_fast: str | None = None
+    llm_model_smart: str | None = None
 
-    # Cloud mode: explicit flag + Postgres connection string
-    use_cloud: bool = True
-    database_url: Optional[str] = None
+    # Legacy: still works for backward compatibility
+    anthropic_api_key: str | None = None
+
+    # Storage mode: "local" (DuckDB) or "postgres"
+    storage_mode: str = "local"
+    database_url: str | None = None
+
+    # Legacy: USE_CLOUD=true still works (mapped in model_post_init)
+    use_cloud: bool | None = None
 
     # Postgres connection pool sizing
     db_pool_min: int = 2
@@ -51,13 +59,23 @@ class Settings(BaseSettings):
 
     # Azure managed identity (cloud mode only)
     azure_use_managed_identity: bool = False
-    azure_postgres_host: Optional[str] = None
+    azure_postgres_host: str | None = None
     azure_postgres_db: str = "unstructured_minds"
     azure_postgres_user: str = "um-backend"
 
-    # Auth (Clerk) — required for cloud mode, validated at request time
-    clerk_secret_key: Optional[str] = None
-    clerk_domain: Optional[str] = None  # e.g. "your-app.clerk.accounts.dev"
+    # Auth mode: "none" (default), "basic", or "clerk"
+    auth_mode: str = "none"
+    basic_auth_username: str | None = None
+    basic_auth_password: str | None = None
+
+    # Clerk auth (only when auth_mode=clerk)
+    clerk_secret_key: str | None = None
+    clerk_domain: str | None = None  # e.g. "your-app.clerk.accounts.dev"
+
+    def model_post_init(self, __context: object) -> None:
+        """Handle backward compat: USE_CLOUD=true → storage_mode=postgres."""
+        if self.use_cloud is True and self.storage_mode == "local":
+            object.__setattr__(self, "storage_mode", "postgres")
 
     @property
     def use_token_auth(self) -> bool:
@@ -66,13 +84,17 @@ class Settings(BaseSettings):
 
     @property
     def is_cloud_mode(self) -> bool:
-        """True when USE_CLOUD=true and DATABASE_URL or managed identity is set."""
-        return self.use_cloud and (self.database_url is not None or self.use_token_auth)
+        """True when storage_mode=postgres and a database connection is available."""
+        return self.storage_mode == "postgres" and (self.database_url is not None or self.use_token_auth)
 
     @property
     def auth_enabled(self) -> bool:
-        """Auth is always enabled in cloud mode, always disabled in local mode."""
-        return self.is_cloud_mode
+        """Auth is enabled when auth_mode is not 'none', or in cloud mode for backward compat."""
+        if self.auth_mode != "none":
+            return True
+        if self.is_cloud_mode and self.clerk_secret_key:
+            return True
+        return False
 
     @property
     def duckdb_path(self) -> Path:
@@ -80,9 +102,14 @@ class Settings(BaseSettings):
         return self.data_path / "unstructured.duckdb"
 
     @property
+    def llm_enabled(self) -> bool:
+        """Check if any LLM provider is configured."""
+        return bool(self.llm_api_key or self.anthropic_api_key or self.llm_provider == "ollama")
+
+    @property
     def claude_enabled(self) -> bool:
-        """Check if Claude API is configured."""
-        return self.anthropic_api_key is not None
+        """Backward compat alias."""
+        return self.llm_enabled
 
 
 settings = Settings()

@@ -2,7 +2,7 @@
 
 import json
 from collections.abc import AsyncGenerator
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -11,12 +11,13 @@ from sse_starlette.sse import EventSourceResponse
 from ..claude import ClaudeClient
 from ..db import DatabaseManager
 from ..extraction import ExtractionPipeline
-from .dependencies import get_db as _dep_get_db, get_storage as _dep_get_storage, get_user_id
-from ..middleware import limiter, validate_file_path, PathValidationError
+from ..middleware import PathValidationError, limiter, validate_file_path
 from ..middleware.rate_limit import RATE_LIMIT_EXTRACTION
 from ..middleware.validation import MAX_FILE_PATH_LENGTH
 from ..storage import StorageBackend
-
+from .dependencies import get_db as _dep_get_db
+from .dependencies import get_storage as _dep_get_storage
+from .dependencies import get_user_id
 
 router = APIRouter()
 
@@ -26,7 +27,7 @@ class ExtractRequest(BaseModel):
 
     file_path: str = Field(..., max_length=MAX_FILE_PATH_LENGTH)
     force: bool = False  # Force re-extraction even if already processed
-    schema_name: Optional[str] = Field(
+    schema_name: str | None = Field(
         None,
         max_length=50,
         description="Schema name to use for extraction (default: combined)",
@@ -39,15 +40,15 @@ class ExtractResponse(BaseModel):
     success: bool
     file_path: str
     message: str
-    records_inserted: Optional[dict[str, int]] = None
-    data: Optional[dict[str, Any]] = None
+    records_inserted: dict[str, int] | None = None
+    data: dict[str, Any] | None = None
 
 
 class ExtractAllRequest(BaseModel):
     """Request to extract all files in the vault."""
 
     force: bool = True  # Default true — this is for recovery
-    schema_name: Optional[str] = None
+    schema_name: str | None = None
     exclude_prefixes: list[str] = ["Templates/"]
 
 
@@ -56,7 +57,7 @@ class ExtractBatchRequest(BaseModel):
 
     file_paths: list[str] = Field(..., max_length=50)  # Limit batch size
     force: bool = False
-    schema_name: Optional[str] = Field(
+    schema_name: str | None = Field(
         None,
         max_length=50,
         description="Schema name to use for extraction (default: combined)",

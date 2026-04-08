@@ -125,23 +125,11 @@ docs/azure_migration_plan.md
 
 ## Cost Checklist
 
-### Free Tier Tracking
+### Self-Hosted Cost Controls
 
-| Resource | Free Period | Post-Free Cost | Action |
-|----------|------------|----------------|--------|
-| PostgreSQL Flexible Server B1ms | 12 months | ~$15/mo | Set calendar reminder at month 11; evaluate Neon/Supabase fallback |
-| Container Registry Basic | 12 months | ~$5/mo | Evaluate if still needed or switch to GitHub Container Registry (free) |
-| Container Apps Consumption | Always free (180K vCPU-sec/mo) | Overage: ~$0.000012/vCPU-sec | Monitor usage, keep max_replicas low |
-| Static Web Apps Free | Always free | N/A | No action needed |
-| Terraform state storage | ~$0.02/GB/mo | Same | Negligible |
-
-### Cost Controls
-
-- [ ] **Azure budget alert**: Create budget with alert at 80% and 100% thresholds
-- [ ] **Container Apps max_replicas**: Set to minimum needed (2 is fine for 10 users)
-- [ ] **Container Apps min_replicas=0**: Scale to zero when idle (saves vCPU-seconds)
-- [ ] **ACR retention policy**: Auto-delete untagged images older than 7 days
-- [ ] **Claude API per-user limits**: Backend enforces daily/monthly token limits per user
+- [ ] **LLM API limits**: Consider per-user daily/monthly token limits if multi-user
+- [ ] **Docker resource limits**: Set memory/CPU limits in docker-compose for production
+- [ ] **Postgres connection pooling**: Use `db_pool_min`/`db_pool_max` settings appropriately
 - [ ] **No auto-scaling surprises**: Review scaling rules, set hard maximums
 - [ ] **Resource tagging**: All resources tagged with `tier` (free, free-12mo, paid) for cost visibility
 - [ ] **Monthly cost review**: Check Azure Cost Management dashboard monthly

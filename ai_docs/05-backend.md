@@ -31,10 +31,13 @@ backend/
 │   ├── storage/
 │   │   ├── local.py         # LocalFilesystem backend
 │   │   └── postgres.py      # PostgresStorage backend
+│   ├── llm/
+│   │   └── client.py        # Provider-agnostic LLM client (via LiteLLM)
 │   ├── claude/
-│   │   └── client.py        # Anthropic SDK wrapper
+│   │   └── __init__.py      # Backward-compat alias → llm.LLMClient
 │   ├── middleware/
-│   │   ├── clerk_auth.py    # JWT verification
+│   │   ├── clerk_auth.py    # JWT verification (Clerk auth mode)
+│   │   ├── basic_auth.py    # HTTP Basic Auth (basic auth mode)
 │   │   ├── rate_limit.py    # slowapi
 │   │   ├── security_headers.py # CSP, X-Frame-Options
 │   │   ├── request_logging.py  # structlog JSON
@@ -64,13 +67,16 @@ get_user_id(req)      → "local" or uuid5(NAMESPACE_URL, clerk_sub)
 ```python
 class Settings(BaseSettings):
     vault_path, data_path, host, port, debug, cors_origins
-    anthropic_api_key, use_cloud, database_url
-    db_pool_min, db_pool_max
+    llm_provider, llm_api_key, llm_model_fast, llm_model_smart
+    anthropic_api_key  # legacy compat
+    storage_mode, database_url, db_pool_min, db_pool_max
+    auth_mode  # none / basic / clerk
+    basic_auth_username, basic_auth_password
     clerk_secret_key, clerk_domain
 
-    @property is_cloud_mode: use_cloud AND database_url is not None
-    @property auth_enabled: is_cloud_mode
-    @property claude_enabled: anthropic_api_key is not None
+    @property is_cloud_mode: storage_mode == "postgres" AND database_url is not None
+    @property auth_enabled: auth_mode != "none" OR (is_cloud_mode AND clerk_secret_key)
+    @property llm_enabled: llm_api_key OR anthropic_api_key is not None
 ```
 
 `LOCAL_USER_ID = "local"` — hardcoded, non-configurable.

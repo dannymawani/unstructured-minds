@@ -1,13 +1,4 @@
 # Deploy Landing Page to Cloudflare Pages
-#
-# Setup steps:
-#   1. Create a Cloudflare Pages project named "unstructured-minds-landing"
-#      (can be done via the first deploy or manually in the Cloudflare dashboard)
-#   2. Add CLOUDFLARE_API_TOKEN secret in GitHub repo settings
-#      (create an API token with Cloudflare Pages edit permission)
-#   3. Add CLOUDFLARE_ACCOUNT_ID secret in GitHub repo settings
-#      (found in your Cloudflare dashboard URL: dash.cloudflare.com/<account-id>)
-#   4. Point custom domain in Cloudflare Pages settings after the first deploy
 
 name: Deploy Landing Page
 

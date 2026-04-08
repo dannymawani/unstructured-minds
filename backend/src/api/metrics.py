@@ -1,6 +1,6 @@
 """Metrics API endpoint for observability."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
@@ -65,7 +65,7 @@ async def get_request_metrics(user_id: str = Depends(get_user_id)) -> MetricsRes
     )
 
     return MetricsResponse(
-        timestamp=datetime.now(timezone.utc).isoformat(),
+        timestamp=datetime.now(UTC).isoformat(),
         total_requests=data["total_requests"],
         requests_by_method=data["requests_by_method"],
         requests_by_status=data["requests_by_status"],

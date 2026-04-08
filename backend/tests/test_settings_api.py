@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 @pytest.fixture
 def test_settings(tmp_path: Path):
     """Create test settings with temp paths."""
-    with patch("src.config.Settings") as mock_settings_cls:
+    with patch("src.config.Settings"):
         mock_settings = MagicMock()
         mock_settings.vault_path = tmp_path / "vault"
         mock_settings.data_path = tmp_path / "data"
@@ -50,7 +50,7 @@ class TestGetSettings:
         data = response.json()
         assert "vault_path" in data
         assert "data_path" in data
-        assert "claude_enabled" in data
+        assert "llm_enabled" in data
         assert "api_key_set" in data
 
     def test_api_key_not_exposed(self, client):
