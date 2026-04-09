@@ -103,15 +103,3 @@ After **structural changes**, update the relevant `ai_docs/` file. Structural ch
 
 **Skip updates for:** Bug fixes, CSS tweaks, copy changes, test additions, or refactors that don't change the public interface.
 
-## Decision Logging
-
-When making significant architectural decisions, append to [10-decisions-log](10-decisions-log.md) using this format:
-
-```markdown
-### YYYY-MM-DD: Decision Title
-
-**Context:** Why this decision was needed
-**Decision:** What was decided
-**Alternatives:** What else was considered
-**Outcome:** Impact on the codebase
-```

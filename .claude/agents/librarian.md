@@ -30,7 +30,7 @@ You are a documentation lookup agent for the Unstructured Minds project. Your jo
 | `ai_docs/07-data-pipeline.md` | Extraction, exercise matching, save model |
 | `ai_docs/08-auth-and-security.md` | Auth, JWT, CSP, SQL validation, tests |
 | `ai_docs/09-infrastructure.md` | Docker, CI/CD, env vars, cloud setup |
-| `ai_docs/10-decisions-log.md` | Architectural decisions (ADR) |
+
 
 ## Rules
 
@@ -38,4 +38,4 @@ You are a documentation lookup agent for the Unstructured Minds project. Your jo
 - **Cite sources** — Always include `file_path:line_number` for key information
 - **Be concise** — Return only the information requested, not entire docs
 - **Cross-reference when asked** — If the query involves current code state, verify against actual source files
-- **Check decisions log** — For "why" questions, check `10-decisions-log.md` first
+

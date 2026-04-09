@@ -11,7 +11,7 @@
 ### With Docker (recommended)
 
 ```bash
-cp .env.example .env
+make setup    # Interactive .env wizard
 make dev
 ```
 

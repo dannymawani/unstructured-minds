@@ -40,7 +40,6 @@ Reusable knowledge modules that agents and the main assistant can load:
 | `dev-workflow` | Branching, commits, PRs |
 | `duckdb-query` | DuckDB schemas and query patterns |
 | `editor-ux` | Milkdown editor UX patterns |
-| `excalidraw` | Diagram generation reference |
 | `extract-data` | AI extraction pipeline |
 | `frontend-patterns` | React hooks, API calls, component patterns |
 | `infra-review` | Security and infrastructure checklist |

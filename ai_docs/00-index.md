@@ -15,13 +15,13 @@ Centralized, Claude-optimized documentation for Unstructured Minds. Each doc is 
 | [07-data-pipeline](07-data-pipeline.md) | Extraction flow, exercise matching, AI classification, save model | Modifying extraction, save triggers, or exercise matching |
 | [08-auth-and-security](08-auth-and-security.md) | Clerk auth, JWT flow, CSP, SQL validation, testing auth bypass | Touching auth, security headers, or writing tests |
 | [09-infrastructure](09-infrastructure.md) | Docker, CI/CD, env vars, cloud setup, backup/restore, LAN access | Changing Docker config, deploying, or setting up environments |
-| [10-decisions-log](10-decisions-log.md) | Architectural decisions (ADR format, append-only) | Making or reviewing significant architectural choices |
+
 
 ## How to Use
 
 1. **Start here** — scan the table above to find the right doc
 2. **Read one doc** — each is self-contained with cross-references where needed
-3. **Check decisions log** — before proposing architectural changes, check if it was already decided
+
 4. **Update after changes** — when making structural changes, update the relevant doc(s)
 
 ## Relationship to Other Documentation

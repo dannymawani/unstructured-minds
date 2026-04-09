@@ -126,13 +126,14 @@ All run from `backend/` directory:
 1. Get Mac IP: `ipconfig getifaddr en0`
 2. Set in `.env`:
    ```
-   VITE_API_URL=http://192.168.x.x:8000
-   CORS_ORIGINS=http://localhost:3000,http://localhost:5173,http://192.168.x.x:5173
+   CORS_ORIGINS=http://localhost:3000,http://192.168.x.x:3000
    ```
-3. Restart containers
-4. Open `http://192.168.x.x:5173` on device
+3. Restart containers: `docker compose up -d`
+4. Open `http://192.168.x.x:3000` on device
 
 **Security:** Unencrypted HTTP — only use on trusted private network. Disable when done.
+
+For persistent remote access, use Tailscale instead. See `docs/LAN_AND_TAILSCALE_ACCESS.md`.
 
 ## Shell / Environment Notes
 

@@ -4,37 +4,51 @@ Security overview and guidelines for the Unstructured Minds application.
 
 ## Architecture Overview
 
-Unstructured Minds is a **local-first, single-user application**. It is designed to run on a user's own machine or private network. There is no multi-user authentication system because the threat model assumes the operator is the sole user.
+Unstructured Minds is a **local-first application** designed to run on a user's own machine or private network. It supports three authentication modes (`none`, `basic`, `clerk`) to accommodate different deployment scenarios -- from single-user local use to multi-user cloud deployments.
 
-All data stays local -- notes live on disk, extracted data lives in a local DuckDB file, and the only external communication is with the Anthropic API for AI features.
+In local mode, all data stays on your machine -- notes live on disk, extracted data lives in a local DuckDB file, and the only external communication is with your configured LLM provider (Anthropic, OpenAI, Ollama, etc.) for AI features.
+
+## Authentication
+
+| Mode | How it works | Multi-user |
+|------|-------------|------------|
+| `none` (default) | No auth. Single implicit user. | No |
+| `basic` | HTTP Basic Auth (username/password from env vars) | No |
+| `clerk` | Clerk JWT verification, per-user data isolation | Yes |
+
+See [`docs/AUTH.md`](./AUTH.md) for full setup instructions.
 
 ## Security Measures
 
-### Read-Only SQL Validation
+### Read-Only SQL Validation (Defense-in-Depth)
 
-All natural language queries are translated to SQL by Claude and then validated before execution. The validation layer enforces:
+Natural language queries are translated to SQL by the LLM and validated through 4 layers before execution:
 
-- Queries must begin with `SELECT` or `WITH` (CTEs).
-- Dangerous keywords are blocked: `INSERT`, `UPDATE`, `DELETE`, `DROP`, `TRUNCATE`, `ALTER`, `CREATE`, `GRANT`, `REVOKE`, `EXEC`, `EXECUTE`, `ATTACH`, `DETACH`, `COPY`, `LOAD`, `INSTALL`, `PRAGMA`, `CALL`, `SET`, `EXPLAIN`.
-- Multiple statements (semicolons mid-query) are rejected.
-- Results are capped at 100 rows.
+1. **System prompt separation** -- SQL generation uses isolated system prompts with anti-injection rules
+2. **`validate_sql()`** -- Keyword deny-list, function deny-list, system table blocking, DuckDB parser (exactly 1 statement)
+3. **`read_only_execute()`** -- Wraps in `BEGIN TRANSACTION` / `ROLLBACK`, materializes results before rollback
+4. **Auto LIMIT 100** on all results
+
+Blocked keywords include: `INSERT`, `UPDATE`, `DELETE`, `DROP`, `TRUNCATE`, `ALTER`, `CREATE`, `GRANT`, `REVOKE`, `EXEC`, `EXECUTE`, `ATTACH`, `DETACH`, `COPY`, `LOAD`, `INSTALL`, `PRAGMA`, `CALL`, `SET`, `EXPLAIN`.
 
 ### Rate Limiting
 
-All API endpoints are rate-limited using slowapi to prevent abuse:
+All API endpoints are rate-limited using slowapi:
 
-- Claude API endpoints have stricter limits to control costs.
-- Search endpoints are rate-limited to prevent excessive file system reads.
-- Standard CRUD endpoints have generous but bounded limits.
+- LLM-calling endpoints: 20-30/min (controls costs)
+- Search endpoints: 100/min
+- Export/Import: 5/min
+- Standard CRUD: generous but bounded
 
 ### CORS
 
-Cross-Origin Resource Sharing is configured to allow only specific origins. By default, only `http://localhost:3000` and `http://localhost:5173` are permitted. Origins are configurable via the `CORS_ORIGINS` environment variable.
+Cross-Origin Resource Sharing is configured to allow only specific origins. By default, only `http://localhost:3000` and `http://localhost:5173` are permitted. Configurable via `CORS_ORIGINS` environment variable. Never use wildcards.
 
 ### Security Headers
 
-A custom middleware adds security headers to every response:
+Defined in `frontend/nginx/security-headers.conf` (single source of truth):
 
+- Content-Security-Policy (CSP)
 - `X-Content-Type-Options: nosniff`
 - `X-Frame-Options: DENY`
 - `X-XSS-Protection: 1; mode=block`
@@ -44,23 +58,26 @@ A custom middleware adds security headers to every response:
 
 All API request bodies are validated using Pydantic models with:
 
-- Maximum length constraints on query strings and text inputs.
-- Type validation on all fields.
-- Field-level constraints (min/max values, allowed patterns).
+- Maximum length constraints on query strings and text inputs
+- Type validation on all fields
+- Field-level constraints (min/max values, allowed patterns)
+- Path traversal prevention (no `..` in file paths)
 
 ## Known Limitations
 
-- **No authentication.** This is a single-user local application. If you expose the API to a network, anyone with access can read and modify your data.
 - **No encryption at rest.** The DuckDB database and vault files are stored as plain files on disk. Use full-disk encryption (FileVault, LUKS, BitLocker) if this is a concern.
-- **API key in environment.** The Anthropic API key is stored in an environment variable or `.env` file. It is not encrypted.
+- **API key in environment.** LLM API keys are stored in environment variables or `.env` file. They are not encrypted.
+- **Basic auth password in plaintext.** The `BASIC_AUTH_PASSWORD` env var is not hashed. Suitable for Tailscale/private network, not for internet-facing deployments.
+- **No HTTPS by default.** Use Tailscale (WireGuard encryption) or place behind a TLS-terminating reverse proxy.
 
 ## Deployment Checklist
 
-1. **Set the API key securely.** Use environment variables or Docker secrets rather than committing the key to source control. Never check `.env` files into git.
-2. **Configure CORS for production.** Set `CORS_ORIGINS` to the exact origin(s) your frontend is served from. Do not use wildcards.
-3. **Use Docker for isolation.** Running the application in containers provides process-level isolation and limits file system access.
-4. **Do not expose ports to the public internet.** This application is designed for local or private network use. If you must expose it, place it behind a reverse proxy with authentication (e.g., nginx with basic auth or an OAuth proxy).
-5. **Keep dependencies updated.** Regularly update Python packages and Docker base images to pick up security patches.
+1. **Set API keys securely.** Use environment variables or Docker secrets. Never commit `.env` files to git.
+2. **Configure CORS for production.** Set `CORS_ORIGINS` to exact origin(s). No wildcards.
+3. **Use Docker for isolation.** Containers provide process-level isolation and limit file system access.
+4. **Do not expose ports to the public internet.** Use Tailscale for remote access, or place behind a reverse proxy with authentication.
+5. **Keep dependencies updated.** Regularly update Python packages and Docker base images.
+6. **Enable authentication.** Use at minimum `AUTH_MODE=basic` when exposing over any network.
 
 ## Reporting Security Issues
 

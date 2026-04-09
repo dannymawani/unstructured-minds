@@ -37,7 +37,6 @@ For detailed reference beyond these essentials, see the **`ai_docs/`** wiki. Sta
 | `07-data-pipeline` | Extraction flow, exercise matching, AI classification |
 | `08-auth-and-security` | Auth modes (none/basic/clerk), CSP, SQL validation, test auth bypass |
 | `09-infrastructure` | Docker, env vars, cloud setup, backup, LAN access |
-| `10-decisions-log` | Architectural decisions (ADR, append-only) |
 
 ## Testing
 
@@ -76,17 +75,3 @@ One change at a time. Verify no regressions before the next edit.
 ## Keeping Documentation Current
 
 After **structural changes**, update the relevant `ai_docs/` file and the `system-architecture` skill. See `ai_docs/03-development-workflow.md` for what counts as structural.
-
-For significant architectural decisions, append to `ai_docs/10-decisions-log.md`.
-
-## Ideas Bank → `ideas/`
-
-Future plans and feature ideas live in `ideas/`. Each idea gets its own `.md` file with status, rationale, and phased implementation notes.
-
-| Idea | Summary |
-|------|---------|
-| `multimodal-content-support` | Image paste, PDF upload, vision-based extraction, binary storage |
-
----
-
-Skills and agents auto-discovered from `.claude/skills/` and `.claude/agents/`.

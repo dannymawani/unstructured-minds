@@ -214,7 +214,7 @@ Access from your phone, tablet, or anywhere — encrypted, no port forwarding ne
 2. Add your Tailscale hostname to `CORS_ORIGINS` in `.env`
 3. Open `http://your-hostname:3000` from any device on your tailnet
 
-See [`docs/LAN_ACCESS.md`](./docs/LAN_ACCESS.md) for full setup including LAN-only access.
+See [`docs/LAN_AND_TAILSCALE_ACCESS.md`](./docs/LAN_AND_TAILSCALE_ACCESS.md) for full setup including LAN and Tailscale access.
 
 ## Documentation
 
@@ -223,7 +223,6 @@ See [`docs/LAN_ACCESS.md`](./docs/LAN_ACCESS.md) for full setup including LAN-on
 | [`.env.example`](./.env.example) | All configuration options, fully commented |
 | [`CLAUDE.md`](./CLAUDE.md) | Development guide and project context |
 | [`ai_docs/`](./ai_docs/) | Deep technical reference (architecture, schemas, pipelines) |
-| [`docs/tech-stack.md`](./docs/tech-stack.md) | Technology choices and rationale |
 | [`docs/SECURITY.md`](./docs/SECURITY.md) | Security architecture and checklist |
 | [`CONTRIBUTING.md`](./CONTRIBUTING.md) | Contribution guidelines |
 | [`SUPPORT.md`](./SUPPORT.md) | Getting help and common issues |
@@ -235,7 +234,7 @@ We welcome contributions! See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for guideli
 
 ```bash
 # Fork, clone, branch
-git checkout -b feature/your-feature
+git switch -c feature/your-feature
 
 # Make changes, test
 make test

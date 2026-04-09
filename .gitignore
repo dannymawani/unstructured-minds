@@ -82,6 +82,7 @@ logs/
 # Temporary
 tmp/
 temp/
+.tmp/
 *.tmp
 
 # Claude Code worktrees
