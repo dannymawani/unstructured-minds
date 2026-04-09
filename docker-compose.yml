@@ -46,6 +46,10 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: unstructured-minds-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
     ports:
       - "8000:8000"
     volumes:
@@ -55,29 +59,13 @@ services:
       - ${DATA_PATH:-./data}:/app/data:rw
       # Uncomment for hot reload (DEBUG=true auto-enables --reload)
       # - ./backend/src:/app/src:ro
+    env_file: .env
     environment:
-      # AI (optional — app works without it)
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-      - LLM_PROVIDER=${LLM_PROVIDER:-}
-      - LLM_API_KEY=${LLM_API_KEY:-}
-      - LLM_MODEL_FAST=${LLM_MODEL_FAST:-}
-      - LLM_MODEL_SMART=${LLM_MODEL_SMART:-}
-      # Storage mode
-      - STORAGE_MODE=${STORAGE_MODE:-local}
-      - DATABASE_URL=${DATABASE_URL:-}
-      # Paths
+      # Fixed container paths (override .env values)
       - VAULT_PATH=/app/vault
       - DATA_PATH=/app/data
-      # Server
       - HOST=0.0.0.0
       - PORT=8000
-      - DEBUG=${DEBUG:-false}
-      # Auth (optional)
-      - AUTH_MODE=${AUTH_MODE:-none}
-      - BASIC_AUTH_USERNAME=${BASIC_AUTH_USERNAME:-}
-      - BASIC_AUTH_PASSWORD=${BASIC_AUTH_PASSWORD:-}
-      - CLERK_SECRET_KEY=${CLERK_SECRET_KEY:-}
-      - CLERK_DOMAIN=${CLERK_DOMAIN:-}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s

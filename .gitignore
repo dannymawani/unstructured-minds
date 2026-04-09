@@ -51,8 +51,8 @@ frontend/build/
 
 # Environment
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 
 # Data — runtime data (schemas and exercise defs live in shared/)
 data/
