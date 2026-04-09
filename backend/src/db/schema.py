@@ -1,8 +1,92 @@
 """DuckDB schema definitions."""
 
+import logging
 from pathlib import Path
 
 import duckdb
+
+logger = logging.getLogger(__name__)
+
+# Tables that need migration from Postgres-style schema (with user_id) to DuckDB schema.
+_PG_MIGRATION_TABLES = [
+    "daily_metrics", "activities", "exercise_log", "food_log", "tasks", "extraction_log",
+]
+
+# All known index names (DuckDB + Postgres) that may exist on affected tables.
+_ALL_INDEX_NAMES = [
+    # DuckDB indexes from _create_indexes()
+    "idx_exercise_date", "idx_metrics_date", "idx_extraction_path", "idx_food_date",
+    "idx_tasks_date", "idx_tasks_status", "idx_kanban_status", "idx_kanban_phase",
+    "idx_activities_date", "idx_activities_type", "idx_exercise_name_date",
+    "idx_tasks_date_status", "idx_activities_date_type", "idx_food_date_type",
+    # Postgres indexes that may have been created in DuckDB file
+    "idx_pg_exercise_date", "idx_pg_metrics_date", "idx_pg_extraction_path",
+    "idx_pg_food_date", "idx_pg_tasks_date", "idx_pg_tasks_status",
+    "idx_pg_kanban_status", "idx_pg_kanban_phase", "idx_pg_activities_date",
+    "idx_pg_activities_type", "idx_pg_kanban_updates_task", "idx_pg_vault_files_updated",
+    "idx_pg_exercise_name_date", "idx_pg_tasks_date_status",
+    "idx_pg_activities_date_type", "idx_pg_food_date_type",
+]
+
+# Column lists for copying data from Postgres-style tables (excludes user_id).
+_PG_MIGRATION_COLUMNS = {
+    "daily_metrics": "date, sleep_hours, sleep_quality, energy, mood, stress, weight_kg, notes, source_file, extracted_at",
+    "activities": "id, date, activity_type, duration_minutes, notes, source_file, extracted_at",
+    "exercise_log": "id, activity_id, date, exercise_name, weight_kg, reps, set_number, duration_minutes, distance_km, notes, source_file, extracted_at",
+    "food_log": "id, date, meal_type, time, description, calories, protein_g, carbs_g, fat_g, notes, source_file, extracted_at",
+    "tasks": "id, date, description, status, completed_at, category, priority, source_file, deadline, notes, extracted_at",
+    # extraction_log: omit id (let sequence assign) and user_id
+    "extraction_log": "file_path, file_hash, extracted_at, success, error_message",
+}
+
+
+def _prepare_postgres_migration(conn: duckdb.DuckDBPyConnection) -> bool:
+    """Detect and prepare migration from Postgres-style DuckDB tables.
+
+    If the DuckDB file was originally created under Postgres mode, tables
+    will have user_id columns and composite/missing primary keys. This
+    function renames those tables so the normal CREATE TABLE IF NOT EXISTS
+    statements can recreate them with correct single-column PKs.
+
+    Returns True if migration is needed (tables were renamed).
+    """
+    # Detection: check if daily_metrics exists and has a user_id column
+    try:
+        rows = conn.execute("PRAGMA table_info('daily_metrics')").fetchall()
+    except duckdb.CatalogException:
+        return False  # Table doesn't exist yet (fresh database)
+    if not rows:
+        return False
+    cols = [row[1] for row in rows]
+    if "user_id" not in cols:
+        return False  # Already has correct DuckDB schema
+
+    logger.info("Detected Postgres-style DuckDB tables — starting migration")
+
+    # Drop all known indexes so renamed tables don't hold stale index names
+    for idx in _ALL_INDEX_NAMES:
+        conn.execute(f"DROP INDEX IF EXISTS {idx}")
+
+    # Rename affected tables
+    for table in _PG_MIGRATION_TABLES:
+        conn.execute(f"ALTER TABLE {table} RENAME TO {table}_pg_old")
+
+    # Drop sequence so it gets recreated fresh
+    conn.execute("DROP SEQUENCE IF EXISTS extraction_log_id_seq")
+
+    return True
+
+
+def _finish_postgres_migration(conn: duckdb.DuckDBPyConnection) -> None:
+    """Copy data from renamed Postgres-style tables and drop them."""
+    for table in _PG_MIGRATION_TABLES:
+        cols = _PG_MIGRATION_COLUMNS[table]
+        conn.execute(f"INSERT INTO {table} ({cols}) SELECT {cols} FROM {table}_pg_old")
+        count = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+        conn.execute(f"DROP TABLE {table}_pg_old")
+        logger.info("Migrated table %s (%d rows)", table, count)
+
+    logger.info("Postgres-to-DuckDB migration complete")
 
 
 def init_database(db_path: Path | str) -> duckdb.DuckDBPyConnection:
@@ -15,6 +99,9 @@ def init_database(db_path: Path | str) -> duckdb.DuckDBPyConnection:
         DuckDB connection
     """
     conn = duckdb.connect(str(db_path))
+
+    # Phase 1: Detect and prepare Postgres-style table migration
+    migrating = _prepare_postgres_migration(conn)
 
     # Activities table (workouts, sessions)
     conn.execute("""
@@ -203,6 +290,10 @@ def init_database(db_path: Path | str) -> duckdb.DuckDBPyConnection:
             error_message VARCHAR
         )
     """)
+
+    # Phase 2: Complete Postgres migration — copy data, drop old tables
+    if migrating:
+        _finish_postgres_migration(conn)
 
     # Create indexes for performance optimization
     # These significantly speed up common queries on large datasets

@@ -323,7 +323,7 @@ async def write_file(
                         except Exception:
                             pass  # Demo cleanup failure shouldn't fail the save
             except Exception:
-                pass  # Extraction failure shouldn't fail the save
+                logger.exception("extraction_failed path=%s", body.path)
 
             # Add "also worked on" reference for non-daily-note files
             if not _is_daily_note_path(body.path):
